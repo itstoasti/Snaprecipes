@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snap Recipes - Save Any Recipe Instantly</title>
+    <meta name="description" content="Snap a photo or paste a link. Snap Recipes extracts and organizes recipes from anywhere. Never lose a recipe again.">
+    <meta name="theme-color" content="#0a0a0f">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Snap Recipes - Save Any Recipe Instantly">
+    <meta property="og:description" content="Snap a photo or paste a link. Snap Recipes extracts and organizes recipes from anywhere.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="/icon.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/icon.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        surface: {
+                            950: '#0a0a0f',
+                            900: '#12121a',
+                            800: '#1a1a24',
+                            700: '#252530',
+                            600: '#32323f',
+                            500: '#5c5c6d',
+                            400: '#8b8b9a',
+                        },
+                        accent: {
+                            DEFAULT: '#FF6B35',
+                            light: '#FF8C5A',
+                            dark: '#E55A28',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'float-delayed': 'float 6s ease-in-out 2s infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'slide-up': 'slideUp 0.6s ease-out forwards',
+                        'fade-in': 'fadeIn 0.8s ease-out forwards',
+                        'scale-in': 'scaleIn 0.5s ease-out forwards',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(1deg); }
+        }
+        @keyframes glow {
+            from { box-shadow: 0 0 30px rgba(255, 107, 53, 0.3); }
+            to { box-shadow: 0 0 50px rgba(255, 107, 53, 0.5); }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #FF6B35 0%, #FF8C5A 50%, #FFB088 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glass {
+            background: rgba(18, 18, 26, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .gradient-border {
+            position: relative;
+            background: linear-gradient(135deg, rgba(255,107,53,0.08) 0%, rgba(255,107,53,0.02) 100%);
+        }
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(255,107,53,0.4) 0%, rgba(255,107,53,0.05) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+
+        .recipe-card {
+            background: linear-gradient(145deg, #12121a 0%, #0a0a0f 100%);
+            box-shadow:
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255,255,255,0.05);
+        }
+
+        .phone-mockup {
+            background: linear-gradient(145deg, #1a1a24 0%, #12121a 100%);
+            border: 3px solid #252530;
+            border-radius: 3rem;
+            box-shadow:
+                0 50px 100px -20px rgba(0, 0, 0, 0.6),
+                0 30px 60px -30px rgba(255, 107, 53, 0.15),
+                inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: #32323f; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #5c5c6d; }
+
+        .food-grid-item {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .food-grid-item:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 30px 60px -15px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body class="bg-surface-950 text-white font-sans antialiased">
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass border-b border-surface-800/50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <a href="/" class="flex items-center gap-3">
+                    <img src="icon.png" alt="Snap Recipes" class="w-10 h-10 rounded-xl shadow-lg">
+                    <span class="text-xl font-bold">Snap Recipes</span>
+                </a>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="#features" class="text-surface-400 hover:text-white transition-colors">Features</a>
+                    <a href="#how-it-works" class="text-surface-400 hover:text-white transition-colors">How It Works</a>
+                    <a href="#pricing" class="text-surface-400 hover:text-white transition-colors">Pricing</a>
+                </div>
+                <a href="#download" class="hidden md:inline-flex px-5 py-2.5 bg-accent hover:bg-accent-light rounded-full font-semibold text-sm transition-all hover:shadow-lg hover:shadow-accent/25 hover:-translate-y-0.5">
+                    Download Free
+                </a>
+                <button class="md:hidden text-white" id="mobile-menu-btn">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="fixed inset-0 z-40 glass hidden">
+        <div class="flex flex-col items-center justify-center h-full gap-8 text-2xl">
+            <a href="#features" class="text-white hover:text-accent transition-colors">Features</a>
+            <a href="#how-it-works" class="text-white hover:text-accent transition-colors">How It Works</a>
+            <a href="#pricing" class="text-white hover:text-accent transition-colors">Pricing</a>
+            <a href="#download" class="px-8 py-3 bg-accent rounded-full font-semibold">Download</a>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="relative min-h-screen flex items-center overflow-hidden pt-20">
+        <!-- Background -->
+        <div class="absolute inset-0">
+            <div class="absolute top-20 left-10 w-72 h-72 bg-accent/20 rounded-full blur-[120px]"></div>
+            <div class="absolute bottom-20 right-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-[150px]"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[200px]"></div>
+        </div>
+
+        <div class="relative max-w-7xl mx-auto px-6 py-20 w-full">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <!-- Text -->
+                <div class="text-center lg:text-left">
+                    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-900/80 border border-surface-700 text-sm text-surface-400 mb-8" style="animation: fadeIn 0.6s ease-out 0.2s forwards; opacity: 0;">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Now available on Android
+                    </div>
+
+                    <h1 class="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] mb-6" style="animation: slideUp 0.6s ease-out 0.3s forwards; opacity: 0;">
+                        Save Any Recipe
+                        <span class="gradient-text block">Instantly</span>
+                    </h1>
+
+                    <p class="text-xl text-surface-400 mb-10 max-w-lg mx-auto lg:mx-0" style="animation: slideUp 0.6s ease-out 0.4s forwards; opacity: 0;">
+                        Snap a photo, paste a link, or share from any app. We extract the recipe and ditch the 10-page life stories. Just clean, beautiful recipes.
+                    </p>
+
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start" style="animation: slideUp 0.6s ease-out 0.5s forwards; opacity: 0;">
+                        <a href="#download" class="group inline-flex items-center justify-center gap-3 px-8 py-4 bg-accent hover:bg-accent-light rounded-2xl font-semibold text-lg transition-all hover:shadow-xl hover:shadow-accent/25 hover:-translate-y-1">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.206 12l2.492-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z"/>
+                            </svg>
+                            Download for Android
+                        </a>
+                    </div>
+
+                    <!-- Social proof -->
+                    <div class="flex items-center gap-6 mt-10 justify-center lg:justify-start" style="animation: fadeIn 0.6s ease-out 0.7s forwards; opacity: 0;">
+                        <div class="flex -space-x-3">
+                            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop" class="w-10 h-10 rounded-full border-2 border-surface-950 object-cover">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop" class="w-10 h-10 rounded-full border-2 border-surface-950 object-cover">
+                            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" class="w-10 h-10 rounded-full border-2 border-surface-950 object-cover">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop" class="w-10 h-10 rounded-full border-2 border-surface-950 object-cover">
+                        </div>
+                        <div class="text-left">
+                            <div class="flex items-center gap-0.5 text-amber-400">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                            </div>
+                            <p class="text-surface-400 text-sm">Loved by 10,000+ home cooks</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hero Visual - Phone with recipe cards -->
+                <div class="relative flex justify-center lg:justify-end" style="animation: scaleIn 0.8s ease-out 0.4s forwards; opacity: 0;">
+                    <!-- Phone mockup -->
+                    <div class="phone-mockup w-72 h-[600px] p-3 animate-float">
+                        <div class="w-full h-full rounded-[2.25rem] bg-surface-950 overflow-hidden relative">
+                            <!-- Notch -->
+                            <div class="absolute top-0 left-0 right-0 h-8 flex items-center justify-center z-20">
+                                <div class="w-28 h-7 bg-black rounded-b-2xl"></div>
+                            </div>
+                            <!-- App content -->
+                            <div class="pt-10 px-4 h-full overflow-hidden">
+                                <div class="flex items-center justify-between mb-5">
+                                    <div>
+                                        <p class="text-surface-500 text-xs">Good evening</p>
+                                        <h3 class="text-lg font-bold">My Recipes</h3>
+                                    </div>
+                                    <div class="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <!-- Recipe Cards -->
+                                <div class="space-y-3">
+                                    <!-- Card 1 -->
+                                    <div class="recipe-card rounded-2xl overflow-hidden">
+                                        <div class="h-24 relative">
+                                            <img src="https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=400&h=200&fit=crop" class="w-full h-full object-cover">
+                                            <div class="absolute inset-0 bg-gradient-to-t from-surface-900/90 to-transparent"></div>
+                                            <div class="absolute bottom-2 left-3 right-3">
+                                                <h4 class="font-bold text-sm">Chocolate Chip Cookies</h4>
+                                            </div>
+                                        </div>
+                                        <div class="p-3 pt-2">
+                                            <div class="flex items-center gap-3 text-[10px] text-surface-400">
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    15 min
+                                                </span>
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                    24 cookies
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card 2 -->
+                                    <div class="recipe-card rounded-2xl overflow-hidden">
+                                        <div class="h-24 relative">
+                                            <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=200&fit=crop" class="w-full h-full object-cover">
+                                            <div class="absolute inset-0 bg-gradient-to-t from-surface-900/90 to-transparent"></div>
+                                            <div class="absolute bottom-2 left-3 right-3">
+                                                <h4 class="font-bold text-sm">Fresh Garden Salad</h4>
+                                            </div>
+                                        </div>
+                                        <div class="p-3 pt-2">
+                                            <div class="flex items-center gap-3 text-[10px] text-surface-400">
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    10 min
+                                                </span>
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                    4 servings
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card 3 -->
+                                    <div class="recipe-card rounded-2xl overflow-hidden">
+                                        <div class="h-24 relative">
+                                            <img src="https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=200&fit=crop" class="w-full h-full object-cover">
+                                            <div class="absolute inset-0 bg-gradient-to-t from-surface-900/90 to-transparent"></div>
+                                            <div class="absolute bottom-2 left-3 right-3">
+                                                <h4 class="font-bold text-sm">Creamy Garlic Pasta</h4>
+                                            </div>
+                                        </div>
+                                        <div class="p-3 pt-2">
+                                            <div class="flex items-center gap-3 text-[10px] text-surface-400">
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    25 min
+                                                </span>
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                    6 servings
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scroll indicator -->
+        <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+            <svg class="w-6 h-6 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Trusted Sources Marquee -->
+    <section class="py-16 border-y border-surface-800/50 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-6">
+            <p class="text-center text-surface-500 text-sm mb-8">Extract recipes from anywhere</p>
+            <div class="flex items-center justify-center gap-12 flex-wrap opacity-50">
+                <span class="text-2xl font-bold text-surface-400">Instagram</span>
+                <span class="text-2xl font-bold text-surface-400">TikTok</span>
+                <span class="text-2xl font-bold text-surface-400">YouTube</span>
+                <span class="text-2xl font-bold text-surface-400">Pinterest</span>
+                <span class="text-2xl font-bold text-surface-400">Websites</span>
+                <span class="text-2xl font-bold text-surface-400">Photos</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem/Solution Section -->
+    <section class="py-32 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <!-- The Problem -->
+                <div class="reveal">
+                    <span class="text-red-400 font-semibold text-sm uppercase tracking-wider">The Problem</span>
+                    <h2 class="text-4xl md:text-5xl font-bold mt-4 mb-6">Recipe blogs are<br><span class="text-surface-500">a nightmare</span></h2>
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-4 p-4 bg-red-500/5 border border-red-500/20 rounded-2xl">
+                            <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-red-300">10-page life stories</h4>
+                                <p class="text-surface-400 text-sm">Scroll forever to find the actual recipe</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4 p-4 bg-red-500/5 border border-red-500/20 rounded-2xl">
+                            <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-red-300">Pop-ups & video ads</h4>
+                                <p class="text-surface-400 text-sm">Interruptions everywhere while you're cooking</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4 p-4 bg-red-500/5 border border-red-500/20 rounded-2xl">
+                            <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-red-300">Lost bookmarks</h4>
+                                <p class="text-surface-400 text-sm">That recipe you saved? Gone forever</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- The Solution -->
+                <div class="reveal" style="transition-delay: 0.2s;">
+                    <span class="text-emerald-400 font-semibold text-sm uppercase tracking-wider">The Solution</span>
+                    <h2 class="text-4xl md:text-5xl font-bold mt-4 mb-6">Snap Recipes<br><span class="gradient-text">fixes everything</span></h2>
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-4 p-4 gradient-border rounded-2xl">
+                            <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white">Just the recipe</h4>
+                                <p class="text-surface-400 text-sm">Ingredients, steps, timing. Nothing else.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4 p-4 gradient-border rounded-2xl">
+                            <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white">Always available</h4>
+                                <p class="text-surface-400 text-sm">Saved locally and synced to the cloud</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4 p-4 gradient-border rounded-2xl">
+                            <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white">Beautiful & organized</h4>
+                                <p class="text-surface-400 text-sm">Your own personal cookbook, searchable</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Grid with Food -->
+    <section id="features" class="py-32 relative">
+        <div class="absolute inset-0 bg-gradient-to-b from-surface-950 via-surface-900/50 to-surface-950"></div>
+
+        <div class="relative max-w-7xl mx-auto px-6">
+            <div class="text-center mb-20 reveal">
+                <span class="text-accent font-semibold text-sm uppercase tracking-wider">Features</span>
+                <h2 class="text-4xl md:text-5xl font-bold mt-4 mb-6">Everything you need</h2>
+                <p class="text-surface-400 text-lg max-w-2xl mx-auto">Powerful features designed for home cooks who want their recipes clean, organized, and always accessible.</p>
+            </div>
+
+            <!-- Feature cards with food imagery -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="reveal food-grid-item gradient-border rounded-3xl overflow-hidden">
+                    <div class="h-48 relative">
+                        <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&h=400&fit=crop" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-surface-900 via-surface-900/50 to-transparent"></div>
+                        <div class="absolute bottom-4 left-4">
+                            <div class="w-12 h-12 rounded-xl bg-accent/90 flex items-center justify-center mb-3">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-bold">Snap to Save</h3>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-4">
+                        <p class="text-surface-400">Point your camera at any recipe - cookbooks, magazines, handwritten cards. Our AI extracts it instantly.</p>
+                    </div>
+                </div>
+
+                <div class="reveal food-grid-item gradient-border rounded-3xl overflow-hidden" style="transition-delay: 0.1s;">
+                    <div class="h-48 relative">
+                        <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=400&fit=crop" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-surface-900 via-surface-900/50 to-transparent"></div>
+                        <div class="absolute bottom-4 left-4">
+                            <div class="w-12 h-12 rounded-xl bg-blue-500/90 flex items-center justify-center mb-3">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-bold">Import from Links</h3>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-4">
+                        <p class="text-surface-400">Paste any recipe URL. We extract just the recipe - no ads, no pop-ups, no life stories.</p>
+                    </div>
+                </div>
+
+                <div class="reveal food-grid-item gradient-border rounded-3xl overflow-hidden" style="transition-delay: 0.2s;">
+                    <div class="h-48 relative">
+                        <img src="https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=600&h=400&fit=crop" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-surface-900 via-surface-900/50 to-transparent"></div>
+                        <div class="absolute bottom-4 left-4">
+                            <div class="w-12 h-12 rounded-xl bg-purple-500/90 flex items-center justify-center mb-3">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-bold">Share from Anywhere</h3>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-4">
+                        <p class="text-surface-400">Share from Instagram, TikTok, YouTube, or any app. We'll grab the recipe automatically.</p>
+                    </div>
+                </div>
+
+                <div class="reveal food-grid-item gradient-border rounded-3xl overflow-hidden" style="transition-delay: 0.3s;">
+                    <div class="h-48 relative">
+                        <img src="https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=600&h=400&fit=crop" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-surface-900 via-surface-900/50 to-transparent"></div>
+                        <div class="absolute bottom-4 left-4">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500/90 flex items-center justify-center mb-3">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-bold">Cook Mode</h3>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-4">
+                        <p class="text-surface-400">Screen stays on while you cook. Check off ingredients and steps as you go.</p>
+                    </div>
+                </div>
+
+                <div class="reveal food-grid-item gradient-border rounded-3xl overflow-hidden" style="transition-delay: 0.4s;">
+                    <div class="h-48 relative">
+                        <img src="https://images.unsplash.com/photo-1482049016gy-2d1ec7ab7445?w=600&h=400&fit=crop" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=600&h=400&fit=crop'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-surface-900 via-surface-900/50 to-transparent"></div>
+                        <div class="absolute bottom-4 left-4">
+                            <div class="w-12 h-12 rounded-xl bg-cyan-500/90 flex items-center justify-center mb-3">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-bold">Cloud Sync</h3>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-4">
+                        <p class="text-surface-400">Your recipes sync across all devices. Start on your phone, continue on your tablet.</p>
+                    </div>
+                </div>
+
+                <div class="reveal food-grid-item gradient-border rounded-3xl overflow-hidden" style="transition-delay: 0.5s;">
+                    <div class="h-48 relative">
+                        <img src="https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=600&h=400&fit=crop" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-surface-900 via-surface-900/50 to-transparent"></div>
+                        <div class="absolute bottom-4 left-4">
+                            <div class="w-12 h-12 rounded-xl bg-amber-500/90 flex items-center justify-center mb-3">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-bold">Collections</h3>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-4">
+                        <p class="text-surface-400">Organize into collections - weeknight dinners, holiday baking, meal prep. Your way.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="py-32 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-20 reveal">
+                <span class="text-accent font-semibold text-sm uppercase tracking-wider">How It Works</span>
+                <h2 class="text-4xl md:text-5xl font-bold mt-4 mb-6">Three simple steps</h2>
+                <p class="text-surface-400 text-lg max-w-2xl mx-auto">From discovery to dinner in seconds. No more lost bookmarks.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="reveal text-center">
+                    <div class="relative inline-block mb-8">
+                        <div class="w-32 h-32 rounded-3xl overflow-hidden shadow-2xl mx-auto">
+                            <img src="https://images.unsplash.com/photo-1551218808-94e220e084d2?w=300&h=300&fit=crop" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -bottom-3 -right-3 w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-2xl font-bold shadow-lg">1</div>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Capture</h3>
+                    <p class="text-surface-400">Snap a photo, paste a link, or share from any app.</p>
+                </div>
+
+                <div class="reveal text-center" style="transition-delay: 0.15s;">
+                    <div class="relative inline-block mb-8">
+                        <div class="w-32 h-32 rounded-3xl overflow-hidden shadow-2xl mx-auto">
+                            <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300&h=300&fit=crop" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -bottom-3 -right-3 w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center text-2xl font-bold shadow-lg">2</div>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Extract</h3>
+                    <p class="text-surface-400">AI reads and extracts ingredients, steps, and timing.</p>
+                </div>
+
+                <div class="reveal text-center" style="transition-delay: 0.3s;">
+                    <div class="relative inline-block mb-8">
+                        <div class="w-32 h-32 rounded-3xl overflow-hidden shadow-2xl mx-auto">
+                            <img src="https://images.unsplash.com/photo-1547592180-85f173990554?w=300&h=300&fit=crop" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -bottom-3 -right-3 w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center text-2xl font-bold shadow-lg">3</div>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Cook</h3>
+                    <p class="text-surface-400">Recipe saved forever. Cook with distraction-free mode.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="py-32 relative">
+        <div class="absolute inset-0 bg-gradient-to-b from-surface-950 via-surface-900/30 to-surface-950"></div>
+
+        <div class="relative max-w-5xl mx-auto px-6">
+            <div class="text-center mb-16 reveal">
+                <span class="text-accent font-semibold text-sm uppercase tracking-wider">Pricing</span>
+                <h2 class="text-4xl md:text-5xl font-bold mt-4 mb-6">Start free, go Pro</h2>
+                <p class="text-surface-400 text-lg">Try Snap Recipes free. Upgrade for unlimited everything.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- Free -->
+                <div class="reveal rounded-3xl bg-surface-900 border border-surface-800 p-8">
+                    <h3 class="text-2xl font-bold mb-2">Free</h3>
+                    <p class="text-surface-400 mb-6">Perfect for trying it out</p>
+                    <div class="mb-8">
+                        <span class="text-5xl font-bold">$0</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-surface-300">5 recipe saves <span class="text-surface-500">/ month</span></span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-surface-300">Camera & link import</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-surface-300">Cook Mode</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-surface-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <span class="text-surface-500">Cloud sync</span>
+                        </li>
+                    </ul>
+                    <a href="#download" class="block w-full py-4 rounded-2xl text-center font-semibold bg-surface-800 hover:bg-surface-700 border border-surface-700 transition-colors">
+                        Get Started Free
+                    </a>
+                </div>
+
+                <!-- Pro -->
+                <div class="reveal gradient-border rounded-3xl p-8 relative" style="transition-delay: 0.1s;">
+                    <div class="absolute top-6 right-6 px-3 py-1 bg-accent/20 rounded-full text-accent text-sm font-semibold">Popular</div>
+                    <h3 class="text-2xl font-bold mb-2">Pro</h3>
+                    <p class="text-surface-400 mb-6">For serious home cooks</p>
+                    <div class="mb-8">
+                        <span class="text-5xl font-bold">$2.99</span>
+                        <span class="text-surface-400">/mo</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-surface-300"><strong>Unlimited</strong> recipe saves</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-surface-300">All import methods</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-surface-300"><strong>Cloud sync</strong> across devices</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-surface-300">Cook Mode</span>
+                        </li>
+                    </ul>
+                    <a href="#download" class="block w-full py-4 rounded-2xl text-center font-semibold bg-accent hover:bg-accent-light transition-all hover:shadow-lg hover:shadow-accent/25">
+                        Upgrade to Pro
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section id="download" class="py-32 relative overflow-hidden">
+        <div class="absolute inset-0">
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent/15 rounded-full blur-[200px]"></div>
+        </div>
+
+        <div class="relative max-w-4xl mx-auto px-6 text-center">
+            <div class="reveal">
+                <img src="icon.png" alt="Snap Recipes" class="w-24 h-24 rounded-3xl mx-auto mb-8 shadow-2xl animate-glow">
+                <h2 class="text-4xl md:text-6xl font-bold mb-6">Ready to save<br><span class="gradient-text">your first recipe?</span></h2>
+                <p class="text-surface-400 text-xl mb-10 max-w-2xl mx-auto">Join thousands of home cooks who never lose a recipe. Download free today.</p>
+
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="#" class="group inline-flex items-center gap-4 px-8 py-4 bg-white text-black rounded-2xl font-semibold transition-all hover:shadow-xl hover:-translate-y-1">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.206 12l2.492-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z"/>
+                        </svg>
+                        <div class="text-left">
+                            <div class="text-xs opacity-70">Get it on</div>
+                            <div class="text-lg font-bold -mt-1">Google Play</div>
+                        </div>
+                    </a>
+                </div>
+                <p class="text-surface-500 text-sm mt-6">iOS and web coming soon</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-16 border-t border-surface-800">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid md:grid-cols-4 gap-12 mb-12">
+                <div class="md:col-span-2">
+                    <a href="/" class="flex items-center gap-3 mb-4">
+                        <img src="icon.png" alt="Snap Recipes" class="w-10 h-10 rounded-xl shadow-lg">
+                        <span class="text-xl font-bold">Snap Recipes</span>
+                    </a>
+                    <p class="text-surface-400 max-w-sm">Save any recipe from anywhere. Never lose a recipe again.</p>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Product</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#features" class="text-surface-400 hover:text-white transition-colors">Features</a></li>
+                        <li><a href="#pricing" class="text-surface-400 hover:text-white transition-colors">Pricing</a></li>
+                        <li><a href="#download" class="text-surface-400 hover:text-white transition-colors">Download</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Legal</h4>
+                    <ul class="space-y-3">
+                        <li><a href="/privacy.html" class="text-surface-400 hover:text-white transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="text-surface-400 hover:text-white transition-colors">Terms of Service</a></li>
+                        <li><a href="/delete-account.html" class="text-surface-400 hover:text-white transition-colors">Delete Account</a></li>
+                        <li><a href="mailto:support@snaprecipes.app" class="text-surface-400 hover:text-white transition-colors">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="pt-8 border-t border-surface-800 flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-surface-500 text-sm">&copy; 2026 Snap Recipes. All rights reserved.</p>
+                <div class="flex items-center gap-6">
+                    <a href="#" class="text-surface-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
+                    </a>
+                    <a href="#" class="text-surface-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        mobileMenuBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+        mobileMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => mobileMenu.classList.add('hidden'));
+        });
+
+        // Scroll reveal
+        const reveals = document.querySelectorAll('.reveal');
+        const revealOnScroll = () => {
+            reveals.forEach(el => {
+                const top = el.getBoundingClientRect().top;
+                if (top < window.innerHeight - 100) el.classList.add('active');
+            });
+        };
+        window.addEventListener('scroll', revealOnScroll);
+        revealOnScroll();
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+    </script>
+</body>
+</html>

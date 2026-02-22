@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Snap Recipes</title>
+    <meta name="description" content="Privacy Policy for Snap Recipes - Learn how we collect, use, and protect your data.">
+    <meta name="theme-color" content="#0a0a0f">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/icon.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        surface: {
+                            950: '#0a0a0f',
+                            900: '#12121a',
+                            800: '#1a1a24',
+                            700: '#252530',
+                            600: '#32323f',
+                            500: '#5c5c6d',
+                            400: '#8b8b9a',
+                            300: '#ababba',
+                        },
+                        accent: {
+                            DEFAULT: '#FF6B35',
+                            light: '#FF8C5A',
+                            dark: '#E55A28',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass {
+            background: rgba(18, 18, 26, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: #32323f; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #5c5c6d; }
+
+        .prose h2 { scroll-margin-top: 100px; }
+    </style>
+</head>
+<body class="bg-surface-950 text-white font-sans antialiased">
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass border-b border-surface-800/50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <a href="/" class="flex items-center gap-3">
+                    <img src="icon.png" alt="Snap Recipes" class="w-10 h-10 rounded-xl shadow-lg">
+                    <span class="text-xl font-bold">Snap Recipes</span>
+                </a>
+                <a href="/" class="text-surface-400 hover:text-white transition-colors">Back to Home</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Privacy Policy Content -->
+    <main class="pt-32 pb-20">
+        <div class="max-w-4xl mx-auto px-6">
+            <!-- Header -->
+            <div class="mb-12">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">Privacy Policy</h1>
+                <div class="flex flex-wrap gap-4 text-sm text-surface-400">
+                    <span><strong class="text-surface-300">Effective Date:</strong> February 22, 2026</span>
+                    <span><strong class="text-surface-300">Last Updated:</strong> February 22, 2026</span>
+                </div>
+            </div>
+
+            <!-- Table of Contents -->
+            <div class="bg-surface-900 rounded-2xl border border-surface-800 p-6 mb-12">
+                <h2 class="font-semibold text-lg mb-4">Table of Contents</h2>
+                <nav class="grid md:grid-cols-2 gap-2 text-sm">
+                    <a href="#introduction" class="text-surface-400 hover:text-accent transition-colors">1. Introduction</a>
+                    <a href="#data-controller" class="text-surface-400 hover:text-accent transition-colors">2. Data Controller</a>
+                    <a href="#data-collected" class="text-surface-400 hover:text-accent transition-colors">3. Information We Collect</a>
+                    <a href="#legal-basis" class="text-surface-400 hover:text-accent transition-colors">4. Legal Basis for Processing</a>
+                    <a href="#how-we-use" class="text-surface-400 hover:text-accent transition-colors">5. How We Use Your Information</a>
+                    <a href="#data-sharing" class="text-surface-400 hover:text-accent transition-colors">6. Data Sharing & Third Parties</a>
+                    <a href="#international-transfers" class="text-surface-400 hover:text-accent transition-colors">7. International Data Transfers</a>
+                    <a href="#data-retention" class="text-surface-400 hover:text-accent transition-colors">8. Data Retention</a>
+                    <a href="#data-security" class="text-surface-400 hover:text-accent transition-colors">9. Data Security</a>
+                    <a href="#your-rights" class="text-surface-400 hover:text-accent transition-colors">10. Your Rights</a>
+                    <a href="#children" class="text-surface-400 hover:text-accent transition-colors">11. Children's Privacy</a>
+                    <a href="#california" class="text-surface-400 hover:text-accent transition-colors">12. California Privacy Rights</a>
+                    <a href="#eu-rights" class="text-surface-400 hover:text-accent transition-colors">13. European Privacy Rights</a>
+                    <a href="#changes" class="text-surface-400 hover:text-accent transition-colors">14. Changes to This Policy</a>
+                    <a href="#contact" class="text-surface-400 hover:text-accent transition-colors">15. Contact Us</a>
+                </nav>
+            </div>
+
+            <!-- Content -->
+            <div class="prose prose-invert max-w-none space-y-12">
+
+                <!-- 1. Introduction -->
+                <section id="introduction">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">1</span>
+                        Introduction
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            Welcome to Snap Recipes ("we," "our," "us," or the "Company"). We are committed to protecting your privacy and ensuring transparency about how we handle your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application ("App") and related services (collectively, the "Services").
+                        </p>
+                        <p>
+                            By downloading, installing, or using Snap Recipes, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with our policies and practices, please do not use our Services.
+                        </p>
+                        <p>
+                            This Privacy Policy applies to all users of Snap Recipes, including users of our free tier and Pro subscribers. Certain data processing activities may only apply to Pro users (such as cloud sync features).
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 2. Data Controller -->
+                <section id="data-controller">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">2</span>
+                        Data Controller
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            For the purposes of applicable data protection laws, Snap Recipes is the data controller responsible for your personal information collected through the App.
+                        </p>
+                        <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                            <p class="font-semibold text-white mb-2">Snap Recipes</p>
+                            <p class="text-surface-400 text-sm">
+                                Email: <a href="mailto:privacy@snaprecipes.app" class="text-accent hover:underline">privacy@snaprecipes.app</a>
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Information We Collect -->
+                <section id="data-collected">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">3</span>
+                        Information We Collect
+                    </h2>
+                    <div class="text-surface-300 space-y-6">
+                        <p>We collect information in the following categories:</p>
+
+                        <div class="space-y-6">
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <h3 class="font-semibold text-white mb-3">3.1 Information You Provide Directly</h3>
+                                <ul class="list-disc list-inside space-y-2 text-surface-400">
+                                    <li><strong class="text-surface-300">Account Information:</strong> When you create an account, we collect your email address and display name.</li>
+                                    <li><strong class="text-surface-300">Recipe Data:</strong> Recipes you save, including titles, ingredients, instructions, images, source URLs, and any notes or modifications you make.</li>
+                                    <li><strong class="text-surface-300">User Content:</strong> Photos you take or upload for recipe extraction, collections you create, and organizational preferences.</li>
+                                    <li><strong class="text-surface-300">Communications:</strong> When you contact us for support, we collect the information you provide in your messages.</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <h3 class="font-semibold text-white mb-3">3.2 Information Collected Automatically</h3>
+                                <ul class="list-disc list-inside space-y-2 text-surface-400">
+                                    <li><strong class="text-surface-300">Device Information:</strong> Device type, model, operating system version, unique device identifiers (such as Android Advertising ID), language settings, and time zone.</li>
+                                    <li><strong class="text-surface-300">Usage Data:</strong> Features you use, actions you take within the App, frequency and duration of activities, and interaction patterns.</li>
+                                    <li><strong class="text-surface-300">Performance Data:</strong> Crash reports, error logs, and diagnostic information to help us improve the App.</li>
+                                    <li><strong class="text-surface-300">Network Information:</strong> IP address, internet service provider, and connection type (WiFi/cellular).</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <h3 class="font-semibold text-white mb-3">3.3 Information from Third Parties</h3>
+                                <ul class="list-disc list-inside space-y-2 text-surface-400">
+                                    <li><strong class="text-surface-300">Payment Information:</strong> When you subscribe to Pro, our payment processor (via Google Play) provides us with transaction confirmation, subscription status, and purchase history. We do not receive or store your credit card details.</li>
+                                    <li><strong class="text-surface-300">Authentication Providers:</strong> If you sign in via Google or other third-party authentication, we receive your email address and basic profile information as authorized by you.</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <h3 class="font-semibold text-white mb-3">3.4 Sensitive Information</h3>
+                                <p class="text-surface-400">
+                                    We do not intentionally collect sensitive personal information such as health data, biometric data, genetic data, religious beliefs, political opinions, or sexual orientation. Recipe data you save may incidentally contain dietary preference information (e.g., "vegan," "gluten-free"), which is stored as part of your recipe content.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. Legal Basis -->
+                <section id="legal-basis">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">4</span>
+                        Legal Basis for Processing
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>We process your personal information based on the following legal grounds:</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-surface-700">
+                                        <th class="text-left py-3 px-4 text-white font-semibold">Processing Activity</th>
+                                        <th class="text-left py-3 px-4 text-white font-semibold">Legal Basis</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-surface-400">
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Providing the App and its features</td>
+                                        <td class="py-3 px-4">Contract performance</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Processing subscriptions and payments</td>
+                                        <td class="py-3 px-4">Contract performance</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Syncing recipes across devices</td>
+                                        <td class="py-3 px-4">Contract performance</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Improving and optimizing the App</td>
+                                        <td class="py-3 px-4">Legitimate interests</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Analyzing usage patterns</td>
+                                        <td class="py-3 px-4">Legitimate interests</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Sending service communications</td>
+                                        <td class="py-3 px-4">Legitimate interests</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Marketing communications</td>
+                                        <td class="py-3 px-4">Consent</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4">Complying with legal obligations</td>
+                                        <td class="py-3 px-4">Legal obligation</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. How We Use Your Information -->
+                <section id="how-we-use">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">5</span>
+                        How We Use Your Information
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>We use the information we collect to:</p>
+                        <ul class="list-disc list-inside space-y-2 text-surface-400">
+                            <li><strong class="text-surface-300">Provide and maintain the Services:</strong> Process your recipes, sync data across devices, and deliver the core functionality of the App.</li>
+                            <li><strong class="text-surface-300">Process transactions:</strong> Manage your subscription, process payments through Google Play, and provide purchase confirmations.</li>
+                            <li><strong class="text-surface-300">Extract recipes:</strong> Process images and URLs you provide through our AI-powered extraction service to identify and structure recipe information.</li>
+                            <li><strong class="text-surface-300">Improve our Services:</strong> Analyze usage patterns, identify bugs, and develop new features based on user behavior.</li>
+                            <li><strong class="text-surface-300">Communicate with you:</strong> Send service-related notices, respond to support requests, and provide updates about the App.</li>
+                            <li><strong class="text-surface-300">Ensure security:</strong> Detect and prevent fraud, abuse, and unauthorized access to your account.</li>
+                            <li><strong class="text-surface-300">Comply with legal requirements:</strong> Meet our legal obligations and respond to lawful requests from authorities.</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- 6. Data Sharing & Third Parties -->
+                <section id="data-sharing">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">6</span>
+                        Data Sharing & Third Parties
+                    </h2>
+                    <div class="text-surface-300 space-y-6">
+                        <p>We share your information with the following categories of third parties:</p>
+
+                        <div class="space-y-4">
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-white">Supabase (Database & Authentication)</h4>
+                                        <p class="text-surface-400 text-sm mt-1">Provides cloud database and authentication services. Stores your account information and synced recipe data for Pro users.</p>
+                                        <p class="text-surface-500 text-xs mt-2">Data processed: Account data, recipe data, authentication tokens</p>
+                                        <a href="https://supabase.com/privacy" class="text-accent text-sm hover:underline mt-2 inline-block">Supabase Privacy Policy →</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-white">Google Cloud / Gemini AI (Recipe Extraction)</h4>
+                                        <p class="text-surface-400 text-sm mt-1">Powers our AI-based recipe extraction from images and URLs. Processes image data to identify and extract recipe content.</p>
+                                        <p class="text-surface-500 text-xs mt-2">Data processed: Images and URLs submitted for recipe extraction</p>
+                                        <a href="https://policies.google.com/privacy" class="text-accent text-sm hover:underline mt-2 inline-block">Google Privacy Policy →</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-white">RevenueCat (Subscription Management)</h4>
+                                        <p class="text-surface-400 text-sm mt-1">Manages in-app subscriptions and purchases. Tracks subscription status and purchase history across platforms.</p>
+                                        <p class="text-surface-500 text-xs mt-2">Data processed: Device identifiers, purchase history, subscription status</p>
+                                        <a href="https://www.revenuecat.com/privacy" class="text-accent text-sm hover:underline mt-2 inline-block">RevenueCat Privacy Policy →</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-white">Expo (App Infrastructure)</h4>
+                                        <p class="text-surface-400 text-sm mt-1">Provides app development infrastructure and over-the-air update services.</p>
+                                        <p class="text-surface-500 text-xs mt-2">Data processed: Device information, app version, update status</p>
+                                        <a href="https://expo.dev/privacy" class="text-accent text-sm hover:underline mt-2 inline-block">Expo Privacy Policy →</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-white">Google Play (App Store & Payments)</h4>
+                                        <p class="text-surface-400 text-sm mt-1">Handles app distribution and payment processing for subscriptions.</p>
+                                        <p class="text-surface-500 text-xs mt-2">Data processed: Payment information, purchase history (processed by Google)</p>
+                                        <a href="https://policies.google.com/privacy" class="text-accent text-sm hover:underline mt-2 inline-block">Google Privacy Policy →</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <h3 class="font-semibold text-white mb-3">We may also share information:</h3>
+                            <ul class="list-disc list-inside space-y-2 text-surface-400">
+                                <li><strong class="text-surface-300">For legal reasons:</strong> When required by law, subpoena, or legal process, or to protect our rights and safety.</li>
+                                <li><strong class="text-surface-300">Business transfers:</strong> In connection with a merger, acquisition, or sale of assets, your information may be transferred.</li>
+                                <li><strong class="text-surface-300">With your consent:</strong> When you explicitly authorize us to share information with third parties.</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 mt-6">
+                            <p class="text-emerald-300 font-semibold mb-2">We Never Sell Your Data</p>
+                            <p class="text-surface-400 text-sm">Snap Recipes does not sell, rent, or trade your personal information to third parties for their marketing purposes. We do not participate in data broker networks or advertising exchanges that involve selling user data.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 7. International Transfers -->
+                <section id="international-transfers">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">7</span>
+                        International Data Transfers
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            Your information may be transferred to and processed in countries other than your country of residence. Our service providers operate in the United States and other jurisdictions.
+                        </p>
+                        <p>
+                            When we transfer personal data from the European Economic Area (EEA), United Kingdom, or Switzerland, we ensure appropriate safeguards are in place, including:
+                        </p>
+                        <ul class="list-disc list-inside space-y-2 text-surface-400">
+                            <li>Standard Contractual Clauses approved by the European Commission</li>
+                            <li>Adequacy decisions where applicable</li>
+                            <li>Binding Corporate Rules where relevant</li>
+                        </ul>
+                        <p class="text-surface-400">
+                            You may request a copy of the safeguards we use by contacting us at <a href="mailto:privacy@snaprecipes.app" class="text-accent hover:underline">privacy@snaprecipes.app</a>.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 8. Data Retention -->
+                <section id="data-retention">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">8</span>
+                        Data Retention
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>We retain your information for as long as necessary to provide our Services and fulfill the purposes described in this Policy:</p>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-surface-700">
+                                        <th class="text-left py-3 px-4 text-white font-semibold">Data Type</th>
+                                        <th class="text-left py-3 px-4 text-white font-semibold">Retention Period</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-surface-400">
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Account information</td>
+                                        <td class="py-3 px-4">Until account deletion + 30 days</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Recipe data (cloud-synced)</td>
+                                        <td class="py-3 px-4">Until account deletion + 30 days</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Recipe data (local only)</td>
+                                        <td class="py-3 px-4">Until app uninstall or manual deletion</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Images submitted for extraction</td>
+                                        <td class="py-3 px-4">Processed immediately, not stored</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Usage analytics</td>
+                                        <td class="py-3 px-4">26 months (aggregated)</td>
+                                    </tr>
+                                    <tr class="border-b border-surface-800">
+                                        <td class="py-3 px-4">Transaction records</td>
+                                        <td class="py-3 px-4">7 years (legal requirement)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4">Support communications</td>
+                                        <td class="py-3 px-4">3 years from resolution</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p class="text-surface-400 mt-4">
+                            When you delete your account, we will delete or anonymize your personal data within 30 days, except where retention is required by law or for legitimate business purposes (such as fraud prevention).
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 9. Data Security -->
+                <section id="data-security">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">9</span>
+                        Data Security
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction:
+                        </p>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-4">
+                                <h4 class="font-semibold text-white mb-2">Encryption</h4>
+                                <p class="text-surface-400 text-sm">All data transmitted between your device and our servers is encrypted using TLS 1.3. Data at rest is encrypted using AES-256.</p>
+                            </div>
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-4">
+                                <h4 class="font-semibold text-white mb-2">Access Controls</h4>
+                                <p class="text-surface-400 text-sm">Strict access controls limit employee access to personal data on a need-to-know basis with audit logging.</p>
+                            </div>
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-4">
+                                <h4 class="font-semibold text-white mb-2">Infrastructure Security</h4>
+                                <p class="text-surface-400 text-sm">Our infrastructure providers maintain SOC 2 Type II compliance and undergo regular security audits.</p>
+                            </div>
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-4">
+                                <h4 class="font-semibold text-white mb-2">Incident Response</h4>
+                                <p class="text-surface-400 text-sm">We maintain incident response procedures and will notify affected users of any data breach as required by law.</p>
+                            </div>
+                        </div>
+                        <p class="text-surface-400 mt-4">
+                            While we strive to protect your information, no method of transmission or storage is 100% secure. We encourage you to use a strong, unique password and keep your device secure.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 10. Your Rights -->
+                <section id="your-rights">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">10</span>
+                        Your Rights
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>Depending on your location, you may have the following rights regarding your personal information:</p>
+
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3 p-4 bg-surface-900 rounded-xl border border-surface-800">
+                                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-white">Right to Access</h4>
+                                    <p class="text-surface-400 text-sm">Request a copy of the personal data we hold about you.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 p-4 bg-surface-900 rounded-xl border border-surface-800">
+                                <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-white">Right to Rectification</h4>
+                                    <p class="text-surface-400 text-sm">Request correction of inaccurate or incomplete data.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 p-4 bg-surface-900 rounded-xl border border-surface-800">
+                                <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-white">Right to Erasure</h4>
+                                    <p class="text-surface-400 text-sm">Request deletion of your personal data ("right to be forgotten").</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 p-4 bg-surface-900 rounded-xl border border-surface-800">
+                                <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-white">Right to Data Portability</h4>
+                                    <p class="text-surface-400 text-sm">Receive your data in a structured, machine-readable format.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 p-4 bg-surface-900 rounded-xl border border-surface-800">
+                                <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-white">Right to Object</h4>
+                                    <p class="text-surface-400 text-sm">Object to processing based on legitimate interests or for direct marketing.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 p-4 bg-surface-900 rounded-xl border border-surface-800">
+                                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-white">Right to Restrict Processing</h4>
+                                    <p class="text-surface-400 text-sm">Request limitation of processing in certain circumstances.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 p-4 bg-surface-900 rounded-xl border border-surface-800">
+                                <div class="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-white">Right to Withdraw Consent</h4>
+                                    <p class="text-surface-400 text-sm">Withdraw consent at any time where processing is based on consent.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-surface-400 mt-6">
+                            To exercise any of these rights, please contact us at <a href="mailto:privacy@snaprecipes.app" class="text-accent hover:underline">privacy@snaprecipes.app</a>. We will respond within 30 days (or as required by applicable law). You may also delete your account directly within the App under Settings → Account → Delete Account.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 11. Children's Privacy -->
+                <section id="children">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">11</span>
+                        Children's Privacy
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            Snap Recipes is not intended for children under the age of 13 (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children under this age.
+                        </p>
+                        <p>
+                            If you are a parent or guardian and believe your child has provided us with personal information without your consent, please contact us at <a href="mailto:privacy@snaprecipes.app" class="text-accent hover:underline">privacy@snaprecipes.app</a>. We will take steps to delete such information promptly.
+                        </p>
+                        <p>
+                            If we become aware that we have collected personal information from a child under the applicable age without parental consent, we will delete that information as quickly as possible.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 12. California Privacy Rights -->
+                <section id="california">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">12</span>
+                        California Privacy Rights (CCPA/CPRA)
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            If you are a California resident, you have additional rights under the California Consumer Privacy Act (CCPA) as amended by the California Privacy Rights Act (CPRA):
+                        </p>
+
+                        <div class="bg-surface-900 rounded-xl border border-surface-800 p-5 space-y-4">
+                            <div>
+                                <h4 class="font-semibold text-white mb-2">Right to Know</h4>
+                                <p class="text-surface-400 text-sm">You may request disclosure of the categories and specific pieces of personal information we have collected, the sources, the business purposes, and the categories of third parties with whom we share it.</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white mb-2">Right to Delete</h4>
+                                <p class="text-surface-400 text-sm">You may request deletion of your personal information, subject to certain exceptions.</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white mb-2">Right to Correct</h4>
+                                <p class="text-surface-400 text-sm">You may request correction of inaccurate personal information.</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white mb-2">Right to Opt-Out of Sale/Sharing</h4>
+                                <p class="text-surface-400 text-sm">We do not sell your personal information or share it for cross-context behavioral advertising.</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white mb-2">Right to Limit Use of Sensitive Personal Information</h4>
+                                <p class="text-surface-400 text-sm">We do not use sensitive personal information for purposes beyond what is necessary to provide the Services.</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white mb-2">Right to Non-Discrimination</h4>
+                                <p class="text-surface-400 text-sm">We will not discriminate against you for exercising your privacy rights.</p>
+                            </div>
+                        </div>
+
+                        <p class="text-surface-400">
+                            To exercise these rights, email <a href="mailto:privacy@snaprecipes.app" class="text-accent hover:underline">privacy@snaprecipes.app</a> or use the in-app privacy controls. We will verify your identity before processing your request.
+                        </p>
+
+                        <div class="bg-surface-900 rounded-xl border border-surface-800 p-5 mt-4">
+                            <h4 class="font-semibold text-white mb-2">Categories of Personal Information Collected (Last 12 Months)</h4>
+                            <ul class="list-disc list-inside text-surface-400 text-sm space-y-1">
+                                <li>Identifiers (email address, device identifiers)</li>
+                                <li>Commercial information (subscription history)</li>
+                                <li>Internet activity (usage data, interaction with the App)</li>
+                                <li>Geolocation data (approximate location via IP address)</li>
+                                <li>Inferences (preferences derived from usage patterns)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 13. European Privacy Rights -->
+                <section id="eu-rights">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">13</span>
+                        European Privacy Rights (GDPR)
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            If you are located in the European Economic Area (EEA), United Kingdom, or Switzerland, you have rights under the General Data Protection Regulation (GDPR) and equivalent local laws:
+                        </p>
+                        <ul class="list-disc list-inside space-y-2 text-surface-400">
+                            <li>All rights listed in Section 10 above apply to you.</li>
+                            <li>You have the right to lodge a complaint with your local data protection authority.</li>
+                            <li>Where we process data based on consent, you may withdraw consent at any time.</li>
+                            <li>You have the right not to be subject to automated decision-making, including profiling, that produces legal effects.</li>
+                        </ul>
+
+                        <div class="bg-surface-900 rounded-xl border border-surface-800 p-5 mt-4">
+                            <h4 class="font-semibold text-white mb-2">Data Protection Authorities</h4>
+                            <p class="text-surface-400 text-sm">
+                                You have the right to lodge a complaint with a supervisory authority, in particular in the EU Member State of your habitual residence, place of work, or place of the alleged infringement. A list of EU data protection authorities is available at: <a href="https://edpb.europa.eu/about-edpb/board/members_en" class="text-accent hover:underline">https://edpb.europa.eu</a>
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 14. Changes to This Policy -->
+                <section id="changes">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">14</span>
+                        Changes to This Policy
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            We may update this Privacy Policy from time to time to reflect changes in our practices, technology, legal requirements, or other factors. When we make material changes:
+                        </p>
+                        <ul class="list-disc list-inside space-y-2 text-surface-400">
+                            <li>We will update the "Last Updated" date at the top of this Policy.</li>
+                            <li>We will notify you via email (if you have an account) or through a prominent notice in the App.</li>
+                            <li>For significant changes, we may require you to acknowledge the updated Policy before continuing to use the Services.</li>
+                        </ul>
+                        <p class="text-surface-400">
+                            We encourage you to review this Privacy Policy periodically to stay informed about how we protect your information.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 15. Contact Us -->
+                <section id="contact">
+                    <h2 class="text-2xl font-bold mb-4 text-white flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-accent/20 text-accent text-sm flex items-center justify-center font-bold">15</span>
+                        Contact Us
+                    </h2>
+                    <div class="text-surface-300 space-y-4">
+                        <p>
+                            If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:
+                        </p>
+
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <h4 class="font-semibold text-white mb-3">Privacy Inquiries</h4>
+                                <p class="text-surface-400 text-sm">
+                                    <strong class="text-surface-300">Email:</strong><br>
+                                    <a href="mailto:privacy@snaprecipes.app" class="text-accent hover:underline">privacy@snaprecipes.app</a>
+                                </p>
+                                <p class="text-surface-400 text-sm mt-3">
+                                    For data access, deletion, or other privacy rights requests.
+                                </p>
+                            </div>
+                            <div class="bg-surface-900 rounded-xl border border-surface-800 p-5">
+                                <h4 class="font-semibold text-white mb-3">General Support</h4>
+                                <p class="text-surface-400 text-sm">
+                                    <strong class="text-surface-300">Email:</strong><br>
+                                    <a href="mailto:support@snaprecipes.app" class="text-accent hover:underline">support@snaprecipes.app</a>
+                                </p>
+                                <p class="text-surface-400 text-sm mt-3">
+                                    For app support, feedback, or general inquiries.
+                                </p>
+                            </div>
+                        </div>
+
+                        <p class="text-surface-400 mt-4">
+                            We aim to respond to all privacy-related inquiries within 30 days. If you are not satisfied with our response, you may contact the relevant data protection authority in your jurisdiction.
+                        </p>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Footer notice -->
+            <div class="mt-16 pt-8 border-t border-surface-800">
+                <p class="text-surface-500 text-sm text-center">
+                    This Privacy Policy was last updated on February 22, 2026 and applies to all users of the Snap Recipes mobile application.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-12 border-t border-surface-800">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <img src="icon.png" alt="Snap Recipes" class="w-8 h-8 rounded-lg">
+                    <span class="font-semibold">Snap Recipes</span>
+                </div>
+                <p class="text-surface-500 text-sm">&copy; 2026 Snap Recipes. All rights reserved.</p>
+                <div class="flex items-center gap-6">
+                    <a href="/" class="text-surface-400 hover:text-white transition-colors text-sm">Home</a>
+                    <a href="/privacy.html" class="text-accent text-sm">Privacy</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

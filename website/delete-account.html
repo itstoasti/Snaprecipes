@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Account - Snap Recipes</title>
+    <meta name="description" content="Delete your Snap Recipes account and all associated data.">
+    <meta name="theme-color" content="#0a0a0f">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/icon.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        surface: {
+                            950: '#0a0a0f',
+                            900: '#12121a',
+                            800: '#1a1a24',
+                            700: '#252530',
+                            600: '#32323f',
+                            500: '#5c5c6d',
+                            400: '#8b8b9a',
+                        },
+                        accent: {
+                            DEFAULT: '#FF6B35',
+                            light: '#FF8C5A',
+                            dark: '#E55A28',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass {
+            background: rgba(18, 18, 26, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: #32323f; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #5c5c6d; }
+    </style>
+</head>
+<body class="bg-surface-950 text-white font-sans antialiased">
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass border-b border-surface-800/50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <a href="/" class="flex items-center gap-3">
+                    <img src="icon.png" alt="Snap Recipes" class="w-10 h-10 rounded-xl shadow-lg">
+                    <span class="text-xl font-bold">Snap Recipes</span>
+                </a>
+                <a href="/" class="text-surface-400 hover:text-white transition-colors">Back to Home</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="pt-32 pb-20">
+        <div class="max-w-2xl mx-auto px-6">
+            <div class="text-center mb-12">
+                <div class="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <h1 class="text-3xl md:text-4xl font-bold mb-4">Delete Your Account</h1>
+                <p class="text-surface-400">We're sorry to see you go. Please read the information below before deleting your account.</p>
+            </div>
+
+            <!-- Warning Box -->
+            <div class="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 mb-8">
+                <h2 class="font-semibold text-red-300 mb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    This action is permanent
+                </h2>
+                <p class="text-surface-400 text-sm">
+                    Deleting your account will permanently remove all your data from our servers. This action cannot be undone.
+                </p>
+            </div>
+
+            <!-- What Gets Deleted -->
+            <div class="bg-surface-900 rounded-2xl border border-surface-800 p-6 mb-8">
+                <h2 class="font-semibold text-white mb-4">What will be deleted:</h2>
+                <ul class="space-y-3">
+                    <li class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <span class="text-surface-300">Your account and profile information</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <span class="text-surface-300">All recipes synced to the cloud</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <span class="text-surface-300">Your collections and organizational data</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <span class="text-surface-300">Subscription and purchase history association</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- What Won't Be Deleted -->
+            <div class="bg-surface-900 rounded-2xl border border-surface-800 p-6 mb-8">
+                <h2 class="font-semibold text-white mb-4">What will NOT be deleted:</h2>
+                <ul class="space-y-3">
+                    <li class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span class="text-surface-300">Recipes stored locally on your device (you can keep using the app without an account)</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span class="text-surface-300">Your subscription (managed by Google Play - cancel separately if needed)</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- How to Delete -->
+            <div class="bg-surface-900 rounded-2xl border border-surface-800 p-6 mb-8">
+                <h2 class="font-semibold text-white mb-4">How to delete your account:</h2>
+
+                <div class="space-y-6">
+                    <!-- Option 1: In-App -->
+                    <div>
+                        <h3 class="font-medium text-accent mb-2">Option 1: Delete from the App (Recommended)</h3>
+                        <ol class="list-decimal list-inside space-y-2 text-surface-400 text-sm">
+                            <li>Open Snap Recipes on your device</li>
+                            <li>Go to <strong class="text-surface-300">Settings</strong> (gear icon)</li>
+                            <li>Scroll down and tap <strong class="text-surface-300">Account</strong></li>
+                            <li>Tap <strong class="text-surface-300">Delete Account</strong></li>
+                            <li>Confirm your decision</li>
+                        </ol>
+                    </div>
+
+                    <!-- Option 2: Email -->
+                    <div>
+                        <h3 class="font-medium text-accent mb-2">Option 2: Request via Email</h3>
+                        <p class="text-surface-400 text-sm mb-4">
+                            If you cannot access the app, you can request account deletion by email. Please include the email address associated with your account.
+                        </p>
+                        <a href="mailto:privacy@snaprecipes.app?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20Snap%20Recipes%20account.%0A%0AAccount%20email%3A%20%5Byour%20email%20here%5D%0A%0AI%20understand%20this%20action%20is%20permanent%20and%20cannot%20be%20undone."
+                           class="inline-flex items-center gap-2 px-5 py-3 bg-surface-800 hover:bg-surface-700 border border-surface-700 rounded-xl font-medium text-sm transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Email Deletion Request
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Time -->
+            <div class="bg-surface-900 rounded-2xl border border-surface-800 p-6 mb-8">
+                <h2 class="font-semibold text-white mb-3">Processing Time</h2>
+                <p class="text-surface-400 text-sm">
+                    Account deletions are processed within <strong class="text-surface-300">30 days</strong>. You will receive a confirmation email once your account has been deleted. During this period, your account will be deactivated and your data will not be accessible.
+                </p>
+            </div>
+
+            <!-- Cancel Subscription Note -->
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 mb-8">
+                <h2 class="font-semibold text-amber-300 mb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Don't forget to cancel your subscription
+                </h2>
+                <p class="text-surface-400 text-sm mb-3">
+                    Deleting your account does not automatically cancel your subscription. To avoid future charges, please cancel your subscription through Google Play:
+                </p>
+                <ol class="list-decimal list-inside space-y-1 text-surface-400 text-sm">
+                    <li>Open the Google Play Store app</li>
+                    <li>Tap your profile icon → Payments & subscriptions → Subscriptions</li>
+                    <li>Find Snap Recipes and tap Cancel subscription</li>
+                </ol>
+            </div>
+
+            <!-- Contact -->
+            <div class="text-center">
+                <p class="text-surface-500 text-sm">
+                    Have questions? Contact us at <a href="mailto:support@snaprecipes.app" class="text-accent hover:underline">support@snaprecipes.app</a>
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-12 border-t border-surface-800">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <img src="icon.png" alt="Snap Recipes" class="w-8 h-8 rounded-lg">
+                    <span class="font-semibold">Snap Recipes</span>
+                </div>
+                <p class="text-surface-500 text-sm">&copy; 2026 Snap Recipes. All rights reserved.</p>
+                <div class="flex items-center gap-6">
+                    <a href="/" class="text-surface-400 hover:text-white transition-colors text-sm">Home</a>
+                    <a href="/privacy.html" class="text-surface-400 hover:text-white transition-colors text-sm">Privacy</a>
+                    <a href="/delete-account.html" class="text-accent text-sm">Delete Account</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
