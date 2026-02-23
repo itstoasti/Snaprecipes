@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { extractFromImage } from "@/lib/extract";
 import { useRecipes } from "@/hooks/useRecipes";
+import { incrementUsage } from "@/lib/usage";
 
 export default function CameraScanner() {
     const [permission, requestPermission] = useCameraPermissions();
@@ -32,6 +33,8 @@ export default function CameraScanner() {
 
             const recipe = await extractFromImage(photo.base64);
             const recipeId = await insertRecipe(recipe, undefined, "camera");
+
+            await incrementUsage();
 
             if (recipeId) {
                 router.replace(`/recipe/${recipeId}`);

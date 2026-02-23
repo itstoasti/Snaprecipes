@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, Platform, StatusBar } from "react-native";
+import { View, Text, Platform, StatusBar, Image } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeIn, FadeOut, SlideInDown, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,7 +23,9 @@ export default function WelcomeScreen() {
             style={{ paddingTop: Math.max(insets.top, Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0) }}
         >
             <Animated.View entering={FadeIn.duration(1000)} className="items-center mb-12">
-                <Text className="text-6xl mb-4">🍳</Text>
+                <View className="mb-6 w-24 h-24 rounded-3xl overflow-hidden self-center border-2 border-surface-800 shadow-xl shadow-black/40">
+                    <Image source={require("../../assets/icon.png")} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                </View>
                 <Text className="text-white font-sans-bold text-4xl">SnapRecipes</Text>
             </Animated.View>
 

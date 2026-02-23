@@ -9,6 +9,7 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
+    Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -26,7 +27,7 @@ import Animated, {
 import GlassContainer from "./GlassContainer";
 import { extractFromUrl } from "@/lib/extract";
 import { useRecipes } from "@/hooks/useRecipes";
-import { hasReachedFreeLimit, incrementMonthlyUsage } from "@/lib/usage";
+import { incrementUsage } from "@/lib/usage";
 
 interface ImportModalProps {
     visible: boolean;
@@ -125,17 +126,27 @@ export default function ImportModal({ visible, onClose }: ImportModalProps) {
     const [mode, setMode] = useState<"choose" | "url">("choose");
     const { insertRecipe } = useRecipes();
     const router = useRouter();
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+    useEffect(() => {
+        const showSubscription = Keyboard.addListener(
+            Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+            (e) => setKeyboardHeight(e.endCoordinates.height)
+        );
+        const hideSubscription = Keyboard.addListener(
+            Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+            () => setKeyboardHeight(0)
+        );
+
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+        };
+    }, []);
 
     const handleExtractUrl = async () => {
         if (!url.trim()) {
             Alert.alert("Error", "Please enter a URL");
-            return;
-        }
-
-        const reachedLimit = await hasReachedFreeLimit();
-        if (reachedLimit) {
-            onClose();
-            router.push("/paywall");
             return;
         }
 
@@ -144,7 +155,8 @@ export default function ImportModal({ visible, onClose }: ImportModalProps) {
             const recipe = await extractFromUrl(url.trim());
             const recipeId = await insertRecipe(recipe, url.trim(), "url");
 
-            await incrementMonthlyUsage();
+            // Tick up the free usage counter
+            await incrementUsage();
 
             setUrl("");
             setMode("choose");
@@ -159,27 +171,13 @@ export default function ImportModal({ visible, onClose }: ImportModalProps) {
         }
     };
 
-    const handleCamera = async () => {
-        const reachedLimit = await hasReachedFreeLimit();
-        if (reachedLimit) {
-            onClose();
-            router.push("/paywall");
-            return;
-        }
-
+    const handleCamera = () => {
         setMode("choose");
         onClose();
         router.push("/camera");
     };
 
-    const handleManual = async () => {
-        const reachedLimit = await hasReachedFreeLimit();
-        if (reachedLimit) {
-            onClose();
-            router.push("/paywall");
-            return;
-        }
-
+    const handleManual = () => {
         setMode("choose");
         onClose();
         router.push("/recipe/new");
@@ -198,145 +196,143 @@ export default function ImportModal({ visible, onClose }: ImportModalProps) {
             animationType="fade"
             onRequestClose={handleClose}
         >
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                className="flex-1"
+            <Pressable
+                onPress={handleClose}
+                className="flex-1 bg-black/60 justify-end"
             >
-                <Pressable
-                    onPress={handleClose}
-                    className="flex-1 bg-black/60 justify-end"
-                >
-                    <Pressable onPress={(e) => e.stopPropagation()}>
-                        <Animated.View entering={SlideInDown.springify().damping(26).stiffness(70)}>
-                            <GlassContainer
-                                style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
-                                className="p-6 pb-12"
-                            >
-                                {/* Handle */}
-                                <View className="self-center w-10 h-1 bg-surface-500 rounded-full mb-5" />
+                <Pressable onPress={(e) => e.stopPropagation()}>
+                    <Animated.View
+                        entering={SlideInDown.springify().damping(26).stiffness(70)}
+                        style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : 0 }}
+                    >
+                        <GlassContainer
+                            style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
+                            className="p-6 pb-12"
+                        >
+                            {/* Handle */}
+                            <View className="self-center w-10 h-1 bg-surface-500 rounded-full mb-5" />
 
-                                {mode === "choose" ? (
-                                    <>
-                                        <Text className="text-white font-sans-bold text-xl mb-1">
-                                            Import Recipe
-                                        </Text>
-                                        <Text className="text-surface-400 font-sans text-sm mb-6">
-                                            Choose how you'd like to add a recipe
-                                        </Text>
+                            {mode === "choose" ? (
+                                <>
+                                    <Text className="text-white font-sans-bold text-xl mb-1">
+                                        Import Recipe
+                                    </Text>
+                                    <Text className="text-surface-400 font-sans text-sm mb-6">
+                                        Choose how you'd like to add a recipe
+                                    </Text>
 
-                                        {/* URL Option */}
-                                        <Pressable
-                                            onPress={() => setMode("url")}
-                                            className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl mb-3"
-                                        >
-                                            <View className="w-12 h-12 rounded-full bg-accent/20 items-center justify-center mr-4">
-                                                <Ionicons name="link" size={24} color="#FF6B35" />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="text-white font-sans-semibold text-base">
-                                                    Paste URL
-                                                </Text>
-                                                <Text className="text-surface-400 font-sans text-xs mt-0.5">
-                                                    Import from any website, TikTok, Instagram, Reddit
-                                                </Text>
-                                            </View>
-                                            <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
-                                        </Pressable>
-
-                                        {/* Camera Option */}
-                                        <Pressable
-                                            onPress={handleCamera}
-                                            className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl mb-3"
-                                        >
-                                            <View className="w-12 h-12 rounded-full bg-mint/20 items-center justify-center mr-4">
-                                                <Ionicons name="camera" size={24} color="#34D399" />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="text-white font-sans-semibold text-base">
-                                                    Scan Recipe
-                                                </Text>
-                                                <Text className="text-surface-400 font-sans text-xs mt-0.5">
-                                                    Take a photo of a printed or handwritten recipe
-                                                </Text>
-                                            </View>
-                                            <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
-                                        </Pressable>
-
-                                        {/* Manual Option */}
-                                        <Pressable
-                                            onPress={handleManual}
-                                            className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl"
-                                        >
-                                            <View className="w-12 h-12 rounded-full bg-surface-600/40 items-center justify-center mr-4">
-                                                <Ionicons name="create-outline" size={24} color="#FFFFFF" />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="text-white font-sans-semibold text-base">
-                                                    Add Manually
-                                                </Text>
-                                                <Text className="text-surface-400 font-sans text-xs mt-0.5">
-                                                    Type or paste text directly into a form
-                                                </Text>
-                                            </View>
-                                            <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
-                                        </Pressable>
-                                    </>
-                                ) : (
-                                    <>
-                                        {/* Back button */}
-                                        <Pressable
-                                            onPress={() => setMode("choose")}
-                                            className="flex-row items-center mb-4"
-                                            disabled={loading}
-                                        >
-                                            <Ionicons name="arrow-back" size={20} color={loading ? "#6E6E85" : "#FF6B35"} />
-                                            <Text className={`font-sans-medium text-sm ml-1 ${loading ? "text-surface-500" : "text-accent"}`}>
-                                                Back
+                                    {/* URL Option */}
+                                    <Pressable
+                                        onPress={() => setMode("url")}
+                                        className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl mb-3"
+                                    >
+                                        <View className="w-12 h-12 rounded-full bg-accent/20 items-center justify-center mr-4">
+                                            <Ionicons name="link" size={24} color="#FF6B35" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-white font-sans-semibold text-base">
+                                                Paste URL
                                             </Text>
-                                        </Pressable>
+                                            <Text className="text-surface-400 font-sans text-xs mt-0.5">
+                                                Import from any website, TikTok, Instagram, Reddit
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                                    </Pressable>
 
-                                        {loading ? (
-                                            <ExtractionLoader />
-                                        ) : (
-                                            <Animated.View entering={FadeIn}>
-                                                <Text className="text-white font-sans-bold text-xl mb-1">
-                                                    Paste Recipe URL
+                                    {/* Camera Option */}
+                                    <Pressable
+                                        onPress={handleCamera}
+                                        className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl mb-3"
+                                    >
+                                        <View className="w-12 h-12 rounded-full bg-mint/20 items-center justify-center mr-4">
+                                            <Ionicons name="camera" size={24} color="#34D399" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-white font-sans-semibold text-base">
+                                                Scan Recipe
+                                            </Text>
+                                            <Text className="text-surface-400 font-sans text-xs mt-0.5">
+                                                Take a photo of a printed or handwritten recipe
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                                    </Pressable>
+
+                                    {/* Manual Option */}
+                                    <Pressable
+                                        onPress={handleManual}
+                                        className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl"
+                                    >
+                                        <View className="w-12 h-12 rounded-full bg-surface-600/40 items-center justify-center mr-4">
+                                            <Ionicons name="create-outline" size={24} color="#FFFFFF" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-white font-sans-semibold text-base">
+                                                Add Manually
+                                            </Text>
+                                            <Text className="text-surface-400 font-sans text-xs mt-0.5">
+                                                Type or paste text directly into a form
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                                    </Pressable>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Back button */}
+                                    <Pressable
+                                        onPress={() => setMode("choose")}
+                                        className="flex-row items-center mb-4"
+                                        disabled={loading}
+                                    >
+                                        <Ionicons name="arrow-back" size={20} color={loading ? "#6E6E85" : "#FF6B35"} />
+                                        <Text className={`font-sans-medium text-sm ml-1 ${loading ? "text-surface-500" : "text-accent"}`}>
+                                            Back
+                                        </Text>
+                                    </Pressable>
+
+                                    {loading ? (
+                                        <ExtractionLoader />
+                                    ) : (
+                                        <Animated.View entering={FadeIn}>
+                                            <Text className="text-white font-sans-bold text-xl mb-1">
+                                                Paste Recipe URL
+                                            </Text>
+                                            <Text className="text-surface-400 font-sans text-sm mb-4">
+                                                Works with most recipe websites and social media
+                                            </Text>
+
+                                            <TextInput
+                                                value={url}
+                                                onChangeText={setUrl}
+                                                placeholder="https://www.allrecipes.com/recipe/..."
+                                                placeholderTextColor="#6E6E85"
+                                                autoCapitalize="none"
+                                                autoCorrect={false}
+                                                keyboardType="url"
+                                                returnKeyType="go"
+                                                onSubmitEditing={handleExtractUrl}
+                                                className="bg-surface-800 text-white font-sans p-4 rounded-2xl mb-4 text-sm"
+                                            />
+
+                                            <Pressable
+                                                onPress={handleExtractUrl}
+                                                disabled={!url.trim()}
+                                                className={`p-4 rounded-2xl items-center ${!url.trim() ? "bg-accent/40" : "bg-accent"}`}
+                                            >
+                                                <Text className="text-white font-sans-semibold text-base">
+                                                    Extract Recipe
                                                 </Text>
-                                                <Text className="text-surface-400 font-sans text-sm mb-4">
-                                                    Works with most recipe websites and social media
-                                                </Text>
-
-                                                <TextInput
-                                                    value={url}
-                                                    onChangeText={setUrl}
-                                                    placeholder="https://www.allrecipes.com/recipe/..."
-                                                    placeholderTextColor="#6E6E85"
-                                                    autoCapitalize="none"
-                                                    autoCorrect={false}
-                                                    keyboardType="url"
-                                                    returnKeyType="go"
-                                                    onSubmitEditing={handleExtractUrl}
-                                                    className="bg-surface-800 text-white font-sans p-4 rounded-2xl mb-4 text-sm"
-                                                />
-
-                                                <Pressable
-                                                    onPress={handleExtractUrl}
-                                                    disabled={!url.trim()}
-                                                    className={`p-4 rounded-2xl items-center ${!url.trim() ? "bg-accent/40" : "bg-accent"}`}
-                                                >
-                                                    <Text className="text-white font-sans-semibold text-base">
-                                                        Extract Recipe
-                                                    </Text>
-                                                </Pressable>
-                                            </Animated.View>
-                                        )}
-                                    </>
-                                )}
-                            </GlassContainer>
-                        </Animated.View>
-                    </Pressable>
+                                            </Pressable>
+                                        </Animated.View>
+                                    )}
+                                </>
+                            )}
+                        </GlassContainer>
+                    </Animated.View>
                 </Pressable>
-            </KeyboardAvoidingView>
+            </Pressable>
         </Modal>
     );
 }

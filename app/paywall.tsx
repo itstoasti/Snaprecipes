@@ -14,8 +14,13 @@ export default function PaywallScreen() {
     const [loading, setLoading] = React.useState(false);
 
     React.useEffect(() => {
-        if (currentOffering) {
-            Purchases.logPaywallPresented(currentOffering);
+        // Log paywall view for analytics (optional, may not be available in all SDK versions)
+        if (currentOffering && typeof Purchases.logPaywallPresented === 'function') {
+            try {
+                Purchases.logPaywallPresented(currentOffering);
+            } catch (e) {
+                // Silently ignore if not supported
+            }
         }
     }, [currentOffering]);
 

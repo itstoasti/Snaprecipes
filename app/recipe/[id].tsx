@@ -22,10 +22,11 @@ import CookMode from "@/components/CookMode";
 import ServingScaler, { scaleQuantity } from "@/components/ServingScaler";
 import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
 import CollectionPickerModal from "@/components/CollectionPickerModal";
+import EditRecipeModal from "@/components/EditRecipeModal";
 import { useCookMode } from "@/hooks/useCookMode";
 import { useRecipes } from "@/hooks/useRecipes";
 import type { Recipe, Ingredient, Step } from "@/db/schema";
-import { hasReachedFreeLimit } from "@/lib/usage";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -37,7 +38,8 @@ function isVideoUrl(url: string | null): boolean {
 export default function RecipeDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
-    const { getRecipeById, deleteRecipe } = useRecipes();
+    const { getRecipeById, deleteRecipe, updateRecipe } = useRecipes();
+    const { isPro } = useRevenueCat();
     const {
         isCookMode,
         checkedIngredients,
@@ -57,6 +59,7 @@ export default function RecipeDetailScreen() {
     const [imageError, setImageError] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showCollectionModal, setShowCollectionModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const insets = useSafeAreaInsets();
 
     const isVideo = recipe ? isVideoUrl(recipe.source_url) : false;
@@ -93,8 +96,7 @@ export default function RecipeDetailScreen() {
     const handleStartCooking = async () => {
         if (!recipe) return;
 
-        const reachedLimit = await hasReachedFreeLimit();
-        if (reachedLimit) {
+        if (!isPro) {
             router.push("/paywall");
             return;
         }
@@ -117,6 +119,23 @@ export default function RecipeDetailScreen() {
                 Alert.alert("Error", "Failed to open the video link.");
             }
         }
+    };
+
+    const handleSaveEdit = async (
+        updates: {
+            title?: string;
+            description?: string;
+            servings?: number;
+            prep_time?: string;
+            cook_time?: string;
+            image_url?: string;
+        },
+        newIngredients: { id?: number; text: string; quantity?: string; unit?: string; name: string }[],
+        newSteps: { id?: number; text: string; step_number: number }[]
+    ) => {
+        if (!recipe) return;
+        await updateRecipe(recipe.id, updates, newIngredients, newSteps);
+        await loadData();
     };
 
     if (loading || !recipe) {
@@ -204,16 +223,25 @@ export default function RecipeDetailScreen() {
                     {/* Add to Collection button */}
                     <Pressable
                         onPress={() => setShowCollectionModal(true)}
-                        className="absolute right-[72px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                        className="absolute right-[120px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
                         style={{ top: Math.max(insets.top, 20) + 12 }}
                     >
                         <Ionicons name="folder-outline" size={20} color="#FFFFFF" />
                     </Pressable>
 
+                    {/* Edit button */}
+                    <Pressable
+                        onPress={() => setShowEditModal(true)}
+                        className="absolute right-[68px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                        style={{ top: Math.max(insets.top, 20) + 12 }}
+                    >
+                        <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
+                    </Pressable>
+
                     {/* Delete button */}
                     <Pressable
                         onPress={handleDelete}
-                        className="absolute right-5 w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                        className="absolute right-4 w-10 h-10 rounded-full bg-black/50 items-center justify-center"
                         style={{ top: Math.max(insets.top, 20) + 12 }}
                     >
                         <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
@@ -291,12 +319,16 @@ export default function RecipeDetailScreen() {
                                         className={`flex-row items-center py-3 ${index < ingredients.length - 1 ? "border-b border-surface-800" : ""
                                             }`}
                                     >
-                                        <Text className="text-accent font-sans-bold text-sm w-14">
-                                            {scaledQty}
-                                        </Text>
-                                        <Text className="text-surface-300 font-sans text-sm mr-1">
-                                            {ing.unit || ""}
-                                        </Text>
+                                        <View className="w-24 flex-row items-center">
+                                            <Text className="text-accent font-sans-bold text-sm">
+                                                {scaledQty}
+                                            </Text>
+                                            {ing.unit ? (
+                                                <Text className="text-surface-300 font-sans text-sm ml-1">
+                                                    {ing.unit}
+                                                </Text>
+                                            ) : null}
+                                        </View>
                                         <Text className="text-white font-sans text-sm flex-1">
                                             {ing.name}
                                         </Text>
@@ -353,6 +385,16 @@ export default function RecipeDetailScreen() {
                 visible={showCollectionModal}
                 recipeId={recipe.id}
                 onClose={() => setShowCollectionModal(false)}
+            />
+
+            {/* Edit Recipe Modal */}
+            <EditRecipeModal
+                visible={showEditModal}
+                recipe={recipe}
+                ingredients={ingredients}
+                steps={steps}
+                onSave={handleSaveEdit}
+                onClose={() => setShowEditModal(false)}
             />
         </View>
     );

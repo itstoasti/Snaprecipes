@@ -1,15 +1,19 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, Platform, TextInput, Pressable } from "react-native";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useCollections } from "@/hooks/useCollections";
 import RecipeFeed from "@/components/RecipeFeed";
 import FilterBar from "@/components/FilterBar";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import ImportModal from "@/components/ImportModal";
-import { getDatabase } from "@/db/client";
+import { useSQLiteContext } from "expo-sqlite";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { canExtractRecipe } from "@/lib/usage";
 
 interface TagItem {
     id: number;
@@ -24,13 +28,15 @@ export default function HomeScreen() {
     const [tags, setTags] = useState<TagItem[]>([]);
     const [filteredRecipes, setFilteredRecipes] = useState(recipes);
     const [searchQuery, setSearchQuery] = useState("");
+    const db = useSQLiteContext();
+    const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { isPro } = useRevenueCat();
     const params = useLocalSearchParams();
 
     // Load tags
     useEffect(() => {
         (async () => {
-            const db = await getDatabase();
             const t = await db.getAllAsync<TagItem>("SELECT * FROM tags ORDER BY name");
             setTags(t);
         })();
@@ -54,7 +60,6 @@ export default function HomeScreen() {
             if (activeFilter === "all") {
                 results = recipes;
             } else {
-                const db = await getDatabase();
                 if (activeFilter.startsWith("col_")) {
                     const colId = parseInt(activeFilter.replace("col_", ""));
                     results = await db.getAllAsync<any>(
@@ -104,6 +109,26 @@ export default function HomeScreen() {
         })),
     ];
 
+    const handleRefresh = useCallback(async () => {
+        try {
+            await pushPendingChanges();
+            await pullRemoteChanges();
+        } catch (e) {
+            console.log("Manual sync failed:", e);
+        } finally {
+            await loadRecipes();
+        }
+    }, [loadRecipes]);
+
+    const checkUsageAndOpenModal = async () => {
+        const allowed = await canExtractRecipe(isPro);
+        if (allowed) {
+            setShowImport(true);
+        } else {
+            router.push("/paywall");
+        }
+    };
+
     return (
         <View
             className="flex-1 bg-surface-950"
@@ -152,11 +177,11 @@ export default function HomeScreen() {
             <RecipeFeed
                 recipes={filteredRecipes}
                 loading={loading}
-                onRefresh={loadRecipes}
+                onRefresh={handleRefresh}
             />
 
             {/* FAB */}
-            <FloatingActionButton onPress={() => setShowImport(true)} />
+            <FloatingActionButton onPress={checkUsageAndOpenModal} />
 
             {/* Import Modal */}
             <ImportModal

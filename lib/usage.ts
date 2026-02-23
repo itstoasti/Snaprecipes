@@ -1,41 +1,42 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from "expo-secure-store";
 
-const USAGE_MONTH_KEY = "current_usage_month";
-const USAGE_COUNT_KEY = "current_usage_count";
+const FREE_TIER_LIMIT = 5;
+const USAGE_COUNT_KEY = "snapshot_usage_count";
+const USAGE_MONTH_KEY = "snapshot_usage_month"; // Tracks the month integer (0-11)
 
-export const FREE_TIER_LIMIT = 5;
+/**
+ * Gets the current usage count for the month. Resets if the month has changed.
+ */
+export async function getCurrentUsage(): Promise<number> {
+    const currentMonth = new Date().getMonth().toString();
+    const storedMonth = await SecureStore.getItemAsync(USAGE_MONTH_KEY);
 
-// Basic usage tracker for the Freemium hook
-export const getMonthlyUsage = async (): Promise<number> => {
-    try {
-        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-        const storedMonth = await SecureStore.getItemAsync(USAGE_MONTH_KEY);
-
-        // If it's a new month, reset the counter
-        if (storedMonth !== currentMonth) {
-            await SecureStore.setItemAsync(USAGE_MONTH_KEY, currentMonth);
-            await SecureStore.setItemAsync(USAGE_COUNT_KEY, "0");
-            return 0;
-        }
-
-        const countStr = await SecureStore.getItemAsync(USAGE_COUNT_KEY);
-        return countStr ? parseInt(countStr, 10) : 0;
-    } catch (e) {
-        console.warn("Error reading usage:", e);
+    if (storedMonth !== currentMonth) {
+        // New month, reset logic
+        await SecureStore.setItemAsync(USAGE_MONTH_KEY, currentMonth);
+        await SecureStore.setItemAsync(USAGE_COUNT_KEY, "0");
         return 0;
     }
-};
 
-export const incrementMonthlyUsage = async () => {
-    try {
-        const current = await getMonthlyUsage();
-        await SecureStore.setItemAsync(USAGE_COUNT_KEY, (current + 1).toString());
-    } catch (e) {
-        console.warn("Error incrementing usage:", e);
-    }
-};
+    const storedCount = await SecureStore.getItemAsync(USAGE_COUNT_KEY);
+    return storedCount ? parseInt(storedCount, 10) : 0;
+}
 
-export const hasReachedFreeLimit = async (): Promise<boolean> => {
-    const current = await getMonthlyUsage();
-    return current >= FREE_TIER_LIMIT;
-};
+/**
+ * Checks if the user is allowed to extract a new recipe.
+ */
+export async function canExtractRecipe(isPro: boolean): Promise<boolean> {
+    if (isPro) return true; // Pro users always pass
+
+    const currentUsage = await getCurrentUsage();
+    return currentUsage < FREE_TIER_LIMIT;
+}
+
+/**
+ * Increments the user's monthly usage count.
+ * Call this AFTER a successful extraction.
+ */
+export async function incrementUsage(): Promise<void> {
+    const currentUsage = await getCurrentUsage();
+    await SecureStore.setItemAsync(USAGE_COUNT_KEY, (currentUsage + 1).toString());
+}

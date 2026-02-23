@@ -86,26 +86,38 @@ export default function CookMode({
                                         )}
                                     </View>
 
-                                    {/* Quantity */}
-                                    {scaledQty ? (
-                                        <Text
-                                            className={`font-sans-bold text-xl mr-2 ${isChecked
-                                                ? "text-surface-500 line-through"
-                                                : "text-accent"
-                                                }`}
-                                        >
-                                            {scaledQty}
-                                        </Text>
-                                    ) : null}
+                                    {/* Quantity and Unit Column */}
+                                    <View className="w-28 flex-row items-baseline">
+                                        {scaledQty ? (
+                                            <Text
+                                                className={`font-sans-bold text-xl mr-1.5 ${isChecked
+                                                    ? "text-surface-500 line-through"
+                                                    : "text-accent"
+                                                    }`}
+                                            >
+                                                {scaledQty}
+                                            </Text>
+                                        ) : null}
+                                        {ing.unit ? (
+                                            <Text
+                                                className={`font-sans text-base ${isChecked
+                                                    ? "text-surface-500 line-through"
+                                                    : "text-surface-400"
+                                                    }`}
+                                            >
+                                                {ing.unit}
+                                            </Text>
+                                        ) : null}
+                                    </View>
 
-                                    {/* Unit + Name */}
+                                    {/* Name */}
                                     <Text
-                                        className={`font-sans text-xl flex-1 ${isChecked
+                                        className={`font-sans text-lg flex-1 leading-snug ${isChecked
                                             ? "text-surface-500 line-through"
                                             : "text-white"
                                             }`}
                                     >
-                                        {ing.unit ? `${ing.unit} ` : ""}{ing.name}
+                                        {ing.name}
                                     </Text>
                                 </Pressable>
                             </Animated.View>

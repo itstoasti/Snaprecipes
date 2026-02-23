@@ -3,6 +3,7 @@
 
 export interface Recipe {
     id: number;
+    remote_id: string | null;
     title: string;
     description: string | null;
     image_url: string | null;
@@ -18,6 +19,7 @@ export interface Recipe {
 
 export interface Ingredient {
     id: number;
+    remote_id: string | null;
     recipe_id: number;
     text: string;
     quantity: string | null;
@@ -29,6 +31,7 @@ export interface Ingredient {
 
 export interface Step {
     id: number;
+    remote_id: string | null;
     recipe_id: number;
     text: string;
     step_number: number;
@@ -37,6 +40,7 @@ export interface Step {
 
 export interface Collection {
     id: number;
+    remote_id: string | null;
     name: string;
     color: string;
     icon_name: string;
@@ -50,6 +54,7 @@ export interface RecipeCollection {
 
 export interface Tag {
     id: number;
+    remote_id: string | null;
     name: string;
 }
 
@@ -82,6 +87,7 @@ export interface ExtractedRecipe {
 export const CREATE_TABLES_SQL = `
   CREATE TABLE IF NOT EXISTS recipes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
     title TEXT NOT NULL,
     description TEXT,
     image_url TEXT,
@@ -97,6 +103,7 @@ export const CREATE_TABLES_SQL = `
 
   CREATE TABLE IF NOT EXISTS ingredients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
     recipe_id INTEGER NOT NULL,
     text TEXT NOT NULL,
     quantity TEXT,
@@ -109,6 +116,7 @@ export const CREATE_TABLES_SQL = `
 
   CREATE TABLE IF NOT EXISTS steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
     recipe_id INTEGER NOT NULL,
     text TEXT NOT NULL,
     step_number INTEGER NOT NULL,
@@ -118,6 +126,7 @@ export const CREATE_TABLES_SQL = `
 
   CREATE TABLE IF NOT EXISTS collections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
     name TEXT NOT NULL,
     color TEXT NOT NULL DEFAULT '#FF6B35',
     icon_name TEXT NOT NULL DEFAULT 'folder',
@@ -134,6 +143,7 @@ export const CREATE_TABLES_SQL = `
 
   CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
     name TEXT NOT NULL UNIQUE
   );
 

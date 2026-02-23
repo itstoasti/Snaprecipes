@@ -118,20 +118,66 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
     }
 
     if (ogImage) {
+        console.log("OG Image URL captured:", ogImage);
         contentForAI += `\n\nIMPORTANT: The original webpage's designated thumbnail image is: ${ogImage}. If you cannot find a better photo of the finished dish in the text above, you MUST use this URL as the \`imageUrl\`. Note: if it is a video thumbnail with a play button, that is perfectly fine. DO NOT attempt to remove the play button or alter the URL. Use the URL exactly as provided.`;
     }
 
     const provider = await SecureStore.getItemAsync(AI_PROVIDER_STORE) || "gemini";
 
-    const { data, error } = await supabase.functions.invoke("extract-recipe", {
-        body: { url, contentForAI, prompt: RECIPE_EXTRACTION_PROMPT, provider },
+    // Use raw fetch temporarily to get the exact textual error from the Edge Function
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://omfmcjmebejcsityvtgx.supabase.co";
+    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Fo9XJu4kuLhwcR81nvuxWw_JiCXHXsJ";
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/extract-recipe`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify({ url, contentForAI, prompt: RECIPE_EXTRACTION_PROMPT, provider, geminiModel: 'gemini-2.5-flash' })
     });
 
-    if (error) {
-        throw new Error(`Edge Function Error: ${error.message}`);
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Detailed Edge Function Error: ${errorText} (Status: ${response.status})`);
     }
 
-    return validateRecipe(data);
+    const data = await response.json();
+
+    // Debug: Log raw response from AI to diagnose Gemini issues
+    console.log("=== RAW AI RESPONSE ===");
+    console.log("Provider:", provider);
+    console.log("Has imageUrl:", !!data.imageUrl);
+    console.log("Has steps:", !!data.steps, "Length:", data.steps?.length || 0);
+    console.log("Has ingredients:", !!data.ingredients, "Length:", data.ingredients?.length || 0);
+    console.log("=== END DEBUG ===");
+
+    const recipe = validateRecipe(data);
+
+    // Instagram/TikTok CDN URLs often fail to load in apps (require cookies/headers)
+    // Check if the extracted image is from a problematic CDN
+    const isProblematicCdn = recipe.imageUrl && (
+        recipe.imageUrl.includes("cdninstagram.com") ||
+        recipe.imageUrl.includes("fbcdn.net") ||
+        recipe.imageUrl.includes("scontent") ||
+        recipe.imageUrl.includes("tiktokcdn.com")
+    );
+
+    // For problematic CDN URLs, try to use a cleaner fallback
+    // Note: ogImage might also be from the same CDN, but it's worth trying
+    if (isProblematicCdn) {
+        console.log("Detected problematic CDN image URL, this may not load in the app");
+        // Keep the URL anyway - expo-image might be able to load it
+        // The user will see a placeholder if it fails
+    }
+
+    // If no image was extracted, use OG image as fallback
+    if (!recipe.imageUrl && ogImage) {
+        console.log("Using OG image fallback:", ogImage);
+        recipe.imageUrl = ogImage;
+    }
+
+    return recipe;
 }
 
 /**
@@ -141,7 +187,7 @@ export async function extractFromImage(base64Image: string): Promise<ExtractedRe
     const provider = await SecureStore.getItemAsync(AI_PROVIDER_STORE) || "gemini";
 
     const { data, error } = await supabase.functions.invoke("extract-recipe", {
-        body: { imageBase64: base64Image, provider },
+        body: { imageBase64: base64Image, provider, geminiModel: 'gemini-2.5-flash' },
     });
 
     if (error) {
@@ -176,6 +222,24 @@ function parseAIResponse(text: string | null | undefined): ExtractedRecipe {
  * Ensure required fields exist with defaults
  */
 function validateRecipe(data: any): ExtractedRecipe {
+    const rawIngredients = data.ingredients || data.ingredient || [];
+    const ingredientsArray = Array.isArray(rawIngredients) ? rawIngredients : [];
+
+    const rawSteps = data.steps || data.instructions || data.instruction || data.method || [];
+    const stepsArray = Array.isArray(rawSteps) ? rawSteps : [];
+
+    // Filter out empty/invalid ingredients
+    const validIngredients = ingredientsArray.filter((ing: any) => {
+        const text = ing.text || ing.name || "";
+        return text.trim().length > 0;
+    });
+
+    // Filter out empty/invalid steps
+    const validSteps = stepsArray.filter((step: any) => {
+        const text = step.text || step.instruction || step.description || "";
+        return text.trim().length > 0;
+    });
+
     return {
         title: data.title || "Untitled Recipe",
         description: data.description || undefined,
@@ -183,20 +247,16 @@ function validateRecipe(data: any): ExtractedRecipe {
         servings: data.servings || 4,
         prepTime: data.prepTime || undefined,
         cookTime: data.cookTime || undefined,
-        ingredients: Array.isArray(data.ingredients)
-            ? data.ingredients.map((ing: any, i: number) => ({
-                text: ing.text || `${ing.quantity || ""} ${ing.unit || ""} ${ing.name || ""}`.trim(),
-                quantity: ing.quantity || null,
-                unit: ing.unit || null,
-                name: ing.name || ing.text || `Ingredient ${i + 1}`,
-            }))
-            : [],
-        steps: Array.isArray(data.steps)
-            ? data.steps.map((step: any, i: number) => ({
-                text: step.text || step.instruction || `Step ${i + 1}`,
-                stepNumber: step.stepNumber || i + 1,
-            }))
-            : [],
+        ingredients: validIngredients.map((ing: any, i: number) => ({
+            text: ing.text || `${ing.quantity || ""} ${ing.unit || ""} ${ing.name || ""}`.trim(),
+            quantity: ing.quantity || null,
+            unit: ing.unit || null,
+            name: ing.name || ing.text || `Ingredient ${i + 1}`,
+        })),
+        steps: validSteps.map((step: any, i: number) => ({
+            text: step.text || step.instruction || step.description || `Step ${i + 1}`,
+            stepNumber: step.stepNumber || step.number || i + 1,
+        })),
         tags: Array.isArray(data.tags) ? data.tags : undefined,
     };
 }

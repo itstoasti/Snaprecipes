@@ -1,26 +1,35 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { jsonrepair } from "https://esm.sh/jsonrepair";
 
 const DEFAULT_GEMINI_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const DEFAULT_OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
-const RECIPE_PROMPT = `You are a recipe extraction expert. Analyze the provided content and extract a structured recipe. Return ONLY valid JSON with this exact schema:
+const RECIPE_PROMPT = `You are a world-class recipe extraction expert. Critically analyze the provided content and meticulously extract every piece of recipe information.
+Return exactly ONE valid JSON object matching this schema structure. Do not omit any keys.
 {
-  "title": "string - recipe title",
-  "description": "string - brief description",
-  "imageUrl": "string or null - critically analyze all image URLs in the content. Select the URL that MOST clearly shows the finished food dish or recipe result. DO NOT select profile pictures, logos, avatars, or images of people. If no food image is found, return null.",
-  "servings": number,
-  "prepTime": "string - e.g. '15 min'",
-  "cookTime": "string - e.g. '30 min'",
+  "title": "recipe name",
+  "description": "brief description or null",
+  "imageUrl": "valid url or null",
+  "servings": 4,
+  "prepTime": "15 min",
+  "cookTime": "30 min",
   "ingredients": [
-    { "text": "full ingredient line", "quantity": "number as string", "unit": "cup/tbsp/etc", "name": "ingredient name" }
+    // Extract ALL available ingredients as objects in this array
+    { "text": "full ingredient line", "quantity": "string", "unit": "string", "name": "string" }
   ],
   "steps": [
-    { "text": "full step instruction", "stepNumber": number }
+    // Extract ALL available step-by-step instructions as objects in this array
+    { "text": "instruction step", "stepNumber": 1 }
   ],
-  "tags": ["string array of dietary/category tags like 'vegetarian', 'dessert', 'quick', etc"]
+  "tags": ["category list"]
 }
-If any field is unknown, use null for strings and reasonable defaults for numbers. Ensure ingredients have properly parsed quantities. Output raw JSON without markdown formatting blocks.`;
+
+CRITICAL RULES:
+1. You MUST include EVERY key from the schema above. NEVER omit 'ingredients' or 'steps'.
+2. If an array is missing from the text (e.g. no step-by-step instructions exist), you MUST output an empty array: "steps": [].
+3. If an ingredient list is present but instructions are missing, you MUST STILL extract the ENTIRE ingredients list!
+4. Output raw JSON ONLY. No markdown blocks.`;
 
 Deno.serve(async (req: Request) => {
     // Handle CORS preflight
@@ -97,7 +106,7 @@ Deno.serve(async (req: Request) => {
             const payload: any = {
                 generationConfig: {
                     temperature: 0.1,
-                    maxOutputTokens: 4096,
+                    maxOutputTokens: 8192,
                     responseMimeType: "application/json",
                 },
                 contents: [{ parts: [] }]
@@ -135,14 +144,26 @@ Deno.serve(async (req: Request) => {
             throw new Error("Empty response from AI engine");
         }
 
-        // Parse and return (let the client handle standard validation)
+        // Robust JSON Parsing
+        let cleanText = aiResponseText.trim();
+        const jsonMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+            cleanText = jsonMatch[1].trim();
+        }
+
         let parsedData;
         try {
-            parsedData = JSON.parse(aiResponseText);
-        } catch {
-            const jsonMatch = aiResponseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (jsonMatch) parsedData = JSON.parse(jsonMatch[1]);
-            else throw new Error("Could not parse JSON from AI response.");
+            // Use jsonrepair to violently fix trailing commas, bracket mismatches, unquoted keys, and array/object hallucinations
+            const repairedJsonString = jsonrepair(cleanText);
+            parsedData = JSON.parse(repairedJsonString);
+        } catch (error) {
+            throw new Error(`Could not parse JSON. Raw Gemini Output: ${cleanText.substring(0, 300)}`);
+        }
+
+        // If it still returned an array of objects despite the prompt, unwrap it
+        if (Array.isArray(parsedData)) {
+            if (parsedData.length > 0) parsedData = parsedData[0];
+            else throw new Error("AI returned an empty JSON array.");
         }
 
         return new Response(JSON.stringify(parsedData), {

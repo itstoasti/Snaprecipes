@@ -9,6 +9,7 @@ import GlassContainer from "@/components/GlassContainer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
 
 
 export const AI_PROVIDER_STORE = "user_ai_provider";
@@ -48,12 +49,10 @@ export default function SettingsScreen() {
     const appVersion = Constants.expoConfig?.version || "1.0.0";
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { isPro } = useRevenueCat();
 
     // Supabase Auth State
     const [session, setSession] = useState<Session | null>(null);
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [authLoading, setAuthLoading] = useState(false);
     const [aiProvider, setAiProvider] = useState<"gemini" | "openai">("gemini");
 
     useEffect(() => {
@@ -73,24 +72,6 @@ export default function SettingsScreen() {
 
         return () => subscription.unsubscribe();
     }, []);
-
-    const signInWithEmail = async () => {
-        setAuthLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) Alert.alert("Sign In Failed", error.message);
-        setAuthLoading(false);
-    };
-
-    const signUpWithEmail = async () => {
-        setAuthLoading(true);
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) {
-            Alert.alert("Sign Up Failed", error.message);
-        } else {
-            Alert.alert("Success", "Account created successfully! You are now logged in.");
-        }
-        setAuthLoading(false);
-    };
 
     const signOut = async () => {
         const { error } = await supabase.auth.signOut();
@@ -160,9 +141,25 @@ export default function SettingsScreen() {
 
                 {/* Account & Sync */}
                 <Text className="text-white font-sans-semibold text-lg mb-3">Account & Cloud Sync</Text>
-                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24 }}>
+                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24, padding: 0 }}>
                     <View className="p-5">
-                        {session && session.user ? (
+                        {!isPro ? (
+                            <View className="items-center py-4">
+                                <View className="w-16 h-16 rounded-full bg-surface-800 items-center justify-center mb-4 border border-surface-700">
+                                    <Ionicons name="lock-closed" size={28} color="#9D9DB0" />
+                                </View>
+                                <Text className="text-white font-sans-bold text-lg mb-2">Pro Feature</Text>
+                                <Text className="text-surface-400 font-sans text-sm text-center mb-6 leading-5">
+                                    Upgrade to SnapRecipes Pro to create an account and unlock secure, automatic cloud syncing across all your devices.
+                                </Text>
+                                <Pressable
+                                    onPress={() => router.push("/paywall")}
+                                    className="w-full py-4 rounded-xl items-center bg-surface-800 border-surface-700 border"
+                                >
+                                    <Text className="text-white font-sans-bold text-base">Unlock Cloud Sync</Text>
+                                </Pressable>
+                            </View>
+                        ) : session && session.user ? (
                             <View>
                                 <View className="flex-row items-center mb-6">
                                     <View className="w-12 h-12 rounded-full bg-surface-800 items-center justify-center mr-4">
@@ -192,52 +189,15 @@ export default function SettingsScreen() {
                         ) : (
                             <View>
                                 <Text className="text-surface-300 font-sans text-sm mb-5 leading-5">
-                                    Create a free account to securely sync your collections to the cloud and access them across devices.
+                                    You are a Pro user! Create your free account to securely sync your collections to the cloud and access them across devices.
                                 </Text>
 
-                                <View className="flex-row items-center bg-surface-950 rounded-xl px-4 py-1 mb-3">
-                                    <Ionicons name="mail" size={18} color="#9D9DB0" className="mr-3" />
-                                    <TextInput
-                                        value={email}
-                                        onChangeText={setEmail}
-                                        placeholder="Email address"
-                                        placeholderTextColor="#6E6E85"
-                                        className="flex-1 text-white font-sans text-sm py-3 px-2"
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        keyboardType="email-address"
-                                    />
-                                </View>
-
-                                <View className="flex-row items-center bg-surface-950 rounded-xl px-4 py-1 mb-5">
-                                    <Ionicons name="lock-closed" size={18} color="#9D9DB0" className="mr-3" />
-                                    <TextInput
-                                        value={password}
-                                        onChangeText={setPassword}
-                                        placeholder="Password"
-                                        placeholderTextColor="#6E6E85"
-                                        className="flex-1 text-white font-sans text-sm py-3 px-2"
-                                        secureTextEntry
-                                    />
-                                </View>
-
-                                <View className="space-y-3">
-                                    <Pressable
-                                        onPress={signInWithEmail}
-                                        disabled={authLoading}
-                                        className={`w-full py-4 rounded-xl items-center ${authLoading ? 'bg-accent/50' : 'bg-accent'} shadow-lg shadow-accent/20`}
-                                    >
-                                        <Text className="text-white font-sans-bold text-base">Sign In</Text>
-                                    </Pressable>
-
-                                    <Pressable
-                                        onPress={signUpWithEmail}
-                                        disabled={authLoading}
-                                        className="w-full py-4 rounded-xl items-center border border-surface-700"
-                                    >
-                                        <Text className="text-surface-300 font-sans-semibold text-base">Create Account</Text>
-                                    </Pressable>
-                                </View>
+                                <Pressable
+                                    onPress={() => router.push("/auth")}
+                                    className="w-full py-4 rounded-xl items-center bg-accent shadow-lg shadow-accent/20"
+                                >
+                                    <Text className="text-white font-sans-bold text-base">Log In / Sign Up</Text>
+                                </Pressable>
                             </View>
                         )}
                     </View>
