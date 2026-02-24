@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(eas build:*)",
+      "Bash(start \"\" \"C:\\\\Users\\\\deanf\\\\OneDrive\\\\Desktop\\\\projects\\\\snaprecipe\\\\website\\\\index.html\")",
+      "Bash(git remote add:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd marketing website with privacy policy and delete account page\n\n- Landing page with features, pricing, and download CTA\n- Privacy policy \\(GDPR/CCPA compliant\\)\n- Delete account page for Google Play compliance\n- Added RevenueCat paywall analytics tracking\n- Updated EAS build config for Android App Bundle \\(.aab\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git mv:*)",
+      "Bash(git commit:*)",
+      "Bash(npm install:*)",
+      "Bash(cd:*)"
+    ]
+  }
+}
