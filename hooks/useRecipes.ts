@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDatabase } from "@/db/client";
 import { syncNewRecipe } from "@/lib/sync";
+import { supabase } from "@/lib/supabase";
 import type { Recipe, Ingredient, Step, ExtractedRecipe } from "@/db/schema";
 
 export function useRecipes() {
@@ -116,7 +117,31 @@ export function useRecipes() {
     const deleteRecipe = useCallback(
         async (id: number) => {
             const db = await getDatabase();
+
+            // Check if the recipe has been synced to Supabase
+            const recipe = await db.getFirstAsync<{ remote_id: string | null }>(
+                "SELECT remote_id FROM recipes WHERE id = ?",
+                [id]
+            );
+
+            // Delete locally
             await db.runAsync("DELETE FROM recipes WHERE id = ?", [id]);
+
+            // Also delete from Supabase if it was synced (fire-and-forget)
+            if (recipe?.remote_id) {
+                (async () => {
+                    try {
+                        await supabase.from('steps').delete().eq('recipe_id', recipe.remote_id);
+                        await supabase.from('ingredients').delete().eq('recipe_id', recipe.remote_id);
+                        const { error } = await supabase.from('recipes').delete().eq('id', recipe.remote_id);
+                        if (error) console.error("Failed to delete recipe from Supabase:", error);
+                        else console.log("Recipe deleted from Supabase:", recipe.remote_id);
+                    } catch (e) {
+                        console.error("Supabase delete failed:", e);
+                    }
+                })();
+            }
+
             await loadRecipes();
         },
         [loadRecipes]
