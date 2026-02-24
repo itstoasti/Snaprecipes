@@ -8,6 +8,7 @@ import * as Haptics from "expo-haptics";
 import GlassContainer from "@/components/GlassContainer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
+import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
 import type { Session } from "@supabase/supabase-js";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 
@@ -54,6 +55,7 @@ export default function SettingsScreen() {
     // Supabase Auth State
     const [session, setSession] = useState<Session | null>(null);
     const [aiProvider, setAiProvider] = useState<"gemini" | "openai">("gemini");
+    const [syncing, setSyncing] = useState(false);
 
     useEffect(() => {
         SecureStore.getItemAsync(AI_PROVIDER_STORE).then(val => {
@@ -174,9 +176,26 @@ export default function SettingsScreen() {
                                 </View>
 
                                 <View className="flex-row justify-between mb-4">
-                                    <Pressable className="flex-1 mr-2 bg-surface-800 py-3 rounded-lg flex-row items-center justify-center">
+                                    <Pressable
+                                        onPress={async () => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setSyncing(true);
+                                            try {
+                                                await pushPendingChanges();
+                                                await pullRemoteChanges();
+                                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                                Alert.alert("Sync Complete", "Your recipes are up to date!");
+                                            } catch (e: any) {
+                                                Alert.alert("Sync Failed", e.message || "An error occurred during sync.");
+                                            } finally {
+                                                setSyncing(false);
+                                            }
+                                        }}
+                                        disabled={syncing}
+                                        className={`flex-1 mr-2 bg-surface-800 py-3 rounded-lg flex-row items-center justify-center ${syncing ? 'opacity-50' : ''}`}
+                                    >
                                         <Ionicons name="sync" size={16} color="#34D399" className="mr-2" />
-                                        <Text className="text-white font-sans-semibold text-sm">Sync Now</Text>
+                                        <Text className="text-white font-sans-semibold text-sm">{syncing ? "Syncing..." : "Sync Now"}</Text>
                                     </Pressable>
                                     <Pressable onPress={signOut} className="flex-1 ml-2 border border-surface-700 py-3 rounded-lg items-center justify-center">
                                         <Text className="text-surface-400 font-sans-semibold text-sm">Sign Out</Text>

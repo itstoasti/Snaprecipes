@@ -33,9 +33,142 @@ Here are the rules you MUST follow:
 - Output raw JSON without markdown formatting blocks.
 - For 'imageUrl', critically analyze all image URLs in the content. Select the URL that MOST clearly shows the finished food dish or recipe result. DO NOT select profile pictures, logos, avatars, or images of people. If no food image is found, return null.
 - If an 'IMPORTANT' note about an 'imageUrl' is provided, you MUST use that URL if you cannot find a better food image in the content.
+- NEVER truncate or abbreviate. You MUST include EVERY SINGLE step and ingredient. If there are 10 steps, output all 10. If there are 30 ingredients, output all 30. Do not stop early.
+- For social media content (TikTok, Instagram), infer and reconstruct the full recipe from the caption/description. Captions often describe the full recipe in a narrative format — parse it into structured ingredients and steps.
 
 Here is the content to extract the recipe from:
 `;
+
+/**
+ * Attempt a direct fetch of the URL with browser-like headers as a fallback
+ * when Jina Reader is blocked (403/CAPTCHA).
+ * Prioritizes JSON-LD structured recipe data if available.
+ */
+async function directFetchFallback(url: string): Promise<string> {
+    try {
+        const response = await fetch(url, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "no-cache",
+            },
+        });
+
+        if (!response.ok) {
+            console.warn(`Direct fetch failed with status ${response.status}`);
+            return "";
+        }
+
+        const html = await response.text();
+
+        // Quick check: if the page is a CAPTCHA/challenge, bail
+        if (html.includes("Just a moment") && html.includes("challenge")) {
+            console.warn("Direct fetch hit CAPTCHA, returning empty");
+            return "";
+        }
+
+        // Extract JSON-LD structured recipe data if available (most recipe sites embed this)
+        const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+        if (jsonLdMatches) {
+            for (const match of jsonLdMatches) {
+                const jsonContent = match.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
+                try {
+                    const parsed = JSON.parse(jsonContent);
+                    const recipe = findRecipeInJsonLd(parsed);
+                    if (recipe) {
+                        return `--- Structured Recipe Data (JSON-LD) ---\n${JSON.stringify(recipe, null, 2)}`;
+                    }
+                } catch {
+                    // Not valid JSON, skip
+                }
+            }
+        }
+
+        // Fallback: strip HTML tags and return raw text (limited)
+        const textContent = html
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+        return textContent.substring(0, 15000);
+    } catch (error) {
+        console.warn("Direct fetch fallback failed:", error);
+        return "";
+    }
+}
+
+/**
+ * Search for Recipe schema in JSON-LD data (handles @graph arrays and nested structures)
+ */
+function findRecipeInJsonLd(data: any): any | null {
+    if (!data) return null;
+
+    if (data["@type"] === "Recipe" || (Array.isArray(data["@type"]) && data["@type"].includes("Recipe"))) {
+        return data;
+    }
+
+    if (data["@graph"] && Array.isArray(data["@graph"])) {
+        for (const item of data["@graph"]) {
+            const found = findRecipeInJsonLd(item);
+            if (found) return found;
+        }
+    }
+
+    if (Array.isArray(data)) {
+        for (const item of data) {
+            const found = findRecipeInJsonLd(item);
+            if (found) return found;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Intelligently extract the recipe-relevant portion from long page content.
+ * Recipe sites like AllRecipes have 30K+ chars of navigation/header/ads before the actual recipe.
+ * This finds recipe section markers and extracts a window around them.
+ */
+function extractRecipeSection(content: string, maxChars: number = 40000): string {
+    if (content.length <= maxChars) return content;
+
+    // Look for common recipe section markers (case-insensitive search)
+    const markers = [
+        /#+\s*Ingredients/i,
+        /\bIngredients\b/i,
+        /#+\s*Directions/i,
+        /\bDirections\b/i,
+        /#+\s*Instructions/i,
+        /\bInstructions\b/i,
+        /#+\s*Steps\b/i,
+        /\bRecipe\s+Instructions\b/i,
+        /\bHow\s+to\s+Make\b/i,
+    ];
+
+    let earliestRecipeStart = -1;
+    for (const marker of markers) {
+        const match = content.search(marker);
+        if (match !== -1 && (earliestRecipeStart === -1 || match < earliestRecipeStart)) {
+            earliestRecipeStart = match;
+        }
+    }
+
+    if (earliestRecipeStart !== -1) {
+        // Found recipe content! Extract a window:
+        // Start 2000 chars before the marker (to get title/description/servings)
+        // and take maxChars from there
+        const windowStart = Math.max(0, earliestRecipeStart - 2000);
+        console.log(`[Smart Truncation] Found recipe section at char ${earliestRecipeStart}, extracting from ${windowStart}`);
+        return content.substring(windowStart, windowStart + maxChars);
+    }
+
+    // No markers found — fall back to first maxChars
+    console.log("[Smart Truncation] No recipe markers found, using first " + maxChars + " chars");
+    return content.substring(0, maxChars);
+}
 
 /**
  * Extract a recipe from a URL using Gemini or OpenAI
@@ -44,6 +177,7 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
     let markdownContent = "";
     let ogImage = "";
     let socialCaption = "";
+    let scrapeFailed = true; // Track if actual page content was scraped
 
     // Step 1: Handle TikTok URLs specifically since they aggressively block Jina and OpenGraph scrapers
     const isTikTok = url.includes("tiktok.com");
@@ -85,30 +219,38 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
         }
     }
 
-    if (!isTikTok) {
-        try {
-            // Use Jina Reader API to bypass bot protections and render JS-heavy pages (like Instagram)
-            const response = await fetch(`https://r.jina.ai/${url}`, {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)",
-                    "Accept": "text/event-stream, text/plain",
-                },
-            });
+    // Step 3: Fetch page content via Jina Reader (for all URLs including TikTok as supplement)
+    try {
+        const response = await fetch(`https://r.jina.ai/${url}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)",
+                "Accept": "text/event-stream, text/plain",
+            },
+        });
 
-            if (!response.ok) {
-                console.warn(`Jina Reader API error: ${response.status}. Falling back to metadata extraction.`);
-            } else {
-                markdownContent = await response.text();
+        if (!response.ok) {
+            console.warn(`Jina Reader API error: ${response.status}`);
+        } else {
+            markdownContent = await response.text();
+            // Detect if Jina likely returned CAPTCHA — still pass content to AI but hint the server
+            const looksLikeCaptcha = markdownContent.includes("Just a moment") || 
+                markdownContent.includes("Verification successful") || 
+                markdownContent.includes("challenge-platform") ||
+                markdownContent.length < 200;
+            if (!looksLikeCaptcha) {
+                scrapeFailed = false; // Jina got real content
             }
-        } catch (error) {
-            console.warn(`Failed to fetch URL content via Jina: ${error}. Proceeding with available metadata.`);
+            // Always keep markdownContent — pass everything to the AI
         }
+    } catch (error) {
+        console.warn(`Failed to fetch URL content via Jina: ${error}`);
     }
 
-    // Limit to ~15,000 characters to ensure it fits within context limits without exploding token cost
+    // Smart truncation: find the recipe-relevant section instead of blindly taking the first 15K chars
+    // Recipe sites like AllRecipes have 30K+ chars of navigation/ads BEFORE the actual recipe
     let contentForAI = `Target URL: ${url}\n\n`;
     if (markdownContent) {
-        contentForAI += `Rendered webpage content:\n\n${markdownContent.substring(0, 15000)}`;
+        contentForAI += `Rendered webpage content:\n\n${extractRecipeSection(markdownContent)}`;
     } else {
         contentForAI += `(Webpage content could not be directly extracted due to bot protections. Rely on the social metadata below if available.)`;
     }
@@ -134,7 +276,7 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${supabaseKey}`
         },
-        body: JSON.stringify({ url, contentForAI, prompt: RECIPE_EXTRACTION_PROMPT, provider, geminiModel: 'gemini-2.5-flash' })
+        body: JSON.stringify({ url, contentForAI, scrapeFailed, prompt: RECIPE_EXTRACTION_PROMPT, provider, geminiModel: 'gemini-2.5-flash' })
     });
 
     if (!response.ok) {

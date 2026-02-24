@@ -87,7 +87,7 @@ export default function CookMode({
                                     </View>
 
                                     {/* Quantity and Unit Column */}
-                                    <View className="w-28 flex-row items-baseline">
+                                    <View className="min-w-[110px] flex-shrink-0 flex-row items-baseline mr-1">
                                         {scaledQty ? (
                                             <Text
                                                 className={`font-sans-bold text-xl mr-1.5 ${isChecked

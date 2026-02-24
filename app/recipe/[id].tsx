@@ -108,12 +108,7 @@ export default function RecipeDetailScreen() {
     const handlePlayVideo = async () => {
         if (recipe?.source_url) {
             try {
-                const canOpen = await Linking.canOpenURL(recipe.source_url);
-                if (canOpen) {
-                    await Linking.openURL(recipe.source_url);
-                } else {
-                    Alert.alert("Error", "Could not open video URL.");
-                }
+                await Linking.openURL(recipe.source_url);
             } catch (error) {
                 console.error("Failed to open URL:", error);
                 Alert.alert("Error", "Failed to open the video link.");
@@ -319,7 +314,7 @@ export default function RecipeDetailScreen() {
                                         className={`flex-row items-center py-3 ${index < ingredients.length - 1 ? "border-b border-surface-800" : ""
                                             }`}
                                     >
-                                        <View className="w-24 flex-row items-center">
+                                        <View className="min-w-[90px] flex-shrink-0 flex-row items-center mr-3">
                                             <Text className="text-accent font-sans-bold text-sm">
                                                 {scaledQty}
                                             </Text>

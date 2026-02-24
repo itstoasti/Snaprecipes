@@ -42,7 +42,7 @@ export default function DeleteConfirmationModal({
                     <Pressable onPress={(e) => e.stopPropagation()}>
                         {/* Modal Content */}
                         <Animated.View
-                            entering={SlideInDown.springify().damping(20).stiffness(150)}
+                            entering={SlideInDown.duration(300)}
                             exiting={SlideOutDown}
                             className="pb-10 pt-4 px-5"
                         >

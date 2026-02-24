@@ -29,7 +29,161 @@ CRITICAL RULES:
 1. You MUST include EVERY key from the schema above. NEVER omit 'ingredients' or 'steps'.
 2. If an array is missing from the text (e.g. no step-by-step instructions exist), you MUST output an empty array: "steps": [].
 3. If an ingredient list is present but instructions are missing, you MUST STILL extract the ENTIRE ingredients list!
-4. Output raw JSON ONLY. No markdown blocks.`;
+4. Output raw JSON ONLY. No markdown blocks.
+5. NEVER truncate or abbreviate. Include EVERY SINGLE step and ingredient. If there are 10 steps, output all 10. If there are 30 ingredients, output all 30.
+6. For social media content (TikTok, Instagram), infer the recipe from the caption/description. The caption often describes the full recipe even without a structured format.
+7. For imageUrl: select the URL showing the finished food dish. NEVER use profile pictures, logos, or avatars.`;
+
+/**
+ * Server-side scrape: fetch the URL from the Deno edge function with browser headers.
+ * Prioritizes JSON-LD structured recipe data.
+ */
+async function serverSideScrape(url: string): Promise<string> {
+    // Strategy 1: Try Jina Reader from server (different IP than client, may succeed)
+    try {
+        console.log(`[Server Scrape] Trying Jina Reader from server...`);
+        const jinaResponse = await fetch(`https://r.jina.ai/${url}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)",
+                "Accept": "text/plain",
+            },
+        });
+        if (jinaResponse.ok) {
+            const jinaText = await jinaResponse.text();
+            const looksLikeCaptcha = jinaText.includes("Just a moment") || 
+                jinaText.includes("Verification successful") ||
+                jinaText.includes("challenge-platform") ||
+                jinaText.length < 300;
+            if (!looksLikeCaptcha) {
+                console.log(`[Server Scrape] Jina Reader returned ${jinaText.length} chars of real content`);
+                return `--- Server-side Jina Reader content ---\n${jinaText.substring(0, 15000)}`;
+            }
+        }
+    } catch (e) {
+        console.log(`[Server Scrape] Jina Reader from server failed:`, e);
+    }
+
+    // Strategy 2: Direct fetch with multiple UAs
+    const userAgents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+        "Googlebot/2.1 (+http://www.google.com/bot.html)",
+    ];
+
+    for (const ua of userAgents) {
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    "User-Agent": ua,
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Cache-Control": "no-cache",
+                },
+                redirect: "follow",
+            });
+
+            if (!response.ok) {
+                console.log(`[Server Scrape] UA "${ua.substring(0, 30)}..." returned ${response.status}`);
+                continue;
+            }
+
+            const html = await response.text();
+
+            // Fixed CAPTCHA detection: use OR, not AND
+            if (html.includes("Just a moment") || html.includes("challenge-platform") || html.includes("cf-chl-bypass") || html.length < 500) {
+                console.log(`[Server Scrape] UA "${ua.substring(0, 30)}..." hit CAPTCHA/empty page`);
+                continue;
+            }
+
+            // Try JSON-LD extraction first (most recipe sites have this)
+            const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+            if (jsonLdMatches) {
+                for (const match of jsonLdMatches) {
+                    const jsonContent = match.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
+                    try {
+                        const parsed = JSON.parse(jsonContent);
+                        const recipe = findRecipeInJsonLd(parsed);
+                        if (recipe) {
+                            return `--- Structured Recipe Data (JSON-LD from server) ---\n${JSON.stringify(recipe, null, 2)}`;
+                        }
+                    } catch {
+                        // Not valid JSON, skip
+                    }
+                }
+            }
+
+            // Fallback: strip HTML to text
+            const textContent = html
+                .replace(/<script[\s\S]*?<\/script>/gi, "")
+                .replace(/<style[\s\S]*?<\/style>/gi, "")
+                .replace(/<[^>]+>/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            if (textContent.length > 200) {
+                return textContent.substring(0, 15000);
+            }
+        } catch (e) {
+            console.log(`[Server Scrape] UA "${ua.substring(0, 30)}..." failed:`, e);
+        }
+    }
+
+    // Strategy 3: Bing search enrichment — search for the recipe URL and extract result snippets
+    // Bing often surfaces recipe ingredients and instructions in its search results
+    try {
+        console.log(`[Server Scrape] Trying Bing search enrichment...`);
+        // Extract a human-readable search query from the URL
+        const urlPath = url.split("/").pop()?.replace(/-/g, " ").replace(/\d+/g, "").trim() || "";
+        const domain = new URL(url).hostname.replace("www.", "");
+        const searchQuery = encodeURIComponent(`site:${domain} ${urlPath} recipe ingredients instructions`);
+        
+        const bingResp = await fetch(`https://www.bing.com/search?q=${searchQuery}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                "Accept": "text/html",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+        });
+        
+        if (bingResp.ok) {
+            const bingHtml = await bingResp.text();
+            // Strip to text — the AI can extract recipe info from search result snippets
+            const bingText = bingHtml
+                .replace(/<script[\s\S]*?<\/script>/gi, "")
+                .replace(/<style[\s\S]*?<\/style>/gi, "")
+                .replace(/<[^>]+>/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+            
+            if (bingText.length > 500 && (bingText.toLowerCase().includes("ingredient") || bingText.toLowerCase().includes("instruction"))) {
+                console.log(`[Server Scrape] Bing search returned ${bingText.length} chars with recipe data`);
+                return `--- Recipe data extracted from Bing search results for: ${url} ---\n${bingText.substring(0, 15000)}`;
+            }
+        }
+    } catch (e) {
+        console.log(`[Server Scrape] Bing search enrichment failed:`, e);
+    }
+
+    return "";
+}
+
+function findRecipeInJsonLd(data: any): any | null {
+    if (!data) return null;
+    if (data["@type"] === "Recipe" || (Array.isArray(data["@type"]) && data["@type"].includes("Recipe"))) return data;
+    if (data["@graph"] && Array.isArray(data["@graph"])) {
+        for (const item of data["@graph"]) {
+            const found = findRecipeInJsonLd(item);
+            if (found) return found;
+        }
+    }
+    if (Array.isArray(data)) {
+        for (const item of data) {
+            const found = findRecipeInJsonLd(item);
+            if (found) return found;
+        }
+    }
+    return null;
+}
 
 Deno.serve(async (req: Request) => {
     // Handle CORS preflight
@@ -38,7 +192,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const { url, contentForAI, imageBase64, prompt, provider, geminiModel } = await req.json();
+        const { url, contentForAI: clientContent, scrapeFailed, imageBase64, prompt, provider, geminiModel } = await req.json();
 
         const activeProvider = provider || "gemini";
         const activeKey = activeProvider === "openai" ? DEFAULT_OPENAI_KEY : DEFAULT_GEMINI_KEY;
@@ -49,6 +203,26 @@ Deno.serve(async (req: Request) => {
                 status: 500,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
+        }
+
+        // ----- Server-side scraping fallback -----
+        // If client signals scrape failure, try from the server to supplement content
+        let contentForAI = clientContent || "";
+        
+        if (url && scrapeFailed && !imageBase64) {
+            console.log(`[Server Scrape] Client scrape failed, attempting server-side fetch for: ${url}`);
+            try {
+                const scraped = await serverSideScrape(url);
+                if (scraped && scraped.length > 200) {
+                    // Prepend server content — keep client OG metadata as fallback
+                    contentForAI = `${scraped}\n\n--- Additional client-provided metadata ---\n${contentForAI}`;
+                    console.log(`[Server Scrape] Successfully scraped ${scraped.length} chars`);
+                } else {
+                    console.log(`[Server Scrape] Server scrape also returned sparse content`);
+                }
+            } catch (e) {
+                console.error(`[Server Scrape] Failed:`, e);
+            }
         }
 
         let aiResponseText = "";
@@ -106,7 +280,7 @@ Deno.serve(async (req: Request) => {
             const payload: any = {
                 generationConfig: {
                     temperature: 0.1,
-                    maxOutputTokens: 8192,
+                    maxOutputTokens: 65536,
                     responseMimeType: "application/json",
                 },
                 contents: [{ parts: [] }]

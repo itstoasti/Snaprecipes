@@ -3,10 +3,13 @@ import {
     View,
     Text,
     Pressable,
+    TouchableOpacity,
     Modal,
     ActivityIndicator,
     ScrollView,
+    StyleSheet,
     TextInput,
+    useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, SlideInDown, FadeInDown } from "react-native-reanimated";
@@ -25,6 +28,7 @@ export default function CollectionPickerModal({
     recipeId,
     onClose,
 }: CollectionPickerModalProps) {
+    const { height: windowHeight } = useWindowDimensions();
     const { collections, createCollection, addRecipeToCollection, removeRecipeFromCollection } = useCollections();
     const [loading, setLoading] = useState(true);
     const [assignedCollectionIds, setAssignedCollectionIds] = useState<Set<number>>(new Set());
@@ -100,69 +104,71 @@ export default function CollectionPickerModal({
             animationType="fade"
             onRequestClose={onClose}
         >
-            <View className="flex-1">
+            <View style={{ flex: 1 }}>
+                {/* Backdrop — sits behind the sheet, tapping it closes the modal */}
                 <Pressable
                     onPress={onClose}
-                    className="flex-1 bg-black/60 justify-end"
-                >
-                    <Pressable onPress={(e) => e.stopPropagation()}>
-                        <Animated.View entering={SlideInDown.springify().damping(22).stiffness(120)}>
-                            <GlassContainer
-                                style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
-                                className="p-6 pb-12 max-h-[80vh]"
-                            >
-                                {/* Handle */}
-                                <View className="self-center w-10 h-1 bg-surface-500 rounded-full mb-5" />
+                    style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.6)" }]}
+                />
 
-                                <View className="flex-row items-center justify-between mb-1 mt-2">
-                                    <Text className="text-white font-sans-bold text-xl">
-                                        Save to Collection
-                                    </Text>
-                                    <Pressable
-                                        onPress={() => setShowCreate(!showCreate)}
-                                        className="w-8 h-8 rounded-full bg-surface-800 items-center justify-center"
-                                    >
-                                        <Ionicons
-                                            name={showCreate ? "close" : "add"}
-                                            size={20}
-                                            color="#FF6B35"
-                                        />
-                                    </Pressable>
-                                </View>
-                                <Text className="text-surface-400 font-sans text-sm mb-6">
-                                    Organize your recipes into custom folders
-                                </Text>
+                {/* Sheet — not nested inside the backdrop Pressable, so no touch conflict */}
+                {/* explicit height (not maxHeight) so flex:1 children have a real size to work with */}
+                <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: windowHeight * 0.75 }}>
+                    <Animated.View style={{ flex: 1 }} entering={SlideInDown.springify().damping(22).stiffness(120)}>
+                        <GlassContainer
+                            style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1 }}
+                        >
+                            {/* flex column: header takes natural height, list takes the rest */}
+                            <View style={{ flex: 1, padding: 24, paddingBottom: 48 }}>
 
-                                {/* Create Input */}
-                                {showCreate && (
-                                    <Animated.View
-                                        entering={FadeInDown.springify()}
-                                        className="mb-4 bg-surface-800 rounded-2xl p-4 flex-row items-center"
-                                    >
-                                        <TextInput
-                                            value={newName}
-                                            onChangeText={setNewName}
-                                            placeholder="New collection name..."
-                                            placeholderTextColor="#6E6E85"
-                                            className="flex-1 text-white font-sans text-base mr-3"
-                                            autoFocus
-                                            onSubmitEditing={handleCreate}
-                                        />
+                                {/* Fixed header — natural height */}
+                                <View>
+                                    <View style={{ alignSelf: "center", width: 40, height: 4, backgroundColor: "#6E6E85", borderRadius: 2, marginBottom: 20 }} />
+
+                                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4, marginTop: 8 }}>
+                                        <Text className="text-white font-sans-bold text-xl">Save to Collection</Text>
                                         <Pressable
-                                            onPress={handleCreate}
-                                            className="bg-accent px-4 py-2 rounded-xl"
+                                            onPress={() => setShowCreate(!showCreate)}
+                                            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#2A2A3A", alignItems: "center", justifyContent: "center" }}
                                         >
-                                            <Text className="text-white font-sans-semibold text-sm">Create</Text>
+                                            <Ionicons name={showCreate ? "close" : "add"} size={20} color="#FF6B35" />
                                         </Pressable>
-                                    </Animated.View>
-                                )}
+                                    </View>
+                                    <Text className="text-surface-400 font-sans text-sm mb-5">
+                                        Organize your recipes into custom folders
+                                    </Text>
 
+                                    {showCreate && (
+                                        <Animated.View
+                                            entering={FadeInDown.springify()}
+                                            style={{ marginBottom: 16, backgroundColor: "#2A2A3A", borderRadius: 16, padding: 16, flexDirection: "row", alignItems: "center" }}
+                                        >
+                                            <TextInput
+                                                value={newName}
+                                                onChangeText={setNewName}
+                                                placeholder="New collection name..."
+                                                placeholderTextColor="#6E6E85"
+                                                style={{ flex: 1, color: "#FFF", fontSize: 16, marginRight: 12 }}
+                                                autoFocus
+                                                onSubmitEditing={handleCreate}
+                                            />
+                                            <Pressable
+                                                onPress={handleCreate}
+                                                style={{ backgroundColor: "#FF6B35", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 }}
+                                            >
+                                                <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14 }}>Create</Text>
+                                            </Pressable>
+                                        </Animated.View>
+                                    )}
+                                </View>
+
+                                {/* Scrollable list — flex:1 fills remaining height */}
                                 {loading ? (
-                                    <View className="items-center py-10">
+                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
                                         <ActivityIndicator size="small" color="#FF6B35" />
                                     </View>
                                 ) : collections.length === 0 ? (
-                                    <View className="items-center py-10 px-4">
+                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 }}>
                                         <Ionicons name="folder-open-outline" size={48} color="#6E6E85" />
                                         <Text className="text-surface-300 font-sans text-center mt-4 mb-2 opacity-80">
                                             You haven't created any collections yet.
@@ -172,46 +178,55 @@ export default function CollectionPickerModal({
                                         </Text>
                                     </View>
                                 ) : (
-                                    <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+                                    <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false}>
                                         {collections.map((collection) => {
                                             const isSelected = assignedCollectionIds.has(collection.id);
                                             return (
                                                 <Pressable
                                                     key={collection.id}
                                                     onPress={() => toggleCollection(collection.id)}
-                                                    className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl mb-3"
+                                                    style={({ pressed }) => [
+                                                        {
+                                                            flexDirection: "row",
+                                                            alignItems: "center",
+                                                            padding: 16,
+                                                            borderRadius: 16,
+                                                            marginBottom: 12,
+                                                            backgroundColor: pressed ? "rgba(255,107,53,0.15)" : "rgba(42,42,58,0.6)"
+                                                        }
+                                                    ]}
                                                 >
                                                     <View
-                                                        className="w-10 h-10 rounded-full items-center justify-center mr-4"
-                                                        style={{ backgroundColor: `${collection.color}20` }}
+                                                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: 16, backgroundColor: `${collection.color}20` }}
                                                     >
-                                                        <Ionicons
-                                                            name={collection.icon_name as any}
-                                                            size={20}
-                                                            color={collection.color}
-                                                        />
+                                                        <Ionicons name={collection.icon_name as any} size={20} color={collection.color} />
                                                     </View>
-                                                    <Text className="text-white font-sans-semibold text-base flex-1">
+                                                    <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600", flex: 1 }}>
                                                         {collection.name}
                                                     </Text>
-
                                                     <View
-                                                        className={`w-6 h-6 rounded-full border items-center justify-center ${isSelected ? "bg-accent border-accent" : "border-surface-600"
-                                                            }`}
+                                                        style={{
+                                                            width: 24,
+                                                            height: 24,
+                                                            borderRadius: 12,
+                                                            borderWidth: 1,
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            backgroundColor: isSelected ? "#FF6B35" : "transparent",
+                                                            borderColor: isSelected ? "#FF6B35" : "#6E6E85"
+                                                        }}
                                                     >
-                                                        {isSelected && (
-                                                            <Ionicons name="checkmark" size={14} color="#FFF" />
-                                                        )}
+                                                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
                                                     </View>
                                                 </Pressable>
                                             );
                                         })}
                                     </ScrollView>
                                 )}
-                            </GlassContainer>
-                        </Animated.View>
-                    </Pressable>
-                </Pressable>
+                            </View>
+                        </GlassContainer>
+                    </Animated.View>
+                </View>
             </View>
         </Modal>
     );
