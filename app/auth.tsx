@@ -16,6 +16,7 @@ export default function AuthScreen() {
 
     const handleEmailSignUp = async () => {
         if (!email || !password) return Alert.alert("Error", "Please enter an email and password.");
+        if (password.length < 8) return Alert.alert("Weak Password", "Password must be at least 8 characters.");
         setLoading(true);
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) {

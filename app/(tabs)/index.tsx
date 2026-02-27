@@ -8,7 +8,7 @@ import RecipeFeed from "@/components/RecipeFeed";
 import FilterBar from "@/components/FilterBar";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import ImportModal from "@/components/ImportModal";
-import { useSQLiteContext } from "expo-sqlite";
+import { getDatabase } from "@/db/client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
@@ -28,7 +28,6 @@ export default function HomeScreen() {
     const [tags, setTags] = useState<TagItem[]>([]);
     const [filteredRecipes, setFilteredRecipes] = useState(recipes);
     const [searchQuery, setSearchQuery] = useState("");
-    const db = useSQLiteContext();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isPro } = useRevenueCat();
@@ -37,6 +36,7 @@ export default function HomeScreen() {
     // Load tags
     useEffect(() => {
         (async () => {
+            const db = await getDatabase();
             const t = await db.getAllAsync<TagItem>("SELECT * FROM tags ORDER BY name");
             setTags(t);
         })();
@@ -62,6 +62,7 @@ export default function HomeScreen() {
             } else {
                 if (activeFilter.startsWith("col_")) {
                     const colId = parseInt(activeFilter.replace("col_", ""));
+                    const db = await getDatabase();
                     results = await db.getAllAsync<any>(
                         `SELECT r.* FROM recipes r
                INNER JOIN recipe_collections rc ON r.id = rc.recipe_id
@@ -70,6 +71,7 @@ export default function HomeScreen() {
                     );
                 } else if (activeFilter.startsWith("tag_")) {
                     const tagId = parseInt(activeFilter.replace("tag_", ""));
+                    const db = await getDatabase();
                     results = await db.getAllAsync<any>(
                         `SELECT r.* FROM recipes r
                INNER JOIN recipe_tags rt ON r.id = rt.recipe_id

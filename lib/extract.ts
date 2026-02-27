@@ -161,12 +161,12 @@ function extractRecipeSection(content: string, maxChars: number = 40000): string
         // Start 2000 chars before the marker (to get title/description/servings)
         // and take maxChars from there
         const windowStart = Math.max(0, earliestRecipeStart - 2000);
-        console.log(`[Smart Truncation] Found recipe section at char ${earliestRecipeStart}, extracting from ${windowStart}`);
+        if (__DEV__) console.log(`[Smart Truncation] Found recipe section at char ${earliestRecipeStart}, extracting from ${windowStart}`);
         return content.substring(windowStart, windowStart + maxChars);
     }
 
     // No markers found — fall back to first maxChars
-    console.log("[Smart Truncation] No recipe markers found, using first " + maxChars + " chars");
+    if (__DEV__) console.log("[Smart Truncation] No recipe markers found, using first " + maxChars + " chars");
     return content.substring(0, maxChars);
 }
 
@@ -196,7 +196,7 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
                 }
             }
         } catch (e) {
-            console.log("Failed to fetch TikTok data via TikWM", e);
+            if (__DEV__) console.log("Failed to fetch TikTok data via TikWM", e);
         }
     }
 
@@ -215,7 +215,7 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
                 socialCaption = `\n\n--- Social Media Metadata / Caption ---\nTitle: ${preview.title || "Unknown"}\nCaption: ${preview.description}`;
             }
         } catch (e) {
-            console.log("Failed to fetch OG fallback data", e);
+            if (__DEV__) console.log("Failed to fetch OG fallback data", e);
         }
     }
 
@@ -260,21 +260,30 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
     }
 
     if (ogImage) {
-        console.log("OG Image URL captured:", ogImage);
+        if (__DEV__) console.log("OG Image URL captured:", ogImage);
         contentForAI += `\n\nIMPORTANT: The original webpage's designated thumbnail image is: ${ogImage}. If you cannot find a better photo of the finished dish in the text above, you MUST use this URL as the \`imageUrl\`. Note: if it is a video thumbnail with a play button, that is perfectly fine. DO NOT attempt to remove the play button or alter the URL. Use the URL exactly as provided.`;
     }
 
     const provider = await SecureStore.getItemAsync(AI_PROVIDER_STORE) || "gemini";
 
     // Use raw fetch temporarily to get the exact textual error from the Edge Function
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://omfmcjmebejcsityvtgx.supabase.co";
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_Fo9XJu4kuLhwcR81nvuxWw_JiCXHXsJ";
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error("Supabase environment variables are not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.");
+    }
+
+    // Get the user's auth token to pass to the Edge Function
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token || supabaseKey;
 
     const response = await fetch(`${supabaseUrl}/functions/v1/extract-recipe`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`
+            'Authorization': `Bearer ${authToken}`,
+            'apikey': supabaseKey
         },
         body: JSON.stringify({ url, contentForAI, scrapeFailed, prompt: RECIPE_EXTRACTION_PROMPT, provider, geminiModel: 'gemini-2.5-flash' })
     });
@@ -287,12 +296,14 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
     const data = await response.json();
 
     // Debug: Log raw response from AI to diagnose Gemini issues
-    console.log("=== RAW AI RESPONSE ===");
-    console.log("Provider:", provider);
-    console.log("Has imageUrl:", !!data.imageUrl);
-    console.log("Has steps:", !!data.steps, "Length:", data.steps?.length || 0);
-    console.log("Has ingredients:", !!data.ingredients, "Length:", data.ingredients?.length || 0);
-    console.log("=== END DEBUG ===");
+    if (__DEV__) {
+        console.log("=== RAW AI RESPONSE ===");
+        console.log("Provider:", provider);
+        console.log("Has imageUrl:", !!data.imageUrl);
+        console.log("Has steps:", !!data.steps, "Length:", data.steps?.length || 0);
+        console.log("Has ingredients:", !!data.ingredients, "Length:", data.ingredients?.length || 0);
+        console.log("=== END DEBUG ===");
+    }
 
     const recipe = validateRecipe(data);
 
@@ -308,14 +319,14 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
     // For problematic CDN URLs, try to use a cleaner fallback
     // Note: ogImage might also be from the same CDN, but it's worth trying
     if (isProblematicCdn) {
-        console.log("Detected problematic CDN image URL, this may not load in the app");
+        if (__DEV__) console.log("Detected problematic CDN image URL, this may not load in the app");
         // Keep the URL anyway - expo-image might be able to load it
         // The user will see a placeholder if it fails
     }
 
     // If no image was extracted, use OG image as fallback
     if (!recipe.imageUrl && ogImage) {
-        console.log("Using OG image fallback:", ogImage);
+        if (__DEV__) console.log("Using OG image fallback:", ogImage);
         recipe.imageUrl = ogImage;
     }
 

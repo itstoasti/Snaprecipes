@@ -11,7 +11,10 @@
       "Bash(git mv:*)",
       "Bash(git commit:*)",
       "Bash(npm install:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(grep:*)",
+      "Bash(cd /c/Users/deanf/OneDrive/Desktop/projects/snaprecipe && eas credentials --platform android 2>&1)",
+      "Bash(cd /c/Users/deanf/OneDrive/Desktop/projects/snaprecipe && eas build:version:set --platform android 2>&1)"
     ]
   }
 }

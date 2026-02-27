@@ -2,7 +2,7 @@ import { getDatabase } from "@/db/client";
 import { supabase } from "@/lib/supabase";
 import * as Crypto from "expo-crypto";
 import type { SQLiteDatabase } from "expo-sqlite";
-import type { Recipe, Ingredient, Step } from "@/db/schema";
+import type { Recipe, Ingredient, Step, Collection } from "@/db/schema";
 
 // Shared helper: push one recipe (ingredients + steps) to Supabase and stamp remote_ids locally
 async function pushSingleRecipe(
@@ -71,6 +71,28 @@ async function pushSingleRecipe(
     }
 }
 
+// Shared helper: push one collection to Supabase and stamp remote_id locally
+async function pushSingleCollection(
+    db: SQLiteDatabase,
+    userId: string,
+    collection: Collection
+): Promise<void> {
+    const collectionRemoteId = Crypto.randomUUID();
+
+    const payload = {
+        id: collectionRemoteId,
+        owner_id: userId,
+        name: collection.name,
+        color: collection.color,
+        icon_name: collection.icon_name,
+    };
+
+    await db.runAsync(`UPDATE collections SET remote_id = ? WHERE id = ?`, [collectionRemoteId, collection.id]);
+
+    const { error } = await supabase.from('collections').insert(payload);
+    if (error) throw error;
+}
+
 export async function initialSync(): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -78,14 +100,41 @@ export async function initialSync(): Promise<void> {
     const db = await getDatabase();
 
     try {
+        // Sync recipes
         const localRecipes = await db.getAllAsync<Recipe>("SELECT * FROM recipes WHERE remote_id IS NULL");
-        if (localRecipes.length === 0) return;
-
-        console.log(`Starting initial sync of ${localRecipes.length} recipes to Supabase for user ${user.id}...`);
-        for (const recipe of localRecipes) {
-            await pushSingleRecipe(db, user.id, recipe);
+        if (localRecipes.length > 0) {
+            if (__DEV__) console.log(`Starting initial sync of ${localRecipes.length} recipes to Supabase...`);
+            for (const recipe of localRecipes) {
+                await pushSingleRecipe(db, user.id, recipe);
+            }
         }
-        console.log("Initial sync completed.");
+
+        // Sync collections
+        const localCollections = await db.getAllAsync<Collection>("SELECT * FROM collections WHERE remote_id IS NULL");
+        if (localCollections.length > 0) {
+            if (__DEV__) console.log(`Syncing ${localCollections.length} collections...`);
+            for (const col of localCollections) {
+                await pushSingleCollection(db, user.id, col);
+            }
+        }
+
+        // Sync recipe_collections associations (only for recipes & collections that have remote_ids)
+        const localAssociations = await db.getAllAsync<{ recipe_id: number; collection_id: number }>(
+            "SELECT rc.recipe_id, rc.collection_id FROM recipe_collections rc"
+        );
+        for (const assoc of localAssociations) {
+            const recipe = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM recipes WHERE id = ?", [assoc.recipe_id]);
+            const collection = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM collections WHERE id = ?", [assoc.collection_id]);
+            if (recipe?.remote_id && collection?.remote_id) {
+                await supabase.from('recipe_collections').upsert({
+                    owner_id: user.id,
+                    recipe_id: recipe.remote_id,
+                    collection_id: collection.remote_id,
+                }, { onConflict: 'recipe_id,collection_id' });
+            }
+        }
+
+        if (__DEV__) console.log("Initial sync completed.");
     } catch (e) {
         console.error("Initial Sync Failed:", e);
     }
@@ -108,6 +157,69 @@ export async function syncNewRecipe(recipeId: number): Promise<void> {
         await pushSingleRecipe(db, user.id, recipe);
     } catch (e) {
         console.error(`syncNewRecipe failed for recipe ${recipeId}:`, e);
+    }
+}
+
+// Push a newly-created collection to Supabase immediately.
+export async function syncNewCollection(collectionId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const collection = await db.getFirstAsync<Collection>(
+        "SELECT * FROM collections WHERE id = ? AND remote_id IS NULL",
+        [collectionId]
+    );
+    if (!collection) return;
+
+    try {
+        await pushSingleCollection(db, user.id, collection);
+    } catch (e) {
+        console.error(`syncNewCollection failed for collection ${collectionId}:`, e);
+    }
+}
+
+// Push a recipe<->collection association to Supabase.
+export async function syncRecipeToCollection(recipeId: number, collectionId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const recipe = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM recipes WHERE id = ?", [recipeId]);
+    const collection = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM collections WHERE id = ?", [collectionId]);
+
+    if (!recipe?.remote_id || !collection?.remote_id) return;
+
+    try {
+        const { error } = await supabase.from('recipe_collections').upsert({
+            owner_id: user.id,
+            recipe_id: recipe.remote_id,
+            collection_id: collection.remote_id,
+        }, { onConflict: 'recipe_id,collection_id' });
+        if (error) console.error('syncRecipeToCollection error:', error);
+    } catch (e) {
+        console.error(`syncRecipeToCollection failed:`, e);
+    }
+}
+
+// Remove a recipe<->collection association from Supabase.
+export async function unsyncRecipeFromCollection(recipeId: number, collectionId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const recipe = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM recipes WHERE id = ?", [recipeId]);
+    const collection = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM collections WHERE id = ?", [collectionId]);
+
+    if (!recipe?.remote_id || !collection?.remote_id) return;
+
+    try {
+        const { error } = await supabase.from('recipe_collections').delete()
+            .eq('recipe_id', recipe.remote_id)
+            .eq('collection_id', collection.remote_id);
+        if (error) console.error('unsyncRecipeFromCollection error:', error);
+    } catch (e) {
+        console.error(`unsyncRecipeFromCollection failed:`, e);
     }
 }
 
@@ -144,7 +256,7 @@ export async function pullRemoteChanges(): Promise<void> {
     const db = await getDatabase();
     
     try {
-        console.log(`Pulling remote changes from Supabase for user ${user.id}...`);
+        if (__DEV__) console.log(`Pulling remote changes from Supabase...`);
         
         // 1. Fetch remote recipes
         const { data: remoteRecipes, error: rErr } = await supabase.from('recipes').select('*').eq('owner_id', user.id);
@@ -212,8 +324,49 @@ export async function pullRemoteChanges(): Promise<void> {
                 }
             }
         }
+
+        // 3. Pull collections
+        const { data: remoteCollections, error: cErr } = await supabase.from('collections').select('*').eq('owner_id', user.id);
+        if (cErr) throw cErr;
+
+        if (remoteCollections && remoteCollections.length > 0) {
+            for (const rCol of remoteCollections) {
+                const existing = await db.getFirstAsync<{ id: number }>(
+                    "SELECT id FROM collections WHERE remote_id = ?", [rCol.id]
+                );
+
+                if (existing) {
+                    await db.runAsync(
+                        `UPDATE collections SET name=?, color=?, icon_name=? WHERE id=?`,
+                        [rCol.name, rCol.color, rCol.icon_name, existing.id]
+                    );
+                } else {
+                    await db.runAsync(
+                        `INSERT INTO collections (remote_id, name, color, icon_name) VALUES (?, ?, ?, ?)`,
+                        [rCol.id, rCol.name, rCol.color, rCol.icon_name]
+                    );
+                }
+            }
+        }
+
+        // 4. Pull recipe_collections associations
+        const { data: remoteRC, error: rcErr } = await supabase.from('recipe_collections').select('*').eq('owner_id', user.id);
+        if (rcErr) throw rcErr;
+
+        if (remoteRC && remoteRC.length > 0) {
+            for (const rAssoc of remoteRC) {
+                const localRecipe = await db.getFirstAsync<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rAssoc.recipe_id]);
+                const localCol = await db.getFirstAsync<{ id: number }>("SELECT id FROM collections WHERE remote_id = ?", [rAssoc.collection_id]);
+                if (localRecipe && localCol) {
+                    await db.runAsync(
+                        `INSERT OR IGNORE INTO recipe_collections (recipe_id, collection_id) VALUES (?, ?)`,
+                        [localRecipe.id, localCol.id]
+                    );
+                }
+            }
+        }
         
-        console.log("Pull sync completed successfully.");
+        if (__DEV__) console.log("Pull sync completed successfully.");
     } catch (e) {
         console.error("Pull Sync Failed:", e);
     }

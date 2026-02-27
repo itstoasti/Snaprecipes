@@ -192,6 +192,35 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
+        // ── AUTH GATE ──────────────────────────────────────────────
+        // Verify the caller's identity when a real JWT is provided.
+        // Free-tier users call with the anon key only (no user JWT).
+        // The anon key itself is verified by Supabase's infrastructure.
+        const authHeader = req.headers.get("Authorization");
+        let callerUserId: string | null = null;
+
+        if (authHeader && !authHeader.includes(Deno.env.get("SUPABASE_ANON_KEY") || "")) {
+            // A real user JWT was provided — verify it
+            const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+            const supabaseAdmin = createClient(
+                Deno.env.get("SUPABASE_URL")!,
+                Deno.env.get("SUPABASE_ANON_KEY")!,
+                { global: { headers: { Authorization: authHeader } } }
+            );
+            const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser();
+            if (authError || !user) {
+                return new Response(JSON.stringify({ error: "Invalid auth token" }), {
+                    status: 401,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+            callerUserId = user.id;
+            console.log(`[Auth] Authenticated user: ${callerUserId}`);
+        } else {
+            console.log(`[Auth] Anonymous (free-tier) request`);
+        }
+        // ── END AUTH GATE ──────────────────────────────────────────
+
         const { url, contentForAI: clientContent, scrapeFailed, imageBase64, prompt, provider, geminiModel } = await req.json();
 
         const activeProvider = provider || "gemini";

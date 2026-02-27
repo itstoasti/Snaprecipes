@@ -2,7 +2,7 @@
   "expo": {
     "name": "SnapRecipes",
     "slug": "snaprecipe",
-    "version": "1.0.0",
+    "version": "5.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -16,7 +16,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.snaprecipe.app"
+      "bundleIdentifier": "com.itstoasti.snaprecipeapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +24,8 @@
         "backgroundColor": "#0A0A0F"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.snaprecipe.app",
+      "package": "com.deanfieldz.yummy",
+      "versionCode": 5,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -43,7 +44,8 @@
         {
           "cameraPermission": "Allow SnapRecipes to use your camera to scan physical recipes."
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "extra": {
       "router": {},

@@ -1,13 +1,11 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import Purchases, { CustomerInfo, PurchasesOffering, LOG_LEVEL } from 'react-native-purchases';
+import Purchases, { CustomerInfo, PurchasesOffering } from 'react-native-purchases';
 import { supabase } from '@/lib/supabase';
+import { initialSync } from '@/lib/sync';
 
-// Use the API key provided by the user
-const API_KEY_ANDROID = "test_JErGprpfNOFecUlssjboixbQYKB";
-// (Assuming the same key for iOS testing for now, or user can swap later)
-const API_KEY_IOS = "test_JErGprpfNOFecUlssjboixbQYKB";
-
+const API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY || "";
+const API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || "";
 interface RevenueCatContextState {
     isPro: boolean;
     customerInfo: CustomerInfo | null;
@@ -37,7 +35,6 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const init = async () => {
             try {
                 if (!isConfigured) {
-                    Purchases.setLogLevel(LOG_LEVEL.DEBUG);
                     if (Platform.OS === 'android') {
                         Purchases.configure({ apiKey: API_KEY_ANDROID });
                     } else if (Platform.OS === 'ios') {
@@ -106,12 +103,16 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const isPro = typeof customerInfo?.entitlements.active !== 'undefined' &&
         Object.keys(customerInfo.entitlements.active).length > 0;
 
-    // Sign out of Supabase when Pro lapses so canceled users can't keep syncing
+    // Sign out of Supabase when Pro lapses; trigger initial sync when user becomes Pro
     const wasProRef = useRef<boolean | null>(null);
     useEffect(() => {
         if (!isReady) return;
         if (wasProRef.current === true && !isPro) {
             supabase.auth.signOut().catch(console.error);
+        }
+        // User just became Pro — push any existing local data to Supabase
+        if (wasProRef.current === false && isPro) {
+            initialSync().catch(console.error);
         }
         wasProRef.current = isPro;
     }, [isPro, isReady]);

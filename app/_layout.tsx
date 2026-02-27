@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator, AppState, AppStateStatus } from "react-native";
@@ -16,7 +16,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
 import { RevenueCatProvider } from "@/hooks/useRevenueCat";
-import { SQLiteProvider, type SQLiteDatabase } from "expo-sqlite";
 import { getDatabase } from "@/db/client";
 import "../global.css";
 
@@ -91,13 +90,9 @@ export default function RootLayout() {
         return () => subscription.remove();
     }, []);
 
-    const initDb = useCallback(async (db: SQLiteDatabase) => {
-        // Initialize schema natively inside SQLiteProvider context
-        try {
-            await getDatabase();
-        } catch (e) {
-            console.error("Error setting up database:", e);
-        }
+    // Initialize the database once on mount
+    useEffect(() => {
+        getDatabase().catch(e => console.error("Error setting up database:", e));
     }, []);
 
     if (!fontsLoaded || !isReady) {
@@ -112,33 +107,31 @@ export default function RootLayout() {
         <SafeAreaProvider>
             <RevenueCatProvider>
                 <ThemeProvider value={DarkTheme}>
-                    <SQLiteProvider databaseName="snaprecipes.db" onInit={initDb}>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
-                            <StatusBar style="light" />
-                            <Stack
-                                screenOptions={{
-                                    headerShown: false,
-                                    contentStyle: { backgroundColor: "#0A0A0F" },
-                                    animation: "slide_from_right",
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                        <StatusBar style="light" />
+                        <Stack
+                            screenOptions={{
+                                headerShown: false,
+                                contentStyle: { backgroundColor: "#0A0A0F" },
+                                animation: "slide_from_right",
+                            }}
+                        >
+                            <Stack.Screen
+                                name="paywall"
+                                options={{
+                                    presentation: "modal",
+                                    animation: "slide_from_bottom"
                                 }}
-                            >
-                                <Stack.Screen
-                                    name="paywall"
-                                    options={{
-                                        presentation: "modal",
-                                        animation: "slide_from_bottom"
-                                    }}
-                                />
-                                <Stack.Screen
-                                    name="auth"
-                                    options={{
-                                        presentation: "modal",
-                                        animation: "slide_from_bottom"
-                                    }}
-                                />
-                            </Stack>
-                        </GestureHandlerRootView>
-                    </SQLiteProvider>
+                            />
+                            <Stack.Screen
+                                name="auth"
+                                options={{
+                                    presentation: "modal",
+                                    animation: "slide_from_bottom"
+                                }}
+                            />
+                        </Stack>
+                    </GestureHandlerRootView>
                 </ThemeProvider>
             </RevenueCatProvider>
         </SafeAreaProvider>

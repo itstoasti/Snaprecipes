@@ -226,21 +226,14 @@ export default function SettingsScreen() {
                 <Text className="text-white font-sans-semibold text-lg mb-3">About</Text>
                 <View className="bg-surface-900 rounded-2xl px-5 mb-6">
                     <SettingRow icon="information-circle" label="Version" value={appVersion} />
-                    <SettingRow icon="hardware-chip" label="SDK" value="Expo 54" />
-                    <SettingRow icon="server" label="Storage" value="Local SQLite" />
                 </View>
 
                 {/* Contact */}
                 <View className="bg-surface-900 rounded-2xl px-5 mb-10">
                     <SettingRow
-                        icon="logo-github"
-                        label="Source Code"
-                        onPress={() => Linking.openURL("https://github.com")}
-                    />
-                    <SettingRow
                         icon="mail"
                         label="Contact"
-                        onPress={() => Linking.openURL("mailto:hello@snaprecipes.app")}
+                        onPress={() => Linking.openURL("mailto:singlesourcedigitalmarketing@gmail.com")}
                     />
                 </View>
 
