@@ -369,6 +369,60 @@ Deno.serve(async (req: Request) => {
             else throw new Error("AI returned an empty JSON array.");
         }
 
+        // ── COMMUNITY RECIPE PIPELINE ──────────────────────────────
+        // For anonymous (free-tier) users, store an anonymized copy
+        // in public_recipes for the future Discover feature.
+        if (!callerUserId && parsedData.title && url) {
+            try {
+                const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+                const serviceClient = createClient(
+                    Deno.env.get("SUPABASE_URL")!,
+                    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+                );
+
+                // Build a content hash for deduplication
+                const ingNames = (parsedData.ingredients || [])
+                    .slice(0, 3)
+                    .map((i: any) => (i.name || i.text || "").toLowerCase().trim())
+                    .join("|");
+                const contentHash = `${parsedData.title.toLowerCase().trim()}::${ingNames}`;
+
+                // Extract domain from URL
+                let sourceDomain = "";
+                try { sourceDomain = new URL(url).hostname.replace("www.", ""); } catch {}
+
+                // Try insert; on duplicate hash, increment save_count
+                const { error: insertErr } = await serviceClient
+                    .from("public_recipes")
+                    .upsert({
+                        title: parsedData.title,
+                        description: parsedData.description || null,
+                        image_url: parsedData.imageUrl || null,
+                        servings: parsedData.servings || null,
+                        prep_time: parsedData.prepTime || null,
+                        cook_time: parsedData.cookTime || null,
+                        ingredients: parsedData.ingredients || [],
+                        steps: parsedData.steps || [],
+                        tags: parsedData.tags || [],
+                        source_url: url,
+                        source_domain: sourceDomain,
+                        content_hash: contentHash,
+                    }, { onConflict: "content_hash", ignoreDuplicates: false });
+
+                if (insertErr) {
+                    // If upsert failed, try to just increment save_count on existing
+                    await serviceClient.rpc("increment_save_count", { hash: contentHash }).catch(() => {});
+                    console.log(`[Community] Duplicate recipe, incremented save_count`);
+                } else {
+                    console.log(`[Community] Stored new community recipe: ${parsedData.title}`);
+                }
+            } catch (e) {
+                // Fire-and-forget — never block the user's response
+                console.log(`[Community] Pipeline error (non-blocking):`, e);
+            }
+        }
+        // ── END COMMUNITY PIPELINE ─────────────────────────────────
+
         return new Response(JSON.stringify(parsedData), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

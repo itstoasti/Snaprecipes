@@ -2,7 +2,7 @@
   "expo": {
     "name": "SnapRecipes",
     "slug": "snaprecipe",
-    "version": "5.0.0",
+    "version": "5.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -25,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.deanfieldz.yummy",
-      "versionCode": 5,
+      "versionCode": 7,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"

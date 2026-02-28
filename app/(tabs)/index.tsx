@@ -48,6 +48,8 @@ export default function HomeScreen() {
             loadRecipes();
             if (params.filter && typeof params.filter === "string") {
                 setActiveFilter(params.filter);
+            } else {
+                setActiveFilter("all");
             }
         }, [loadRecipes, params.filter])
     );
@@ -180,6 +182,10 @@ export default function HomeScreen() {
                 recipes={filteredRecipes}
                 loading={loading}
                 onRefresh={handleRefresh}
+                {...(activeFilter.startsWith("col_") ? {
+                    emptyTitle: "This Collection is Empty",
+                    emptyMessage: "Open a recipe and tap the bookmark icon to add it to this collection.",
+                } : {})}
             />
 
             {/* FAB */}

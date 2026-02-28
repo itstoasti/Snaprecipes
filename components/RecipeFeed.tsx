@@ -7,18 +7,20 @@ interface RecipeFeedProps {
     recipes: Recipe[];
     loading: boolean;
     onRefresh: () => void;
+    emptyTitle?: string;
+    emptyMessage?: string;
 }
 
-export default function RecipeFeed({ recipes, loading, onRefresh }: RecipeFeedProps) {
+export default function RecipeFeed({ recipes, loading, onRefresh, emptyTitle, emptyMessage }: RecipeFeedProps) {
     if (!loading && recipes.length === 0) {
         return (
             <View className="flex-1 items-center justify-center px-8">
-                <Text className="text-5xl mb-4">📖</Text>
+                <Text className="text-5xl mb-4">{emptyTitle ? "📂" : "📖"}</Text>
                 <Text className="text-white font-sans-bold text-xl text-center mb-2">
-                    No Recipes Yet
+                    {emptyTitle || "No Recipes Yet"}
                 </Text>
                 <Text className="text-surface-400 font-sans text-center text-sm leading-5">
-                    Tap the + button to import your first recipe from a URL or snap a photo of one!
+                    {emptyMessage || "Tap the + button to import your first recipe from a URL or snap a photo of one!"}
                 </Text>
             </View>
         );

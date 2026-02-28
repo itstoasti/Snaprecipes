@@ -152,3 +152,56 @@ CREATE TRIGGER update_recipes_updated_at
     BEFORE UPDATE ON recipes
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ==========================================
+-- 4. Community Recipe Library (public_recipes)
+-- ==========================================
+-- Anonymized, shared recipe data contributed by free-tier users.
+-- No owner_id — fully decoupled from user accounts.
+
+CREATE TABLE public_recipes (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    servings INT,
+    prep_time TEXT,
+    cook_time TEXT,
+    ingredients JSONB NOT NULL DEFAULT '[]',
+    steps JSONB NOT NULL DEFAULT '[]',
+    tags TEXT[] DEFAULT '{}',
+    source_url TEXT,
+    source_domain TEXT,
+    quality_score FLOAT DEFAULT 0,
+    save_count INT DEFAULT 1,
+    content_hash TEXT UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX idx_public_recipes_tags ON public_recipes USING GIN (tags);
+CREATE INDEX idx_public_recipes_domain ON public_recipes (source_domain);
+CREATE INDEX idx_public_recipes_score ON public_recipes (quality_score DESC);
+CREATE INDEX idx_public_recipes_hash ON public_recipes (content_hash);
+
+ALTER TABLE public_recipes ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can read community recipes (for future Discover tab)
+CREATE POLICY "Anyone can read public recipes"
+ON public_recipes FOR SELECT
+TO anon, authenticated
+USING (true);
+
+-- Only the service role (Edge Functions / server) can insert/update
+CREATE POLICY "Service role can manage public recipes"
+ON public_recipes FOR ALL
+TO service_role
+USING (true)
+WITH CHECK (true);
+
+-- RPC to increment save_count when a duplicate recipe is extracted
+CREATE OR REPLACE FUNCTION increment_save_count(hash TEXT)
+RETURNS void AS $$
+BEGIN
+    UPDATE public_recipes SET save_count = save_count + 1 WHERE content_hash = hash;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
