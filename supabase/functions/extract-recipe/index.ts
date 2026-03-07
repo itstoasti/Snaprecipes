@@ -391,6 +391,17 @@ Deno.serve(async (req: Request) => {
                 let sourceDomain = "";
                 try { sourceDomain = new URL(url).hostname.replace("www.", ""); } catch {}
 
+                // Generate SEO-friendly slug from title
+                const baseSlug = parsedData.title
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, "")
+                    .replace(/\s+/g, "-")
+                    .replace(/-+/g, "-")
+                    .replace(/^-|-$/g, "")
+                    .substring(0, 80);
+                const slugSuffix = Math.random().toString(36).substring(2, 6);
+                const slug = `${baseSlug}-${slugSuffix}`;
+
                 // Try insert; on duplicate hash, increment save_count
                 const { error: insertErr } = await serviceClient
                     .from("public_recipes")
@@ -407,6 +418,7 @@ Deno.serve(async (req: Request) => {
                         source_url: url,
                         source_domain: sourceDomain,
                         content_hash: contentHash,
+                        slug: slug,
                     }, { onConflict: "content_hash", ignoreDuplicates: false });
 
                 if (insertErr) {

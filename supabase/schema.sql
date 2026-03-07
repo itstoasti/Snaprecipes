@@ -161,6 +161,7 @@ CREATE TRIGGER update_recipes_updated_at
 
 CREATE TABLE public_recipes (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    slug TEXT UNIQUE,
     title TEXT NOT NULL,
     description TEXT,
     image_url TEXT,
@@ -182,6 +183,7 @@ CREATE INDEX idx_public_recipes_tags ON public_recipes USING GIN (tags);
 CREATE INDEX idx_public_recipes_domain ON public_recipes (source_domain);
 CREATE INDEX idx_public_recipes_score ON public_recipes (quality_score DESC);
 CREATE INDEX idx_public_recipes_hash ON public_recipes (content_hash);
+CREATE INDEX idx_public_recipes_slug ON public_recipes (slug);
 
 ALTER TABLE public_recipes ENABLE ROW LEVEL SECURITY;
 

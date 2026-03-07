@@ -17,6 +17,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
 import { RevenueCatProvider } from "@/hooks/useRevenueCat";
 import { getDatabase } from "@/db/client";
+import { ShareIntentProvider, useShareIntent } from "expo-share-intent";
 import "../global.css";
 
 export default function RootLayout() {
@@ -90,6 +91,21 @@ export default function RootLayout() {
         return () => subscription.remove();
     }, []);
 
+    // Handle incoming share intents
+    const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+
+    useEffect(() => {
+        if (hasShareIntent && shareIntent?.text) {
+            // Extract URL from shared text
+            const urlMatch = shareIntent.text.match(/https?:\/\/[^\s]+/);
+            const sharedUrl = urlMatch ? urlMatch[0] : shareIntent.text.trim();
+            if (sharedUrl) {
+                resetShareIntent();
+                router.push({ pathname: "/share", params: { url: sharedUrl } });
+            }
+        }
+    }, [hasShareIntent, shareIntent]);
+
     // Initialize the database once on mount
     useEffect(() => {
         getDatabase().catch(e => console.error("Error setting up database:", e));
@@ -104,36 +120,38 @@ export default function RootLayout() {
     }
 
     return (
-        <SafeAreaProvider>
-            <RevenueCatProvider>
-                <ThemeProvider value={DarkTheme}>
-                    <GestureHandlerRootView style={{ flex: 1 }}>
-                        <StatusBar style="light" />
-                        <Stack
-                            screenOptions={{
-                                headerShown: false,
-                                contentStyle: { backgroundColor: "#0A0A0F" },
-                                animation: "slide_from_right",
-                            }}
-                        >
-                            <Stack.Screen
-                                name="paywall"
-                                options={{
-                                    presentation: "modal",
-                                    animation: "slide_from_bottom"
+        <ShareIntentProvider>
+            <SafeAreaProvider>
+                <RevenueCatProvider>
+                    <ThemeProvider value={DarkTheme}>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                            <StatusBar style="light" />
+                            <Stack
+                                screenOptions={{
+                                    headerShown: false,
+                                    contentStyle: { backgroundColor: "#0A0A0F" },
+                                    animation: "slide_from_right",
                                 }}
-                            />
-                            <Stack.Screen
-                                name="auth"
-                                options={{
-                                    presentation: "modal",
-                                    animation: "slide_from_bottom"
-                                }}
-                            />
-                        </Stack>
-                    </GestureHandlerRootView>
-                </ThemeProvider>
-            </RevenueCatProvider>
-        </SafeAreaProvider>
+                            >
+                                <Stack.Screen
+                                    name="paywall"
+                                    options={{
+                                        presentation: "modal",
+                                        animation: "slide_from_bottom"
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="auth"
+                                    options={{
+                                        presentation: "modal",
+                                        animation: "slide_from_bottom"
+                                    }}
+                                />
+                            </Stack>
+                        </GestureHandlerRootView>
+                    </ThemeProvider>
+                </RevenueCatProvider>
+            </SafeAreaProvider>
+        </ShareIntentProvider>
     );
 }

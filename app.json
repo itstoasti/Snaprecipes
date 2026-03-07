@@ -2,7 +2,7 @@
   "expo": {
     "name": "SnapRecipes",
     "slug": "snaprecipe",
-    "version": "5.0.1",
+    "version": "5.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -25,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.deanfieldz.yummy",
-      "versionCode": 7,
+      "versionCode": 8,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -45,7 +45,15 @@
           "cameraPermission": "Allow SnapRecipes to use your camera to scan physical recipes."
         }
       ],
-      "expo-build-properties"
+      "expo-build-properties",
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": [
+            "text/*"
+          ]
+        }
+      ]
     ],
     "extra": {
       "router": {},
