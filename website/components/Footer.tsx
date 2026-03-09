@@ -29,7 +29,7 @@ export default function Footer() {
                         <ul className="space-y-3">
                             <li><Link href="/privacy.html" className="text-surface-400 hover:text-white transition-colors">Privacy Policy</Link></li>
                             <li><Link href="/delete-account.html" className="text-surface-400 hover:text-white transition-colors">Delete Account</Link></li>
-                            <li><a href="mailto:support@snaprecipes.app" className="text-surface-400 hover:text-white transition-colors">Contact</a></li>
+                            <li><a href="mailto:singlesourcedigitalmarketing@gmail.com" className="text-surface-400 hover:text-white transition-colors">Contact</a></li>
                         </ul>
                     </div>
                 </div>

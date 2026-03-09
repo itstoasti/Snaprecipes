@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 import type { ExtractedRecipe } from "@/db/schema";
 import * as SecureStore from "expo-secure-store";
 import { getLinkPreview } from "link-preview-js";
-import { AI_PROVIDER_STORE } from "@/app/(tabs)/settings";
+import { AI_PROVIDER_STORE } from "./constants";
 
 const RECIPE_EXTRACTION_PROMPT = `You are an expert recipe extractor. Your task is to extract recipe information from the provided webpage content or social media metadata.
 You MUST respond with a JSON object matching the following TypeScript interface:
@@ -173,7 +173,7 @@ function extractRecipeSection(content: string, maxChars: number = 40000): string
 /**
  * Extract a recipe from a URL using Gemini or OpenAI
  */
-export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
+export async function extractFromUrl(url: string, reCacheOnly = false): Promise<ExtractedRecipe> {
     let markdownContent = "";
     let ogImage = "";
     let socialCaption = "";
@@ -285,7 +285,16 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
             'Authorization': `Bearer ${authToken}`,
             'apikey': supabaseKey
         },
-        body: JSON.stringify({ url, contentForAI, scrapeFailed, prompt: RECIPE_EXTRACTION_PROMPT, provider, geminiModel: 'gemini-2.5-flash' })
+        body: JSON.stringify({ 
+            url, 
+            contentForAI, 
+            scrapeFailed, 
+            prompt: RECIPE_EXTRACTION_PROMPT, 
+            provider, 
+            geminiModel: 'gemini-2.5-flash',
+            reCacheOnly,
+            ogImageUrl: ogImage
+        })
     });
 
     if (!response.ok) {
@@ -307,27 +316,42 @@ export async function extractFromUrl(url: string): Promise<ExtractedRecipe> {
 
     const recipe = validateRecipe(data);
 
-    // Instagram/TikTok CDN URLs often fail to load in apps (require cookies/headers)
-    // Check if the extracted image is from a problematic CDN
+    // Instagram/Facebook CDN URLs often fail to load in apps due to expiring signatures in query params
+    // Check if the extracted image is from a problematic CDN.
+    // NOTE: We do NOT include TikTok here anymore, because TikTok images *need* their query params to load correctly,
+    // and the wsrv.nl proxy strips them and breaks the image entirely.
     const isProblematicCdn = recipe.imageUrl && (
         recipe.imageUrl.includes("cdninstagram.com") ||
         recipe.imageUrl.includes("fbcdn.net") ||
-        recipe.imageUrl.includes("scontent") ||
-        recipe.imageUrl.includes("tiktokcdn.com")
+        recipe.imageUrl.includes("scontent")
     );
 
-    // For problematic CDN URLs, try to use a cleaner fallback
-    // Note: ogImage might also be from the same CDN, but it's worth trying
-    if (isProblematicCdn) {
-        if (__DEV__) console.log("Detected problematic CDN image URL, this may not load in the app");
-        // Keep the URL anyway - expo-image might be able to load it
-        // The user will see a placeholder if it fails
+    if (isProblematicCdn && recipe.imageUrl) {
+        if (__DEV__) console.log("Detected problematic CDN image URL, attempting to clean it.");
+        try {
+            // Option 1: Strip query parameters that cause 403 Forbidden on expiring signatures
+            const urlObj = new URL(recipe.imageUrl);
+            const cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
+            
+            // Option 2: Wrap it in a reliable image proxy that bypasses CDN hotlink protection
+            // We use wsrv.nl (images.weserv.nl) which is a free caching proxy often used for mobile apps
+            recipe.imageUrl = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
+            if (__DEV__) console.log("Proxied Cleaned URL:", recipe.imageUrl);
+        } catch (e) {
+            console.warn("Failed to clean/proxy CDN URL", e);
+        }
     }
 
-    // If no image was extracted, use OG image as fallback
-    if (!recipe.imageUrl && ogImage) {
+    // If no image was extracted or if the AI returned a messy one, and we have a clean OG image fallback
+    if ((!recipe.imageUrl || recipe.imageUrl === "") && ogImage) {
         if (__DEV__) console.log("Using OG image fallback:", ogImage);
         recipe.imageUrl = ogImage;
+    } else if (ogImage && recipe.imageUrl && recipe.imageUrl.includes("cdninstagram")) {
+         // Even after cleaning, IG URLs can be very stubborn over time.
+         // If we successfully grabbed a generic OG image earlier, it is much safer
+         // to use it as a fallback instead of a proxy-wrapped CDN image.
+         if (__DEV__) console.log("Replacing stubborn IG CDN url with clean OG image fallback");
+         recipe.imageUrl = ogImage;
     }
 
     return recipe;

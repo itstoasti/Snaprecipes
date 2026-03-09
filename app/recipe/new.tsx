@@ -20,6 +20,8 @@ import type { ExtractedRecipe } from "@/db/schema";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
+import { useAppReview } from "@/hooks/useAppReview";
+import ReviewPromptModal from "@/components/ReviewPromptModal";
 
 function FormInput({
     label,
@@ -60,6 +62,7 @@ export default function NewRecipeScreen() {
     const router = useRouter();
     const { insertRecipe } = useRecipes();
     const [loading, setLoading] = useState(false);
+    const { showPrePrompt, recordSuccessfulSave, handlePrePromptResponse } = useAppReview();
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -126,6 +129,8 @@ export default function NewRecipeScreen() {
             };
 
             const recipeId = await insertRecipe(recipeData, undefined, "manual");
+
+            await recordSuccessfulSave();
 
             router.replace(`/recipe/${recipeId}`);
         } catch (error: any) {
@@ -297,6 +302,8 @@ export default function NewRecipeScreen() {
                     </Pressable>
                 </GlassContainer>
             </View>
+
+            <ReviewPromptModal visible={showPrePrompt} onRespond={handlePrePromptResponse} />
         </KeyboardAvoidingView>
     );
 }

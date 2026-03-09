@@ -26,6 +26,7 @@ async function pushSingleRecipe(
         servings: recipe.servings,
         prep_time: recipe.prep_time,
         cook_time: recipe.cook_time,
+        updated_at: recipe.updated_at || new Date().toISOString()
     };
 
     const ingredientsPayload = ingredients.map(ing => {
@@ -134,6 +135,9 @@ export async function initialSync(): Promise<void> {
             }
         }
 
+        // Finally, pull everything down from the cloud
+        await pullRemoteChanges();
+
         if (__DEV__) console.log("Initial sync completed.");
     } catch (e) {
         console.error("Initial Sync Failed:", e);
@@ -157,6 +161,44 @@ export async function syncNewRecipe(recipeId: number): Promise<void> {
         await pushSingleRecipe(db, user.id, recipe);
     } catch (e) {
         console.error(`syncNewRecipe failed for recipe ${recipeId}:`, e);
+    }
+}
+
+// Push an update to an existing recipe to Supabase.
+export async function syncUpdateRecipe(recipeId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const recipe = await db.getFirstAsync<Recipe>(
+        "SELECT * FROM recipes WHERE id = ? AND remote_id IS NOT NULL",
+        [recipeId]
+    );
+    if (!recipe) return;
+
+    try {
+        const { error } = await supabase.from('recipes').update({
+            title: recipe.title,
+            description: recipe.description,
+            image_url: recipe.image_url,
+            source_url: recipe.source_url,
+            source_type: recipe.source_type,
+            servings: recipe.servings,
+            prep_time: recipe.prep_time,
+            cook_time: recipe.cook_time,
+            updated_at: recipe.updated_at
+        }).eq('id', recipe.remote_id);
+        
+        if (error) {
+            console.error(`syncUpdateRecipe failed for recipe ${recipeId}:`, error.message);
+            throw error;
+        } else {
+            console.log(`Successfully synced update for recipe ${recipeId} to Supabase.`);
+            await db.runAsync("UPDATE recipes SET sync_status='synced' WHERE id=?", [recipeId]);
+        }
+    } catch (e) {
+        console.error(`syncUpdateRecipe failed for recipe ${recipeId}:`, e);
+        throw e; // Rethrow to allow caller to handle failure
     }
 }
 
@@ -274,17 +316,30 @@ export async function pullRemoteChanges(): Promise<void> {
         // 2. Insert or Update Local DB based on remote_id
         for (const rRecipe of remoteRecipes) {
             // Check if recipe exists locally by remote_id
-            const existing = await db.getFirstAsync<Recipe>("SELECT id FROM recipes WHERE remote_id = ?", [rRecipe.id]);
+            const existing = await db.getFirstAsync<Recipe>("SELECT * FROM recipes WHERE remote_id = ?", [rRecipe.id]);
             
             let localRecipeId;
             
             if (existing) {
-                // Update
-                localRecipeId = existing.id;
-                await db.runAsync(
-                    `UPDATE recipes SET title=?, description=?, image_url=?, source_url=?, source_type=?, servings=?, prep_time=?, cook_time=?, sync_status='synced' WHERE id=?`,
-                    [rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time, existing.id]
-                );
+                // Conflict resolution: only update if remote is newer
+                const localDate = new Date(existing.updated_at || 0);
+                const remoteDate = new Date(rRecipe.updated_at);
+                
+                const localUpdated = localDate.getTime();
+                const remoteUpdated = remoteDate.getTime();
+                
+                // Add a small buffer for network latency/precision (e.g. 2s)
+                if (remoteUpdated > localUpdated + 2000) {
+                    console.log(`[Sync] Updating recipe ${existing.id} (remote is newer: ${rRecipe.updated_at} vs ${existing.updated_at})`);
+                    localRecipeId = existing.id;
+                    await db.runAsync(
+                        `UPDATE recipes SET title=?, description=?, image_url=?, source_url=?, source_type=?, servings=?, prep_time=?, cook_time=?, sync_status='synced', updated_at=? WHERE id=?`,
+                        [rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time, rRecipe.updated_at, existing.id]
+                    );
+                } else {
+                    console.log(`[Sync] Skipping recipe ${existing.id} (local is newer or equal: ${existing.updated_at} >= ${rRecipe.updated_at})`);
+                    continue;
+                }
             } else {
                 // Insert
                 const res = await db.runAsync(
@@ -366,9 +421,45 @@ export async function pullRemoteChanges(): Promise<void> {
             }
         }
         
+        // Final sanity check: Deduplicate any local recipes that share the exact same title
+        // This resolves issues where free-user syncs might duplicate existing remote items.
+        await deduplicateRecipes(db);
+
         if (__DEV__) console.log("Pull sync completed successfully.");
     } catch (e) {
         console.error("Pull Sync Failed:", e);
+    }
+}
+
+async function deduplicateRecipes(db: SQLiteDatabase) {
+    try {
+        const recipes = await db.getAllAsync<Recipe>("SELECT * FROM recipes ORDER BY created_at ASC");
+        const seenTitles = new Map<string, Recipe>();
+        const dupesToDelete: number[] = [];
+
+        for (const recipe of recipes) {
+            const normalized = recipe.title.toLowerCase().trim();
+            if (seenTitles.has(normalized)) {
+                // It's a duplicate. Mark for local deletion.
+                dupesToDelete.push(recipe.id);
+                // Also explicitly delete from Supabase if it synced as a duplicate
+                if (recipe.remote_id) {
+                    supabase.from('recipes').delete().eq('id', recipe.remote_id).then();
+                }
+            } else {
+                seenTitles.set(normalized, recipe);
+            }
+        }
+
+        for (const id of dupesToDelete) {
+            await db.runAsync("DELETE FROM recipes WHERE id = ?", [id]);
+        }
+
+        if (dupesToDelete.length > 0 && __DEV__) {
+            console.log(`Deleted ${dupesToDelete.length} duplicate recipes.`);
+        }
+    } catch (e) {
+        console.error("Deduplication failed:", e);
     }
 }
 

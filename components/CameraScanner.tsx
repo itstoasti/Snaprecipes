@@ -6,7 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { extractFromImage } from "@/lib/extract";
 import { useRecipes } from "@/hooks/useRecipes";
-import { incrementUsage } from "@/lib/usage";
+import { canExtractRecipe, incrementUsage } from "@/lib/usage";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
 
 export default function CameraScanner() {
     const [permission, requestPermission] = useCameraPermissions();
@@ -14,9 +15,23 @@ export default function CameraScanner() {
     const cameraRef = useRef<CameraView>(null);
     const router = useRouter();
     const { insertRecipe } = useRecipes();
+    const { isPro } = useRevenueCat();
 
     const handleCapture = async () => {
         if (!cameraRef.current) return;
+
+        const canExtract = await canExtractRecipe(isPro);
+        if (!canExtract) {
+            Alert.alert(
+                "Usage Limit Reached",
+                "You've reached your free limit of 5 recipe extractions for this month. Upgrade to SnapRecipes Pro for unlimited extractions!",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Upgrade", onPress: () => { router.push("/paywall"); } }
+                ]
+            );
+            return;
+        }
 
         setLoading(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -37,7 +52,7 @@ export default function CameraScanner() {
             await incrementUsage();
 
             if (recipeId) {
-                router.replace(`/recipe/${recipeId}`);
+                router.replace(`/recipe/${recipeId}?isNew=true`);
             } else {
                 if (router.canGoBack()) {
                     router.back()
@@ -46,7 +61,15 @@ export default function CameraScanner() {
                 }
             }
         } catch (error: any) {
-            Alert.alert("Scan Failed", error.message || "Could not extract recipe from this photo");
+            const errorMsg = error.message || "";
+            if (errorMsg.toLowerCase().includes("network request failed")) {
+                Alert.alert(
+                    "Scan Interrupted",
+                    "The connection was dropped because the app went into the background. Please keep SnapRecipes open while scanning."
+                );
+            } else {
+                Alert.alert("Scan Failed", errorMsg || "Could not extract recipe from this photo");
+            }
             setLoading(false);
         }
     };

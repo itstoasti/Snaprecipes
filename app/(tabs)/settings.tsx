@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
-import { View, Text, Pressable, Platform, TextInput, Alert, KeyboardAvoidingView, ScrollView, Linking } from "react-native";
+import { View, Text, Pressable, Platform, TextInput, Alert, KeyboardAvoidingView, ScrollView, Linking, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
@@ -9,11 +9,12 @@ import GlassContainer from "@/components/GlassContainer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
+import { clearDatabase } from "@/db/client";
 import type { Session } from "@supabase/supabase-js";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
-
-
-export const AI_PROVIDER_STORE = "user_ai_provider";
+import { useRecipes } from "@/hooks/useRecipes";
+import { AI_PROVIDER_STORE } from "@/lib/constants";
+import StatusModal from "@/components/StatusModal";
 
 function SettingRow({
     icon,
@@ -51,11 +52,23 @@ export default function SettingsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const { isPro } = useRevenueCat();
+    const { repairBrokenImages } = useRecipes();
 
     // Supabase Auth State
     const [session, setSession] = useState<Session | null>(null);
     const [aiProvider, setAiProvider] = useState<"gemini" | "openai">("gemini");
     const [syncing, setSyncing] = useState(false);
+    const [modal, setModal] = useState<{
+        visible: boolean;
+        type: "success" | "error";
+        title: string;
+        message: string;
+    }>({
+        visible: false,
+        type: "success",
+        title: "",
+        message: "",
+    });
 
     useEffect(() => {
         SecureStore.getItemAsync(AI_PROVIDER_STORE).then(val => {
@@ -77,7 +90,17 @@ export default function SettingsScreen() {
 
     const signOut = async () => {
         const { error } = await supabase.auth.signOut();
-        if (error) Alert.alert("Error signing out", error.message);
+        if (error) {
+            setModal({
+                visible: true,
+                type: "error",
+                title: "Sign Out Failed",
+                message: error.message
+            });
+        } else {
+            await clearDatabase();
+            router.replace("/");
+        }
     };
 
     return (
@@ -86,7 +109,7 @@ export default function SettingsScreen() {
             className="flex-1 bg-surface-950"
             style={{ paddingTop: Math.max(insets.top, 20) + 10 }}
         >
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}>
                 <Text className="text-surface-400 font-sans text-xs uppercase tracking-widest">
                     App
                 </Text>
@@ -94,20 +117,32 @@ export default function SettingsScreen() {
                     Settings
                 </Text>
 
-                {/* SnapRecipes Pro Upgrade Banner */}
-                <Pressable
-                    onPress={() => router.push("/paywall")}
-                    className="flex-row items-center bg-surface-900 border border-accent/30 p-4 rounded-2xl mb-8"
-                >
-                    <View className="w-12 h-12 rounded-full bg-accent/20 items-center justify-center mr-4">
-                        <Ionicons name="star" size={24} color="#FF6B35" />
+                {/* SnapRecipes Pro Upgrade/Active Banner */}
+                {isPro ? (
+                    <View className="flex-row items-center bg-surface-900 border border-emerald-500/30 p-4 rounded-2xl mb-8">
+                        <View className="w-12 h-12 rounded-full bg-emerald-500/20 items-center justify-center mr-4">
+                            <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-white font-sans-bold text-lg">SnapRecipes Pro Active</Text>
+                            <Text className="text-surface-400 font-sans text-sm">Thank you for your support!</Text>
+                        </View>
                     </View>
-                    <View className="flex-1">
-                        <Text className="text-white font-sans-bold text-lg">SnapRecipes Pro</Text>
-                        <Text className="text-surface-400 font-sans text-sm">Unlimited saves & cook mode</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
-                </Pressable>
+                ) : (
+                    <Pressable
+                        onPress={() => router.push("/paywall")}
+                        className="flex-row items-center bg-surface-900 border border-accent/30 p-4 rounded-2xl mb-8"
+                    >
+                        <View className="w-12 h-12 rounded-full bg-accent/20 items-center justify-center mr-4">
+                            <Ionicons name="star" size={24} color="#FF6B35" />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-white font-sans-bold text-lg">SnapRecipes Pro</Text>
+                            <Text className="text-surface-400 font-sans text-sm">Unlimited saves & cook mode</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                    </Pressable>
+                )}
 
                 {/* AI Engine Preference */}
                 <Text className="text-white font-sans-semibold text-lg mb-3">AI Extraction Engine</Text>
@@ -141,6 +176,48 @@ export default function SettingsScreen() {
                     </View>
                 </GlassContainer>
 
+                {/* Maintenance Tools */}
+                <Text className="text-white font-sans-semibold text-lg mb-3">Maintenance</Text>
+                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24, padding: 0 }}>
+                    <View className="p-5">
+                        <Text className="text-surface-400 font-sans text-sm mb-4 leading-5">
+                            Fix recipes with broken images (common with Instagram and TikTok). This will attempt to re-save the image to your permanent storage.
+                        </Text>
+                        <Pressable
+                            onPress={async () => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                setSyncing(true);
+                                try {
+                                    const count = await repairBrokenImages();
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    setModal({
+                                        visible: true,
+                                        type: "success",
+                                        title: "Repair Complete",
+                                        message: `Successfully repaired ${count} broken images! Your library is back in shape.`
+                                    });
+                                } catch (e: any) {
+                                    setModal({
+                                        visible: true,
+                                        type: "error",
+                                        title: "Repair Failed",
+                                        message: e.message || "An error occurred during repair."
+                                    });
+                                } finally {
+                                    setSyncing(false);
+                                }
+                            }}
+                            disabled={syncing}
+                            className={`w-full py-4 rounded-xl items-center bg-surface-800 border-surface-700 border flex-row justify-center ${syncing ? 'opacity-50' : ''}`}
+                        >
+                            <Ionicons name="construct" size={18} color="#FF6B35" />
+                            <Text className="text-white font-sans-bold text-base ml-2">
+                                {syncing ? "Repairing..." : "Repair Broken Images"}
+                            </Text>
+                        </Pressable>
+                    </View>
+                </GlassContainer>
+
                 {/* Account & Sync */}
                 <Text className="text-white font-sans-semibold text-lg mb-3">Account & Cloud Sync</Text>
                 <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24, padding: 0 }}>
@@ -151,9 +228,23 @@ export default function SettingsScreen() {
                                     <Ionicons name="lock-closed" size={28} color="#9D9DB0" />
                                 </View>
                                 <Text className="text-white font-sans-bold text-lg mb-2">Pro Feature</Text>
-                                <Text className="text-surface-400 font-sans text-sm text-center mb-6 leading-5">
-                                    Upgrade to SnapRecipes Pro to create an account and unlock secure, automatic cloud syncing across all your devices.
+                                <Text className="text-surface-300 font-sans text-sm text-center mb-4 leading-5">
+                                    Upgrade to SnapRecipes Pro to create an account and unlock premium features:
                                 </Text>
+                                <View className="w-full px-2 mb-6 space-y-3 gap-3">
+                                    <View className="flex-row items-center">
+                                        <Ionicons name="infinite" size={18} color="#FF6B35" />
+                                        <Text className="text-surface-300 font-sans text-sm ml-3 flex-1">Unlimited recipe saves</Text>
+                                    </View>
+                                    <View className="flex-row items-center">
+                                        <Ionicons name="cloud-done" size={18} color="#3b82f6" />
+                                        <Text className="text-surface-300 font-sans text-sm ml-3 flex-1">Secure, automatic cloud syncing</Text>
+                                    </View>
+                                    <View className="flex-row items-center">
+                                        <Ionicons name="restaurant" size={18} color="#10b981" />
+                                        <Text className="text-surface-300 font-sans text-sm ml-3 flex-1">Ad-free Cook Mode</Text>
+                                    </View>
+                                </View>
                                 <Pressable
                                     onPress={() => router.push("/paywall")}
                                     className="w-full py-4 rounded-xl items-center bg-surface-800 border-surface-700 border"
@@ -184,9 +275,19 @@ export default function SettingsScreen() {
                                                 await pushPendingChanges();
                                                 await pullRemoteChanges();
                                                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                                Alert.alert("Sync Complete", "Your recipes are up to date!");
+                                                setModal({
+                                                    visible: true,
+                                                    type: "success",
+                                                    title: "Sync Complete",
+                                                    message: "Your recipes are securely backed up and up-to-date across all devices."
+                                                });
                                             } catch (e: any) {
-                                                Alert.alert("Sync Failed", e.message || "An error occurred during sync.");
+                                                setModal({
+                                                    visible: true,
+                                                    type: "error",
+                                                    title: "Sync Failed",
+                                                    message: e.message || "An error occurred during sync."
+                                                });
                                             } finally {
                                                 setSyncing(false);
                                             }
@@ -239,13 +340,23 @@ export default function SettingsScreen() {
 
                 {/* Branding */}
                 <View className="items-center mb-6">
-                    <Text className="text-3xl mb-2">🍳</Text>
+                    <View className="w-16 h-16 rounded-2xl bg-surface-900 border border-surface-800 items-center justify-center mb-3 overflow-hidden shadow-lg shadow-black/50">
+                        <Image source={require("../../assets/icon.png")} style={{ width: 64, height: 64 }} resizeMode="cover" />
+                    </View>
                     <Text className="text-white font-sans-bold text-lg">SnapRecipes</Text>
                     <Text className="text-surface-500 font-sans text-xs mt-1">
                         Save any recipe, instantly.
                     </Text>
                 </View>
             </ScrollView>
+
+            <StatusModal
+                visible={modal.visible}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                onClose={() => setModal(prev => ({ ...prev, visible: false }))}
+            />
         </KeyboardAvoidingView>
     );
 }

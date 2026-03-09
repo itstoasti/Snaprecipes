@@ -10,14 +10,20 @@ import { useRevenueCat } from "@/hooks/useRevenueCat";
 export default function PaywallScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { currentOffering, isReady } = useRevenueCat();
+    const { isPro, currentOffering, isReady } = useRevenueCat();
     const [loading, setLoading] = React.useState(false);
 
     React.useEffect(() => {
-        // Log paywall view for analytics (optional, may not be available in all SDK versions)
-        if (currentOffering && typeof Purchases.logPaywallPresented === 'function') {
+        if (isPro) {
+            router.replace("/(tabs)/");
+        }
+    }, [isPro]);
+
+    React.useEffect(() => {
+        // ... (rest)
+        if (currentOffering && typeof (Purchases as any).logPaywallPresented === 'function') {
             try {
-                Purchases.logPaywallPresented(currentOffering);
+                (Purchases as any).logPaywallPresented(currentOffering);
             } catch (e) {
                 // Silently ignore if not supported
             }
@@ -27,6 +33,12 @@ export default function PaywallScreen() {
     const handlePurchase = async (pkg: PurchasesPackage) => {
         try {
             setLoading(true);
+            const Constants = require('expo-constants').default;
+            if (Constants.appOwnership === 'expo') {
+                alert("Purchases are disabled in Expo Go. Please use a development build to test native payments.");
+                setLoading(false);
+                return;
+            }
             await Purchases.purchasePackage(pkg);
             // Purchase successful
             router.replace("/(tabs)/");
@@ -46,7 +58,7 @@ export default function PaywallScreen() {
         >
             <Pressable onPress={() => {
                 if (router.canGoBack()) {
-                    router.back()
+                    router.back();
                 } else {
                     router.replace("/(tabs)/");
                 }

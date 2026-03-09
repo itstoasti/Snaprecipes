@@ -3,9 +3,11 @@ import { Platform } from 'react-native';
 import Purchases, { CustomerInfo, PurchasesOffering } from 'react-native-purchases';
 import { supabase } from '@/lib/supabase';
 import { initialSync } from '@/lib/sync';
+import Constants from 'expo-constants';
 
 const API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY || "";
 const API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || "";
+
 interface RevenueCatContextState {
     isPro: boolean;
     customerInfo: CustomerInfo | null;
@@ -29,10 +31,28 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
     const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
     const [isReady, setIsReady] = useState(false);
+    const [session, setSession] = useState<any>(null);
 
-    // 1. Initial configuration
+    // 1. Initial configuration & Auth Tracking
     useEffect(() => {
+        // Track Supabase session for Expo Go "Virtual Pro" mode
+        supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+        const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
         const init = async () => {
+            // Check if we are in Expo Go
+            const isExpoGo = Constants.appOwnership === 'expo';
+
+            if (isExpoGo) {
+                console.log("Expo Go app detected. RevenueCat native features unavailable.");
+                // We do NOT provide mock offerings here to preserve production integrity.
+                // The paywall will correctly show its "Loading..." state.
+                setIsReady(true);
+                return;
+            }
+
             try {
                 if (!isConfigured) {
                     if (Platform.OS === 'android') {
@@ -59,11 +79,15 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
 
         init();
+        return () => authSub.unsubscribe();
     }, []);
 
-    // 2. Auth state synchronization
+    // 2. Auth state synchronization (Native only)
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            const isExpoGo = Constants.appOwnership === 'expo';
+            if (isExpoGo) return; // Skip RevenueCat sync in Expo Go
+
             if (session?.user?.id) {
                 try {
                     const { customerInfo } = await Purchases.logIn(session.user.id);
@@ -86,8 +110,11 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
     }, []);
 
-    // 3. Customer Info Updates (purchases made outside the app or on another device)
+    // 3. Customer Info Updates (Native only)
     useEffect(() => {
+        const isExpoGo = Constants.appOwnership === 'expo';
+        if (isExpoGo) return;
+
         const purchaseListener = (info: CustomerInfo) => {
             setCustomerInfo(info);
         };
@@ -98,19 +125,30 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
     }, []);
 
-    // Check if user has the active pro entitlement (default name is often 'pro' or 'premium')
-    // We'll check for any active entitlement for the MVP safety.
-    const isPro = typeof customerInfo?.entitlements.active !== 'undefined' &&
+    // Derived Pro Status
+    // In Expo Go, we grant Pro status ONLY if they are logged in.
+    // In production, we check real RevenueCat entitlements.
+    const isActuallyPro = typeof customerInfo?.entitlements.active !== 'undefined' &&
         Object.keys(customerInfo.entitlements.active).length > 0;
+
+    const isPro = (Constants.appOwnership === 'expo' ? !!session?.user?.id : isActuallyPro);
 
     // Sign out of Supabase when Pro lapses; trigger initial sync when user becomes Pro
     const wasProRef = useRef<boolean | null>(null);
     useEffect(() => {
         if (!isReady) return;
-        if (wasProRef.current === true && !isPro) {
-            supabase.auth.signOut().catch(console.error);
+
+        // Only trigger wipe logic on native devices where we have real subscriber info
+        const isNative = Constants.appOwnership !== 'expo';
+
+        if (isNative && wasProRef.current === true && !isPro) {
+            supabase.auth.signOut().then(async () => {
+                const { clearDatabase } = require('@/db/client');
+                await clearDatabase();
+            }).catch(console.error);
         }
-        // User just became Pro — push any existing local data to Supabase
+
+        // Trigger sync when user becomes Pro
         if (wasProRef.current === false && isPro) {
             initialSync().catch(console.error);
         }

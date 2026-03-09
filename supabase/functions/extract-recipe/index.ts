@@ -221,7 +221,17 @@ Deno.serve(async (req: Request) => {
         }
         // ── END AUTH GATE ──────────────────────────────────────────
 
-        const { url, contentForAI: clientContent, scrapeFailed, imageBase64, prompt, provider, geminiModel } = await req.json();
+        const { 
+            url, 
+            contentForAI: clientContent, 
+            scrapeFailed, 
+            imageBase64, 
+            prompt, 
+            provider, 
+            geminiModel,
+            reCacheOnly,
+            ogImageUrl 
+        } = await req.json();
 
         const activeProvider = provider || "gemini";
         const activeKey = activeProvider === "openai" ? DEFAULT_OPENAI_KEY : DEFAULT_GEMINI_KEY;
@@ -251,6 +261,46 @@ Deno.serve(async (req: Request) => {
                 }
             } catch (e) {
                 console.error(`[Server Scrape] Failed:`, e);
+            }
+        }
+
+        // --- Fast Path: Re-Cache Only (Skip AI) ---
+        if (reCacheOnly && url) {
+            console.log(`[Fast Path] reCacheOnly mode enabled for: ${url}`);
+            
+            // Priority 1: Use ogImageUrl passed from client
+            // Priority 2: Try to find a fresh one by scraping the server side
+            let imageToCache = ogImageUrl;
+
+            if (!imageToCache) {
+                console.log(`[Fast Path] No ogImageUrl provided, attempting server-side scrape...`);
+                // We'll use a very basic scrape to find the first large JPEG or og:image
+                try {
+                    const resp = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }});
+                    if (resp.ok) {
+                        const html = await resp.text();
+                        const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+                        if (ogMatch) imageToCache = ogMatch[1];
+                    }
+                } catch (e) {
+                    console.log(`[Fast Path] Server scrape failed:`, e);
+                }
+            }
+
+            if (imageToCache) {
+                // Remove any trailing dots or punctuation that might have leaked in
+                imageToCache = imageToCache.trim().replace(/[.,!?;]+$/, "");
+                
+                const result = await performImageCaching(imageToCache, url);
+                return new Response(JSON.stringify({ imageUrl: result || imageToCache }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            } else {
+                console.log(`[Fast Path] Failed to find any image URL to cache.`);
+                return new Response(JSON.stringify({ error: "Failed to find image" }), {
+                    status: 404,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
             }
         }
 
@@ -369,6 +419,19 @@ Deno.serve(async (req: Request) => {
             else throw new Error("AI returned an empty JSON array.");
         }
 
+        // ── IMAGE CACHING PIPELINE ─────────────────────────────────
+        // Cache images from ephemeral sources like Instagram/TikTok
+        if (parsedData.imageUrl && url) {
+            // Hard clean the URL
+            parsedData.imageUrl = parsedData.imageUrl.trim().replace(/[.,!?;]+$/, "");
+            
+            const cachedUrl = await performImageCaching(parsedData.imageUrl, url);
+            if (cachedUrl) {
+                parsedData.imageUrl = cachedUrl;
+            }
+        }
+        // ── END IMAGE CACHING PIPELINE ──────────────────────────────
+
         // ── COMMUNITY RECIPE PIPELINE ──────────────────────────────
         // For anonymous (free-tier) users, store an anonymized copy
         // in public_recipes for the future Discover feature.
@@ -446,3 +509,71 @@ Deno.serve(async (req: Request) => {
         });
     }
 });
+
+/**
+ * Shared logic to download an image from an ephemeral URL and upload to Supabase Storage.
+ */
+async function performImageCaching(imageUrl: string, sourceUrl: string): Promise<string | null> {
+    try {
+        const problematicDomains = ["instagram.com", "tiktok.com", "facebook.com", "fb.watch", "pinterest.com"];
+        let sourceDomain = "";
+        try { sourceDomain = new URL(sourceUrl).hostname.replace("www.", ""); } catch {}
+
+        const isEphemeral = problematicDomains.some(d => sourceDomain.includes(d));
+        if (!isEphemeral && !imageUrl.includes("tiktokcdn") && !imageUrl.includes("cdninstagram.com") && !imageUrl.includes("scontent")) {
+            return null;
+        }
+
+        console.log(`[Storage] Image caching started for: ${sourceDomain}`);
+        
+        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+        const serviceClient = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        );
+
+        // 1. Download the image
+        const imgResp = await fetch(imageUrl.trim().replace(/[.,!?;]+$/, ""), {
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" }
+        });
+        
+        if (!imgResp.ok) {
+            console.error(`[Storage] Failed to download image: ${imgResp.status}`);
+            return null;
+        }
+
+        const contentType = imgResp.headers.get("content-type") || "image/jpeg";
+        const buffer = await imgResp.arrayBuffer();
+        
+        // 2. Generate unique filename based on the URL hash
+        const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(imageUrl));
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("").substring(0, 16);
+        const ext = contentType.split("/")[1]?.split(";")[0] || "jpg";
+        const fileName = `social-cache/${hashHex}.${ext}`;
+
+        // 3. Upload to Supabase Storage
+        const { data: uploadData, error: uploadErr } = await serviceClient.storage
+            .from("recipe-images")
+            .upload(fileName, buffer, {
+                contentType,
+                upsert: true
+            });
+
+        if (uploadErr) {
+            console.error(`[Storage] Upload failed:`, uploadErr);
+            return null;
+        }
+
+        // 4. Return the public URL
+        const { data: { publicUrl } } = serviceClient.storage
+            .from("recipe-images")
+            .getPublicUrl(fileName);
+        
+        console.log(`[Storage] Image cached successfully: ${publicUrl}`);
+        return publicUrl;
+    } catch (e) {
+        console.error(`[Storage] performImageCaching error:`, e);
+        return null;
+    }
+}

@@ -63,3 +63,23 @@ export async function closeDatabase(): Promise<void> {
         dbPromise = null;
     }
 }
+
+export async function clearDatabase(): Promise<void> {
+    const database = await getDatabase();
+    try {
+        await database.execAsync("PRAGMA foreign_keys = OFF;");
+        await database.runAsync("DELETE FROM recipe_collections;");
+        await database.runAsync("DELETE FROM recipe_tags;");
+        await database.runAsync("DELETE FROM ingredients;");
+        await database.runAsync("DELETE FROM steps;");
+        await database.runAsync("DELETE FROM recipes;");
+        await database.runAsync("DELETE FROM collections;");
+        await database.runAsync("DELETE FROM tags;");
+        await database.runAsync("DELETE FROM sync_queue;");
+        await database.execAsync("PRAGMA foreign_keys = ON;");
+        console.log("Local database successfully wiped.");
+    } catch (e) {
+        console.error("Failed to clear database:", e);
+        throw e;
+    }
+}

@@ -10,6 +10,8 @@ import {
     StyleSheet,
     TextInput,
     useWindowDimensions,
+    KeyboardAvoidingView,
+    Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, SlideInDown, FadeInDown } from "react-native-reanimated";
@@ -113,8 +115,11 @@ export default function CollectionPickerModal({
 
                 {/* Sheet — not nested inside the backdrop Pressable, so no touch conflict */}
                 {/* explicit height (not maxHeight) so flex:1 children have a real size to work with */}
-                <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: windowHeight * 0.75 }}>
-                    <Animated.View style={{ flex: 1 }} entering={SlideInDown.springify().damping(22).stiffness(120)}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
+                    style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: windowHeight * 0.75 }}
+                >
+                    <Animated.View style={{ flex: 1 }} entering={SlideInDown.duration(300)}>
                         <GlassContainer
                             style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1 }}
                         >
@@ -226,7 +231,7 @@ export default function CollectionPickerModal({
                             </View>
                         </GlassContainer>
                     </Animated.View>
-                </View>
+                </KeyboardAvoidingView>
             </View>
         </Modal>
     );

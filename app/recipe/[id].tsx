@@ -10,10 +10,10 @@ import {
     StatusBar as RNStatusBar,
     Dimensions,
     Linking,
+    Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInDown, SlideInUp } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
@@ -27,6 +27,8 @@ import { useCookMode } from "@/hooks/useCookMode";
 import { useRecipes } from "@/hooks/useRecipes";
 import type { Recipe, Ingredient, Step } from "@/db/schema";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { useAppReview } from "@/hooks/useAppReview";
+import ReviewPromptModal from "@/components/ReviewPromptModal";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -36,7 +38,7 @@ function isVideoUrl(url: string | null): boolean {
 }
 
 export default function RecipeDetailScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id, isNew } = useLocalSearchParams<{ id: string, isNew?: string }>();
     const router = useRouter();
     const { getRecipeById, deleteRecipe, updateRecipe } = useRecipes();
     const { isPro } = useRevenueCat();
@@ -61,6 +63,7 @@ export default function RecipeDetailScreen() {
     const [showCollectionModal, setShowCollectionModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const insets = useSafeAreaInsets();
+    const { showPrePrompt, recordSuccessfulSave, handlePrePromptResponse } = useAppReview();
 
     const isVideo = recipe ? isVideoUrl(recipe.source_url) : false;
     const headerHeight = SCREEN_WIDTH * 0.9; // Slightly taller for better framing
@@ -80,6 +83,16 @@ export default function RecipeDetailScreen() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Handle the review prompt milestone check exactly once on mount
+    useEffect(() => {
+        if (isNew === "true") {
+            recordSuccessfulSave();
+        }
+        // ESLint might complain about empty deps here, but it's intentional
+        // so we don't spam the review counter on every screen re-render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleDelete = () => {
         if (!recipe) return;
@@ -169,19 +182,18 @@ export default function RecipeDetailScreen() {
             >
                 {/* Hero Image or Video */}
                 <View style={{ width: SCREEN_WIDTH, height: headerHeight, backgroundColor: "#111" }}>
-                    {recipe.image_url && !imageError ? (
-                        <Image
-                            source={{ uri: recipe.image_url }}
-                            style={{ width: "100%", height: "100%" }}
-                            contentFit="cover"
-                            transition={400}
-                            onError={() => setImageError(true)}
-                        />
-                    ) : (
-                        <View className="flex-1 bg-surface-800 items-center justify-center">
-                            <Text className="text-6xl">🍽️</Text>
-                        </View>
-                    )}
+                    <Pressable onPress={handlePlayVideo} className="flex-1 w-full h-full bg-surface-800 items-center justify-center">
+                        {/* Fallback emoji rendered BEHIND the image */}
+                        <Text className="text-6xl absolute z-0 w-full text-center">🍽️</Text>
+
+                        {recipe.image_url ? (
+                            <Image
+                                source={{ uri: recipe.image_url }}
+                                style={{ width: "100%", height: "100%", position: "absolute", zIndex: 10 }}
+                                resizeMode="cover"
+                            />
+                        ) : null}
+                    </Pressable>
 
                     {/* Gradient overlay */}
                     <View
@@ -390,6 +402,12 @@ export default function RecipeDetailScreen() {
                 steps={steps}
                 onSave={handleSaveEdit}
                 onClose={() => setShowEditModal(false)}
+            />
+
+            {/* Smart Review Pre-Prompt Overlay */}
+            <ReviewPromptModal
+                visible={showPrePrompt}
+                onRespond={handlePrePromptResponse}
             />
         </View>
     );

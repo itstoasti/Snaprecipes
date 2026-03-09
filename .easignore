@@ -8,3 +8,8 @@ npm-debug.*
 *.key
 *.mobileprovision
 *.orig.*
+
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+android/.cxx/

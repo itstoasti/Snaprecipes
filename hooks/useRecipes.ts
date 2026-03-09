@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDatabase } from "@/db/client";
-import { syncNewRecipe } from "@/lib/sync";
+import { syncNewRecipe, pushPendingChanges, pullRemoteChanges, syncUpdateRecipe } from "@/lib/sync";
+import { extractFromUrl } from "@/lib/extract";
 import { supabase } from "@/lib/supabase";
 import type { Recipe, Ingredient, Step, ExtractedRecipe } from "@/db/schema";
 
@@ -297,6 +298,9 @@ export function useRecipes() {
             }
 
             await loadRecipes();
+
+            // Push update to cloud (fire-and-forget)
+            syncUpdateRecipe(recipeId);
         },
         [loadRecipes]
     );
@@ -311,5 +315,69 @@ export function useRecipes() {
         updateRecipe,
         filterByCollection,
         filterByTag,
+        repairBrokenImages: useCallback(async () => {
+            const db = await getDatabase();
+            const recipesToRepair = await db.getAllAsync<Recipe>(
+                `SELECT * FROM recipes 
+                 WHERE source_url IS NOT NULL 
+                 AND (
+                    image_url IS NULL 
+                    OR image_url LIKE '%cdninstagram.com%' 
+                    OR image_url LIKE '%fbcdn.net%' 
+                    OR image_url LIKE '%scontent%' 
+                    OR image_url LIKE '%fb.watch%'
+                    OR image_url LIKE '%tiktokcdn%' 
+                    OR image_url LIKE '%tiktok.com%'
+                    OR image_url LIKE '%pinterest.com%'
+                 )`
+            );
+
+            // Debug: Log if there are ANY recipes that AREN'T being picked up but seem suspicious
+            if (__DEV__) {
+                const total = await db.getAllAsync<Recipe>("SELECT * FROM recipes WHERE source_url IS NOT NULL");
+                const excluded = total.filter(r => !recipesToRepair.some(tr => tr.id === r.id));
+                const suspicious = excluded.filter(r => 
+                    r.image_url && (r.image_url.includes("p16-") || r.image_url.includes("byteimg.com"))
+                );
+                if (suspicious.length > 0) {
+                    console.log(`[Repair] Found ${suspicious.length} suspicious but excluded recipes:`, suspicious.map(s => s.title));
+                }
+            }
+
+            console.log(`[Repair] Found ${recipesToRepair.length} recipes to repair.`);
+            let successCount = 0;
+            for (const recipe of recipesToRepair) {
+                try {
+                        console.log(`[Repair] Checking recipe ${recipe.id}: ${recipe.title}`);
+                        if (!recipe.source_url) {
+                            console.log(`[Repair] No source URL for recipe ${recipe.id}, skipping.`);
+                            continue;
+                        }
+                        const extracted = await extractFromUrl(recipe.source_url, true);
+                        if (extracted.imageUrl && extracted.imageUrl !== recipe.image_url) {
+                        console.log(`[Repair] Updating image for recipe ${recipe.id}: ${extracted.imageUrl}`);
+                        await db.runAsync(
+                            "UPDATE recipes SET image_url = ?, updated_at = ? WHERE id = ?",
+                            [extracted.imageUrl, new Date().toISOString(), recipe.id]
+                        );
+                        // Await sync to cloud for repair persistence
+                        try {
+                            await syncUpdateRecipe(recipe.id);
+                            successCount++;
+                            console.log(`[Repair] Successfully synced recipe ${recipe.id}`);
+                        } catch (syncErr) {
+                            console.error(`[Repair] Failed to sync recipe ${recipe.id} to cloud:`, syncErr);
+                            // We keep the local update, but won't count it as a "full" success
+                            // or maybe we should to show visual progress? Let's count it since local DB is updated.
+                            successCount++; 
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Failed to repair recipe ${recipe.id}:`, e);
+                }
+            }
+            await loadRecipes();
+            return successCount;
+        }, [loadRecipes]),
     };
 }

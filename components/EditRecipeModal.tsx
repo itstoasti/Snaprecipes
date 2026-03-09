@@ -240,7 +240,7 @@ export default function EditRecipeModal({
                                     >
                                         {/* Image Section */}
                                         <Pressable onPress={handlePickImage} className="mb-5">
-                                            <View className="h-40 bg-surface-800 rounded-2xl overflow-hidden items-center justify-center">
+                                            <View className="h-40 bg-surface-900 rounded-2xl overflow-hidden items-center justify-center">
                                                 {imageUrl ? (
                                                     <Image
                                                         source={{ uri: imageUrl }}
@@ -248,12 +248,11 @@ export default function EditRecipeModal({
                                                         contentFit="cover"
                                                     />
                                                 ) : (
-                                                    <View className="items-center">
-                                                        <Ionicons name="image-outline" size={40} color="#6E6E85" />
-                                                        <Text className="text-surface-400 font-sans text-sm mt-2">
-                                                            Tap to add photo
-                                                        </Text>
-                                                    </View>
+                                                    <Image
+                                                        source={require("../assets/placeholder.png")}
+                                                        style={{ width: "100%", height: "100%" }}
+                                                        contentFit="contain"
+                                                    />
                                                 )}
                                                 <View className="absolute bottom-2 right-2 bg-black/60 rounded-full p-2">
                                                     <Ionicons name="camera" size={16} color="#FFF" />
