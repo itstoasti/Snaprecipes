@@ -51,7 +51,7 @@ export default function SettingsScreen() {
     const appVersion = Constants.expoConfig?.version || "1.0.0";
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { isPro } = useRevenueCat();
+    const { isPro, isReady } = useRevenueCat();
     const { repairBrokenImages } = useRecipes();
 
     // Supabase Auth State
@@ -118,7 +118,7 @@ export default function SettingsScreen() {
                 </Text>
 
                 {/* SnapRecipes Pro Upgrade/Active Banner */}
-                {isPro ? (
+                {isReady && isPro ? (
                     <View className="flex-row items-center bg-surface-900 border border-emerald-500/30 p-4 rounded-2xl mb-8">
                         <View className="w-12 h-12 rounded-full bg-emerald-500/20 items-center justify-center mr-4">
                             <Ionicons name="checkmark-circle" size={28} color="#10B981" />

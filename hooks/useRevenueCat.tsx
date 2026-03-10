@@ -126,19 +126,23 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }, []);
 
     // Derived Pro Status
-    // In Expo Go, we grant Pro status ONLY if they are logged in.
-    // In production, we check real RevenueCat entitlements.
+    // CRITICAL: isPro must be FALSE until isReady is true.
+    // This prevents the UI from flashing "Pro" before RevenueCat has actually loaded.
     const activeEntitlements = customerInfo?.entitlements?.active;
-    const isActuallyPro = !!activeEntitlements && Object.keys(activeEntitlements).length > 0;
+    const activeKeys = activeEntitlements ? Object.keys(activeEntitlements) : [];
+    const isActuallyPro = activeKeys.length > 0;
 
-    // Debug: log exactly what RevenueCat is reporting
-    if (__DEV__ && isReady) {
-        console.log('[RevenueCat] customerInfo exists:', !!customerInfo);
-        console.log('[RevenueCat] active entitlements:', activeEntitlements ? Object.keys(activeEntitlements) : 'none');
-        console.log('[RevenueCat] isActuallyPro:', isActuallyPro);
+    // Log what RevenueCat is reporting (console.warn visible in logcat for production debugging)
+    if (isReady) {
+        console.warn('[RevenueCat] customerInfo exists:', !!customerInfo);
+        console.warn('[RevenueCat] active entitlements:', JSON.stringify(activeKeys));
+        console.warn('[RevenueCat] isActuallyPro:', isActuallyPro);
     }
 
-    const isPro = (Constants.appOwnership === 'expo' ? !!session?.user?.id : isActuallyPro);
+    // Gate on isReady: default to NOT Pro until RevenueCat has fully loaded and confirmed.
+    const isPro = isReady
+        ? (Constants.appOwnership === 'expo' ? !!session?.user?.id : isActuallyPro)
+        : false;
 
     // Sign out of Supabase when Pro lapses; trigger initial sync when user becomes Pro
     const wasProRef = useRef<boolean | null>(null);
