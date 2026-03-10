@@ -9,7 +9,5 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 
-android/app/build/
-android/.gradle/
-android/app/.cxx/
-android/.cxx/
+android/
+ios/
