@@ -142,18 +142,18 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const isIdentified = !!session?.user?.id;
     const isActuallyPro = isIdentified && hasActiveEntitlements;
 
+    // Gate on isReady: default to NOT Pro until RevenueCat has fully loaded and confirmed.
+    const isPro = isReady
+        ? (Constants.appOwnership === 'expo' ? isIdentified : isActuallyPro)
+        : false;
+
     // Log what RevenueCat is reporting (console.warn visible in logcat for production debugging)
     if (isReady) {
         console.warn('[RevenueCat] customerInfo exists:', !!customerInfo);
         console.warn('[RevenueCat] active entitlements:', JSON.stringify(activeKeys));
         console.warn('[RevenueCat] isIdentified (Supabase):', isIdentified);
-        console.warn('[RevenueCat] isPro:', isActuallyPro);
+        console.warn('[RevenueCat] isPro:', isPro);
     }
-
-    // Gate on isReady: default to NOT Pro until RevenueCat has fully loaded and confirmed.
-    const isPro = isReady
-        ? (Constants.appOwnership === 'expo' ? isIdentified : isActuallyPro)
-        : false;
 
     // Sign out of Supabase when Pro lapses; trigger initial sync when user becomes Pro
     const wasProRef = useRef<boolean | null>(null);

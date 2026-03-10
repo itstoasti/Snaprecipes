@@ -302,7 +302,22 @@ export default function SettingsScreen() {
                                         <Text className="text-surface-400 font-sans-semibold text-sm">Sign Out</Text>
                                     </Pressable>
                                 </View>
-                                <Text className="text-surface-500 font-sans text-xs text-center">
+
+                                <View className="mt-2 pt-2 border-t border-surface-800">
+                                    <SettingRow
+                                        icon="card"
+                                        label="Manage Subscription"
+                                        onPress={() => {
+                                            const url = Platform.OS === 'ios'
+                                                ? 'https://apps.apple.com/account/subscriptions'
+                                                : 'https://play.google.com/store/account/subscriptions?package=com.deanfieldz.yummy';
+                                            Linking.openURL(url);
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        }}
+                                    />
+                                </View>
+
+                                <Text className="text-surface-500 font-sans text-xs text-center mt-4">
                                     Your recipes securely sync across all your devices.
                                 </Text>
                             </View>

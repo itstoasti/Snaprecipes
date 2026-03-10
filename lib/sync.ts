@@ -94,11 +94,19 @@ async function pushSingleCollection(
     if (error) throw error;
 }
 
+let isSyncing = false;
+
 export async function initialSync(): Promise<void> {
+    if (isSyncing) {
+        if (__DEV__) console.log("[Sync] initialSync already in progress, skipping...");
+        return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const db = await getDatabase();
+    isSyncing = true;
 
     try {
         // Sync recipes
@@ -141,6 +149,8 @@ export async function initialSync(): Promise<void> {
         if (__DEV__) console.log("Initial sync completed.");
     } catch (e) {
         console.error("Initial Sync Failed:", e);
+    } finally {
+        isSyncing = false;
     }
 }
 
@@ -341,13 +351,20 @@ export async function pullRemoteChanges(): Promise<void> {
                     continue;
                 }
             } else {
-                // Insert
+                // Insert OR IGNORE to prevent UNIQUE constraint crashes
                 const res = await db.runAsync(
-                    `INSERT INTO recipes (remote_id, title, description, image_url, source_url, source_type, servings, prep_time, cook_time, sync_status) 
+                    `INSERT OR IGNORE INTO recipes (remote_id, title, description, image_url, source_url, source_type, servings, prep_time, cook_time, sync_status) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
                     [rRecipe.id, rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time]
                 );
-                localRecipeId = res.lastInsertRowId;
+                
+                if (res.lastInsertRowId === 0) {
+                    // It was ignored, so it must exist now. Re-fetch the id.
+                    const existingNow = await db.getFirstAsync<{id: number}>("SELECT id FROM recipes WHERE remote_id = ?", [rRecipe.id]);
+                    localRecipeId = existingNow?.id;
+                } else {
+                    localRecipeId = res.lastInsertRowId;
+                }
             }
 
             // Sync Ingredients

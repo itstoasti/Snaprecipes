@@ -23,8 +23,7 @@ export default function AuthScreen() {
             setLoading(false);
             Alert.alert("Sign Up Failed", error.message);
         } else {
-            console.log("[Auth] Sign up successful, performing initial sync...");
-            await initialSync();
+            console.log("[Auth] Sign up successful. Redirection will trigger sync.");
             setLoading(false);
             Alert.alert("Welcome!", "Your account has been created and your recipes are syncing.");
             router.replace("/(tabs)/");
@@ -39,8 +38,7 @@ export default function AuthScreen() {
             setLoading(false);
             Alert.alert("Sign In Failed", error.message);
         } else {
-            console.log("[Auth] Sign in successful, performing initial sync...");
-            await initialSync();
+            console.log("[Auth] Sign in successful. Redirection will trigger sync.");
             setLoading(false);
             // Replace with main tabs to avoid going back to a potentially stale paywall
             router.replace("/(tabs)/");
