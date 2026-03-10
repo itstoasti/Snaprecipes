@@ -128,8 +128,15 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Derived Pro Status
     // In Expo Go, we grant Pro status ONLY if they are logged in.
     // In production, we check real RevenueCat entitlements.
-    const isActuallyPro = typeof customerInfo?.entitlements.active !== 'undefined' &&
-        Object.keys(customerInfo.entitlements.active).length > 0;
+    const activeEntitlements = customerInfo?.entitlements?.active;
+    const isActuallyPro = !!activeEntitlements && Object.keys(activeEntitlements).length > 0;
+
+    // Debug: log exactly what RevenueCat is reporting
+    if (__DEV__ && isReady) {
+        console.log('[RevenueCat] customerInfo exists:', !!customerInfo);
+        console.log('[RevenueCat] active entitlements:', activeEntitlements ? Object.keys(activeEntitlements) : 'none');
+        console.log('[RevenueCat] isActuallyPro:', isActuallyPro);
+    }
 
     const isPro = (Constants.appOwnership === 'expo' ? !!session?.user?.id : isActuallyPro);
 

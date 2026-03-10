@@ -153,19 +153,38 @@ export function useAppReview() {
         if (isPositive === true) {
             // The user loves the app! Trigger the official native OS review popup.
             try {
-                if (await StoreReview.isAvailableAsync()) {
+                const isAvailable = await StoreReview.isAvailableAsync();
+                const hasAction = await StoreReview.hasAction();
+
+                if (isAvailable && hasAction) {
+                    // App is on the store — show the real native review dialog
                     await StoreReview.requestReview();
                 } else {
-                    // Fallback for Expo Go or environments where native StoreReview isn't available
+                    // App isn't published yet (preview/dev build) or native review unavailable.
+                    // Try opening the store listing directly; if that fails, show a thank-you alert.
                     const storeUrl = Platform.OS === 'ios'
-                        ? 'https://apps.apple.com/app/id123456789?action=write-review' // Replace with real iOS ID
-                        : 'https://play.google.com/store/apps/details?id=com.snaprecipe.app'; // Replace with real Android ID
-                    
-                    await Linking.openURL(storeUrl);
+                        ? 'https://apps.apple.com/app/id123456789?action=write-review' // Replace with real iOS App ID
+                        : `https://play.google.com/store/apps/details?id=com.deanfieldz.yummy`;
+
+                    const canOpen = await Linking.canOpenURL(storeUrl);
+                    if (canOpen) {
+                        await Linking.openURL(storeUrl);
+                    } else {
+                        // Preview build — store listing doesn't exist yet
+                        Alert.alert(
+                            '💛 Thank You!',
+                            'We really appreciate your support! Once SnapRecipes is live on the app store, you\'ll be able to leave a review there.',
+                            [{ text: 'Sounds good!' }]
+                        );
+                    }
                 }
             } catch (e) {
-                console.warn("Native review prompt failed, falling back to browser", e);
-                Linking.openURL('https://snaprecipes.com/review'); 
+                console.warn("Review prompt failed", e);
+                Alert.alert(
+                    '💛 Thank You!',
+                    'We really appreciate your support! Once SnapRecipes is live on the app store, you\'ll be able to leave a review there.',
+                    [{ text: 'Sounds good!' }]
+                );
             }
         }
     };
