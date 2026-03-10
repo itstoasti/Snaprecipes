@@ -42,17 +42,27 @@ export default function HomeScreen() {
         })();
     }, [recipes]);
 
-    // Refresh on focus and handle incoming filter params from other tabs
+    // Refresh recipes data on every focus, but do NOT reset the filter here.
+    // Filter is controlled separately to avoid overriding the user's manual selection.
     useFocusEffect(
         useCallback(() => {
             loadRecipes();
-            if (params.filter && typeof params.filter === "string") {
-                setActiveFilter(params.filter);
-            } else {
-                setActiveFilter("all");
-            }
-        }, [loadRecipes, params.filter])
+        }, [loadRecipes])
     );
+
+    // Apply incoming filter param from Collections tab — only when the param actually changes.
+    useEffect(() => {
+        if (params.filter && typeof params.filter === "string") {
+            setActiveFilter(params.filter);
+        }
+    }, [params.filter]);
+
+    // When the user manually picks a filter, clear the route param so it
+    // doesn't re-apply on the next focus event and override their choice.
+    const handleFilterSelect = useCallback((filterId: string) => {
+        router.setParams({ filter: undefined });
+        setActiveFilter(filterId);
+    }, [router]);
 
     // Apply filter and search
     useEffect(() => {
@@ -173,7 +183,7 @@ export default function HomeScreen() {
                 <FilterBar
                     filters={filterItems}
                     activeFilter={activeFilter}
-                    onFilterSelect={setActiveFilter}
+                    onFilterSelect={handleFilterSelect}
                 />
             )}
 
