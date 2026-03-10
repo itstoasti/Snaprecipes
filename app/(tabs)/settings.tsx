@@ -51,7 +51,7 @@ export default function SettingsScreen() {
     const appVersion = Constants.expoConfig?.version || "1.0.0";
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { isPro, isReady } = useRevenueCat();
+    const { isPro, hasActiveEntitlements, isReady } = useRevenueCat();
     const { repairBrokenImages } = useRecipes();
 
     // Supabase Auth State
@@ -128,6 +128,20 @@ export default function SettingsScreen() {
                             <Text className="text-surface-400 font-sans text-sm">Thank you for your support!</Text>
                         </View>
                     </View>
+                ) : isReady && hasActiveEntitlements && !session ? (
+                    <Pressable
+                        onPress={() => router.push("/auth")}
+                        className="flex-row items-center bg-surface-900 border border-blue-500/30 p-4 rounded-2xl mb-8"
+                    >
+                        <View className="w-12 h-12 rounded-full bg-blue-500/20 items-center justify-center mr-4">
+                            <Ionicons name="log-in" size={24} color="#3B82F6" />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-white font-sans-bold text-lg">Activate Your Pro Purchase</Text>
+                            <Text className="text-surface-400 font-sans text-sm">Log in to unlock your Pro features</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                    </Pressable>
                 ) : (
                     <Pressable
                         onPress={() => router.push("/paywall")}

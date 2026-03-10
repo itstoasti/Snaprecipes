@@ -10,6 +10,7 @@ const API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || "";
 
 interface RevenueCatContextState {
     isPro: boolean;
+    hasActiveEntitlements: boolean;
     customerInfo: CustomerInfo | null;
     currentOffering: PurchasesOffering | null;
     isReady: boolean;
@@ -17,6 +18,7 @@ interface RevenueCatContextState {
 
 const RevenueCatContext = createContext<RevenueCatContextState>({
     isPro: false,
+    hasActiveEntitlements: false,
     customerInfo: null,
     currentOffering: null,
     isReady: false,
@@ -126,22 +128,31 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }, []);
 
     // Derived Pro Status
-    // CRITICAL: isPro must be FALSE until isReady is true.
-    // This prevents the UI from flashing "Pro" before RevenueCat has actually loaded.
+    // CRITICAL: We ONLY trust RevenueCat entitlements when the SDK has been
+    // identified with a real Supabase user ID (via Purchases.logIn()).
+    // Anonymous RevenueCat users can have phantom entitlements from previous
+    // test purchases, sandbox data, or device-level purchase restoration.
+    // This means: no Supabase login = always free tier, period.
     const activeEntitlements = customerInfo?.entitlements?.active;
     const activeKeys = activeEntitlements ? Object.keys(activeEntitlements) : [];
-    const isActuallyPro = activeKeys.length > 0;
+    const hasActiveEntitlements = activeKeys.length > 0;
+
+    // Only trust entitlements if the user is logged into Supabase
+    // (which means Purchases.logIn() was called with their Supabase user ID)
+    const isIdentified = !!session?.user?.id;
+    const isActuallyPro = isIdentified && hasActiveEntitlements;
 
     // Log what RevenueCat is reporting (console.warn visible in logcat for production debugging)
     if (isReady) {
         console.warn('[RevenueCat] customerInfo exists:', !!customerInfo);
         console.warn('[RevenueCat] active entitlements:', JSON.stringify(activeKeys));
-        console.warn('[RevenueCat] isActuallyPro:', isActuallyPro);
+        console.warn('[RevenueCat] isIdentified (Supabase):', isIdentified);
+        console.warn('[RevenueCat] isPro:', isActuallyPro);
     }
 
     // Gate on isReady: default to NOT Pro until RevenueCat has fully loaded and confirmed.
     const isPro = isReady
-        ? (Constants.appOwnership === 'expo' ? !!session?.user?.id : isActuallyPro)
+        ? (Constants.appOwnership === 'expo' ? isIdentified : isActuallyPro)
         : false;
 
     // Sign out of Supabase when Pro lapses; trigger initial sync when user becomes Pro
@@ -167,7 +178,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }, [isPro, isReady]);
 
     return (
-        <RevenueCatContext.Provider value={{ isPro, customerInfo, currentOffering, isReady }}>
+        <RevenueCatContext.Provider value={{ isPro, hasActiveEntitlements, customerInfo, currentOffering, isReady }}>
             {children}
         </RevenueCatContext.Provider>
     );

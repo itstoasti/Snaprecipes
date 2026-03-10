@@ -40,8 +40,9 @@ export default function PaywallScreen() {
                 return;
             }
             await Purchases.purchasePackage(pkg);
-            // Purchase successful
-            router.replace("/(tabs)/");
+            // Purchase successful — redirect to auth so they can create an account
+            // and link their purchase to their Supabase user ID
+            router.replace("/auth");
         } catch (e: any) {
             if (!e.userCancelled) {
                 console.error("Purchase error", e);
