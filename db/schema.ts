@@ -63,6 +63,28 @@ export interface RecipeTag {
     tag_id: number;
 }
 
+export interface MealPlan {
+    id: number;
+    remote_id: string | null;
+    recipe_id: number;
+    planned_date: string; // YYYY-MM-DD
+    meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+    servings: number;
+    created_at: string;
+}
+
+export interface ShoppingItem {
+    id: number;
+    remote_id: string | null;
+    name: string;
+    quantity: string | null;
+    unit: string | null;
+    is_checked: boolean;
+    category: string | null;
+    source_recipe_id: number | null;
+    created_at: string;
+}
+
 // Structured recipe data from extraction
 export interface ExtractedRecipe {
     title: string;
@@ -163,5 +185,29 @@ export const CREATE_TABLES_SQL = `
     payload TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     status TEXT NOT NULL DEFAULT 'pending'
+  );
+
+  CREATE TABLE IF NOT EXISTS meal_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
+    recipe_id INTEGER NOT NULL,
+    planned_date TEXT NOT NULL,
+    meal_type TEXT NOT NULL DEFAULT 'dinner',
+    servings INTEGER NOT NULL DEFAULT 4,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS shopping_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
+    name TEXT NOT NULL,
+    quantity TEXT,
+    unit TEXT,
+    is_checked INTEGER NOT NULL DEFAULT 0,
+    category TEXT,
+    source_recipe_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (source_recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
   );
 `;

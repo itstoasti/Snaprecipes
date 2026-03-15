@@ -26,6 +26,7 @@ export default function AuthScreen() {
             console.log("[Auth] Sign up successful. Redirection will trigger sync.");
             setLoading(false);
             Alert.alert("Welcome!", "Your account has been created and your recipes are syncing.");
+            initialSync();
             router.replace("/(tabs)/");
         }
     };
@@ -40,6 +41,7 @@ export default function AuthScreen() {
         } else {
             console.log("[Auth] Sign in successful. Redirection will trigger sync.");
             setLoading(false);
+            initialSync();
             // Replace with main tabs to avoid going back to a potentially stale paywall
             router.replace("/(tabs)/");
         }
@@ -73,7 +75,7 @@ export default function AuthScreen() {
                     </Text>
                 </Animated.View>
 
-                <Animated.View entering={SlideInDown.delay(300).springify()} className="bg-surface-900 rounded-3xl p-6 border border-surface-800">
+                <Animated.View entering={SlideInDown.delay(300)} className="bg-surface-900 rounded-3xl p-6 border border-surface-800">
                     <View className="flex-row items-center bg-surface-950 border border-surface-800 rounded-xl px-4 py-2 mb-4">
                         <Ionicons name="mail" size={20} color="#9D9DB0" className="mr-3" />
                         <TextInput

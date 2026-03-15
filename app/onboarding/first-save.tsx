@@ -38,15 +38,15 @@ export default function FirstSaveScreen() {
                     <Ionicons name="bookmark" size={40} color="#FF6B35" />
                 </Animated.View>
 
-                <Animated.Text entering={SlideInDown.delay(500).springify()} className="text-white font-sans-bold text-3xl text-center mb-3">
+                <Animated.Text entering={SlideInDown.delay(500)} className="text-white font-sans-bold text-3xl text-center mb-3">
                     Your collection{"\n"}starts here.
                 </Animated.Text>
 
-                <Animated.Text entering={SlideInDown.delay(700).springify()} className="text-surface-400 font-sans text-base text-center mb-12 px-4 leading-6">
+                <Animated.Text entering={SlideInDown.delay(700)} className="text-surface-400 font-sans text-base text-center mb-12 px-4 leading-6">
                     Grab a recipe URL from TikTok, Instagram, or any blog and paste it in. We'll do the rest.
                 </Animated.Text>
 
-                <Animated.View entering={SlideInDown.delay(900).springify()} className="w-full">
+                <Animated.View entering={SlideInDown.delay(900)} className="w-full">
                     <Pressable
                         onPress={handleStartImport}
                         className="bg-accent w-full py-4 rounded-2xl items-center flex-row justify-center shadow-lg shadow-accent/30"

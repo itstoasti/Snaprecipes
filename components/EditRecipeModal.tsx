@@ -69,6 +69,7 @@ export default function EditRecipeModal({
     const [ingredients, setIngredients] = useState<EditableIngredient[]>([]);
     const [steps, setSteps] = useState<EditableStep[]>([]);
     const [saving, setSaving] = useState(false);
+    const [hasError, setHasError] = useState(false);
 
     // Reset form when modal opens with new recipe
     useEffect(() => {
@@ -79,6 +80,7 @@ export default function EditRecipeModal({
             setPrepTime(recipe.prep_time || "");
             setCookTime(recipe.cook_time || "");
             setImageUrl(recipe.image_url || "");
+            setHasError(false);
             setIngredients(
                 initialIngredients.map((ing) => ({
                     id: ing.id,
@@ -108,6 +110,7 @@ export default function EditRecipeModal({
 
         if (!result.canceled && result.assets[0]) {
             setImageUrl(result.assets[0].uri);
+            setHasError(false);
         }
     };
 
@@ -241,11 +244,12 @@ export default function EditRecipeModal({
                                         {/* Image Section */}
                                         <Pressable onPress={handlePickImage} className="mb-5">
                                             <View className="h-40 bg-surface-900 rounded-2xl overflow-hidden items-center justify-center">
-                                                {imageUrl ? (
+                                                {imageUrl && !hasError ? (
                                                     <Image
                                                         source={{ uri: imageUrl }}
                                                         style={{ width: "100%", height: "100%" }}
                                                         contentFit="cover"
+                                                        onError={() => setHasError(true)}
                                                     />
                                                 ) : (
                                                     <Image

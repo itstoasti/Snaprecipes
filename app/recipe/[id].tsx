@@ -183,16 +183,19 @@ export default function RecipeDetailScreen() {
                 {/* Hero Image or Video */}
                 <View style={{ width: SCREEN_WIDTH, height: headerHeight, backgroundColor: "#111" }}>
                     <Pressable onPress={handlePlayVideo} className="flex-1 w-full h-full bg-surface-800 items-center justify-center">
-                        {/* Fallback emoji rendered BEHIND the image */}
-                        <Text className="text-6xl absolute z-0 w-full text-center">🍽️</Text>
+                        {/* Fallback emoji - Only show if no image_url OR if there's an error */}
+                        {(!recipe.image_url || imageError) && (
+                            <Text className="text-6xl absolute z-0 w-full text-center">🍽️</Text>
+                        )}
 
-                        {recipe.image_url ? (
+                        {recipe.image_url && !imageError && (
                             <Image
                                 source={{ uri: recipe.image_url }}
-                                style={{ width: "100%", height: "100%", position: "absolute", zIndex: 10 }}
+                                style={{ width: "100%", height: "100%" }}
                                 resizeMode="cover"
+                                onError={() => setImageError(true)}
                             />
-                        ) : null}
+                        )}
                     </Pressable>
 
                     {/* Gradient overlay */}
@@ -306,7 +309,7 @@ export default function RecipeDetailScreen() {
                     )}
 
                     {/* Serving Scaler */}
-                    <Animated.View entering={FadeInDown.delay(300).springify()} className="mb-6">
+                    <Animated.View entering={FadeInDown.delay(300)} className="mb-6">
                         <ServingScaler
                             originalServings={recipe.servings}
                             currentMultiplier={multiplier}
@@ -315,7 +318,7 @@ export default function RecipeDetailScreen() {
                     </Animated.View>
 
                     {/* Ingredients */}
-                    <Animated.View entering={FadeInDown.delay(350).springify()} className="mb-6">
+                    <Animated.View entering={FadeInDown.delay(350)} className="mb-6">
                         <Text className="text-white font-sans-bold text-lg mb-3">Ingredients</Text>
                         <View className="bg-surface-900 rounded-2xl px-4 py-1">
                             {ingredients.map((ing, index) => {
@@ -346,7 +349,7 @@ export default function RecipeDetailScreen() {
                     </Animated.View>
 
                     {/* Steps */}
-                    <Animated.View entering={FadeInDown.delay(400).springify()}>
+                    <Animated.View entering={FadeInDown.delay(400)}>
                         <Text className="text-white font-sans-bold text-lg mb-3">Instructions</Text>
                         {steps.map((step) => (
                             <View key={step.id} className="flex-row mb-4">

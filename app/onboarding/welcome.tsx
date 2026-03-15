@@ -30,17 +30,17 @@ export default function WelcomeScreen() {
             </Animated.View>
 
             <View className="space-y-8 w-full max-w-sm">
-                <Animated.View entering={SlideInDown.delay(600).springify().damping(26).stiffness(70)} className="flex-row items-center justify-center">
+                <Animated.View entering={SlideInDown.delay(600)} className="flex-row items-center justify-center">
                     <Ionicons name="sparkles" size={26} color="#FF6B35" className="mr-3" />
                     <Text className="text-white font-sans-semibold text-xl">Get clean recipes.</Text>
                 </Animated.View>
 
-                <Animated.View entering={SlideInDown.delay(1200).springify().damping(26).stiffness(70)} className="flex-row items-center justify-center">
+                <Animated.View entering={SlideInDown.delay(1200)} className="flex-row items-center justify-center">
                     <Ionicons name="ban" size={26} color="#34D399" className="mr-3" />
                     <Text className="text-white font-sans-semibold text-xl">No annoying ads.</Text>
                 </Animated.View>
 
-                <Animated.View entering={SlideInDown.delay(1800).springify().damping(26).stiffness(70)} className="flex-row items-center justify-center">
+                <Animated.View entering={SlideInDown.delay(1800)} className="flex-row items-center justify-center">
                     <Ionicons name="reader" size={26} color="#818CF8" className="mr-3" />
                     <Text className="text-white font-sans-semibold text-xl">No 10-page life stories.</Text>
                 </Animated.View>

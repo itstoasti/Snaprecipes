@@ -48,6 +48,8 @@ export default function RecipeCard({
         router.push(`/recipe/${id}`);
     }, [router, id]);
 
+    const [hasError, setHasError] = useState(false);
+
     const timeLabel = [prepTime, cookTime].filter(Boolean).join(" + ") || null;
 
     const sourceIcon =
@@ -63,23 +65,26 @@ export default function RecipeCard({
             className="flex-1 m-1.5 rounded-3xl overflow-hidden bg-surface-800"
         >
             <View className="aspect-[4/3] bg-surface-700 overflow-hidden relative">
-                {/* Fallback Placeholder (Always there, but behind) */}
-                <View className="absolute inset-0 items-center justify-center bg-surface-900 z-0">
-                    <Image
-                        source={require("../assets/placeholder.png")}
-                        style={{ width: "100%", height: "100%" }}
-                        resizeMode="contain"
-                    />
-                </View>
+                {/* Fallback Placeholder - Only show if no imageUrl OR if there's an error */}
+                {(!imageUrl || hasError) && (
+                    <View className="absolute inset-0 items-center justify-center bg-surface-900 z-0">
+                        <Image
+                            source={require("../assets/placeholder.png")}
+                            style={{ width: "100%", height: "100%" }}
+                            resizeMode="contain"
+                        />
+                    </View>
+                )}
 
-                {/* Actual Image (Loads over the placeholder) */}
-                {imageUrl ? (
+                {/* Actual Image */}
+                {imageUrl && !hasError && (
                     <Image
                         source={{ uri: imageUrl }}
-                        style={{ width: "100%", height: "100%", position: "absolute", zIndex: 10 }}
+                        style={{ width: "100%", height: "100%" }}
                         resizeMode="cover"
+                        onError={() => setHasError(true)}
                     />
-                ) : null}
+                )}
             </View>
 
             {/* Content */}

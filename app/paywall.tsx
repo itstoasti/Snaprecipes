@@ -76,7 +76,7 @@ export default function PaywallScreen() {
             </Animated.View>
 
             <View className="space-y-6 mb-12 flex-1">
-                <Animated.View entering={SlideInDown.delay(400).springify()} className="flex-row items-center bg-surface-900 p-4 rounded-2xl border border-surface-800">
+                <Animated.View entering={SlideInDown.delay(400)} className="flex-row items-center bg-surface-900 p-4 rounded-2xl border border-surface-800">
                     <View className="w-10 h-10 rounded-full bg-accent/20 items-center justify-center mr-4">
                         <Ionicons name="infinite" size={20} color="#FF6B35" />
                     </View>
@@ -86,7 +86,7 @@ export default function PaywallScreen() {
                     </View>
                 </Animated.View>
 
-                <Animated.View entering={SlideInDown.delay(500).springify()} className="flex-row items-center bg-surface-900 p-4 rounded-2xl border border-surface-800">
+                <Animated.View entering={SlideInDown.delay(500)} className="flex-row items-center bg-surface-900 p-4 rounded-2xl border border-surface-800">
                     <View className="w-10 h-10 rounded-full bg-blue-500/20 items-center justify-center mr-4">
                         <Ionicons name="cloud-done" size={20} color="#3B82F6" />
                     </View>
@@ -96,7 +96,7 @@ export default function PaywallScreen() {
                     </View>
                 </Animated.View>
 
-                <Animated.View entering={SlideInDown.delay(600).springify()} className="flex-row items-center bg-surface-900 p-4 rounded-2xl border border-surface-800">
+                <Animated.View entering={SlideInDown.delay(600)} className="flex-row items-center bg-surface-900 p-4 rounded-2xl border border-surface-800">
                     <View className="w-10 h-10 rounded-full bg-emerald-500/20 items-center justify-center mr-4">
                         <Ionicons name="flame" size={20} color="#10B981" />
                     </View>
@@ -107,7 +107,7 @@ export default function PaywallScreen() {
                 </Animated.View>
             </View>
 
-            <Animated.View entering={SlideInDown.delay(800).springify()} className="pb-10">
+            <Animated.View entering={SlideInDown.delay(800)} className="pb-10">
                 {isReady && currentOffering ? (
                     currentOffering.availablePackages.map((pkg, idx) => (
                         <Pressable

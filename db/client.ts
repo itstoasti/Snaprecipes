@@ -36,21 +36,20 @@ async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
     // Create tables
     await database.execAsync(CREATE_TABLES_SQL);
 
-    // Run safe auto-migrations for new columns (e.g. Phase 9 Cloud Sync: remote_id)
+    // Run safe auto-migrations for new columns
     try {
-        const tableInfo = await database.getAllAsync<{ name: string }>("PRAGMA table_info(recipes)");
-        if (!tableInfo.some(c => c.name === 'remote_id')) {
-            console.log("Migrating local database to support Cloud Sync (adding remote_id columns)...");
-            await database.execAsync(`
-                ALTER TABLE recipes ADD COLUMN remote_id TEXT UNIQUE;
-                ALTER TABLE ingredients ADD COLUMN remote_id TEXT UNIQUE;
-                ALTER TABLE steps ADD COLUMN remote_id TEXT UNIQUE;
-                ALTER TABLE collections ADD COLUMN remote_id TEXT UNIQUE;
-                ALTER TABLE tags ADD COLUMN remote_id TEXT UNIQUE;
-            `);
+        const migrationTables = ['recipes', 'ingredients', 'steps', 'collections', 'tags', 'meal_plans', 'shopping_items'];
+        for (const tableName of migrationTables) {
+            const tableInfo = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(${tableName})`);
+            if (tableInfo && !tableInfo.some(c => c.name === 'remote_id')) {
+                console.log(`Migrating local database: adding remote_id to ${tableName}...`);
+                // SQLite ALTER TABLE doesn't support adding UNIQUE columns directly
+                await database.execAsync(`ALTER TABLE ${tableName} ADD COLUMN remote_id TEXT;`);
+                await database.execAsync(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_remote_id ON ${tableName}(remote_id);`);
+            }
         }
     } catch (error) {
-        console.warn("Auto-migration failed (this might just mean columns already exist):", error);
+        console.warn("Auto-migration failed:", error);
     }
 
     return database;

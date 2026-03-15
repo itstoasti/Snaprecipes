@@ -2,7 +2,7 @@ import { getDatabase } from "@/db/client";
 import { supabase } from "@/lib/supabase";
 import * as Crypto from "expo-crypto";
 import type { SQLiteDatabase } from "expo-sqlite";
-import type { Recipe, Ingredient, Step, Collection } from "@/db/schema";
+import type { Recipe, Ingredient, Step, Collection, MealPlan, ShoppingItem } from "@/db/schema";
 
 // Shared helper: push one recipe (ingredients + steps) to Supabase and stamp remote_ids locally
 async function pushSingleRecipe(
@@ -94,6 +94,65 @@ async function pushSingleCollection(
     if (error) throw error;
 }
 
+// Shared helper: push one meal plan to Supabase
+async function pushSingleMealPlan(
+    db: SQLiteDatabase,
+    userId: string,
+    plan: MealPlan
+): Promise<void> {
+    const planRemoteId = Crypto.randomUUID();
+
+    // Need remote_id for recipe
+    const recipe = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM recipes WHERE id = ?", [plan.recipe_id]);
+    if (!recipe?.remote_id) return; // Can't sync plan for unsynced recipe
+
+    const payload = {
+        id: planRemoteId,
+        owner_id: userId,
+        recipe_id: recipe.remote_id,
+        planned_date: plan.planned_date,
+        meal_type: plan.meal_type,
+        servings: plan.servings,
+    };
+
+    await db.runAsync(`UPDATE meal_plans SET remote_id = ? WHERE id = ?`, [planRemoteId, plan.id]);
+
+    const { error } = await supabase.from('meal_plans').insert(payload);
+    if (error) throw error;
+}
+
+// Shared helper: push one shopping item to Supabase
+async function pushSingleShoppingItem(
+    db: SQLiteDatabase,
+    userId: string,
+    item: ShoppingItem
+): Promise<void> {
+    const itemRemoteId = Crypto.randomUUID();
+
+    // Optional remote_id for source recipe
+    let sourceRecipeRemoteId = null;
+    if (item.source_recipe_id) {
+        const recipe = await db.getFirstAsync<{ remote_id: string | null }>("SELECT remote_id FROM recipes WHERE id = ?", [item.source_recipe_id]);
+        sourceRecipeRemoteId = recipe?.remote_id || null;
+    }
+
+    const payload = {
+        id: itemRemoteId,
+        owner_id: userId,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        is_checked: item.is_checked,
+        category: item.category,
+        source_recipe_id: sourceRecipeRemoteId,
+    };
+
+    await db.runAsync(`UPDATE shopping_items SET remote_id = ? WHERE id = ?`, [itemRemoteId, item.id]);
+
+    const { error } = await supabase.from('shopping_items').insert(payload);
+    if (error) throw error;
+}
+
 let isSyncing = false;
 
 export async function initialSync(): Promise<void> {
@@ -140,6 +199,24 @@ export async function initialSync(): Promise<void> {
                     recipe_id: recipe.remote_id,
                     collection_id: collection.remote_id,
                 }, { onConflict: 'recipe_id,collection_id' });
+            }
+        }
+
+        // Sync meal plans
+        const localPlans = await db.getAllAsync<MealPlan>("SELECT * FROM meal_plans WHERE remote_id IS NULL");
+        if (localPlans.length > 0) {
+            if (__DEV__) console.log(`Syncing ${localPlans.length} meal plans...`);
+            for (const plan of localPlans) {
+                await pushSingleMealPlan(db, user.id, plan);
+            }
+        }
+
+        // Sync shopping items
+        const localItems = await db.getAllAsync<ShoppingItem>("SELECT * FROM shopping_items WHERE remote_id IS NULL");
+        if (localItems.length > 0) {
+            if (__DEV__) console.log(`Syncing ${localItems.length} shopping items...`);
+            for (const item of localItems) {
+                await pushSingleShoppingItem(db, user.id, item);
             }
         }
 
@@ -272,6 +349,116 @@ export async function unsyncRecipeFromCollection(recipeId: number, collectionId:
         if (error) console.error('unsyncRecipeFromCollection error:', error);
     } catch (e) {
         console.error(`unsyncRecipeFromCollection failed:`, e);
+    }
+}
+
+// Push a newly-created meal plan to Supabase
+export async function syncNewMealPlan(planId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const plan = await db.getFirstAsync<MealPlan>(
+        "SELECT * FROM meal_plans WHERE id = ? AND remote_id IS NULL",
+        [planId]
+    );
+    if (!plan) return;
+
+    try {
+        await pushSingleMealPlan(db, user.id, plan);
+    } catch (e) {
+        console.error(`syncNewMealPlan failed:`, e);
+    }
+}
+
+// Update a meal plan in Supabase
+export async function syncUpdateMealPlan(planId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const plan = await db.getFirstAsync<MealPlan>(
+        "SELECT * FROM meal_plans WHERE id = ? AND remote_id IS NOT NULL",
+        [planId]
+    );
+    if (!plan) return;
+
+    try {
+        await supabase.from('meal_plans').update({
+            planned_date: plan.planned_date,
+            meal_type: plan.meal_type,
+            servings: plan.servings,
+        }).eq('id', plan.remote_id);
+    } catch (e) {
+        console.error(`syncUpdateMealPlan failed:`, e);
+    }
+}
+
+// Remove a meal plan from Supabase
+export async function unsyncMealPlan(remoteId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+        await supabase.from('meal_plans').delete().eq('id', remoteId);
+    } catch (e) {
+        console.error(`unsyncMealPlan failed:`, e);
+    }
+}
+
+// Push a newly-created shopping item to Supabase
+export async function syncNewShoppingItem(itemId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const item = await db.getFirstAsync<ShoppingItem>(
+        "SELECT * FROM shopping_items WHERE id = ? AND remote_id IS NULL",
+        [itemId]
+    );
+    if (!item) return;
+
+    try {
+        await pushSingleShoppingItem(db, user.id, item);
+    } catch (e) {
+        console.error(`syncNewShoppingItem failed:`, e);
+    }
+}
+
+// Update a shopping item in Supabase
+export async function syncUpdateShoppingItem(itemId: number): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const db = await getDatabase();
+    const item = await db.getFirstAsync<ShoppingItem>(
+        "SELECT * FROM shopping_items WHERE id = ? AND remote_id IS NOT NULL",
+        [itemId]
+    );
+    if (!item) return;
+
+    try {
+        await supabase.from('shopping_items').update({
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            is_checked: item.is_checked,
+            category: item.category,
+        }).eq('id', item.remote_id);
+    } catch (e) {
+        console.error(`syncUpdateShoppingItem failed:`, e);
+    }
+}
+
+// Remove a shopping item from Supabase
+export async function unsyncShoppingItem(remoteId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+        await supabase.from('shopping_items').delete().eq('id', remoteId);
+    } catch (e) {
+        console.error(`unsyncShoppingItem failed:`, e);
     }
 }
 
@@ -433,6 +620,57 @@ export async function pullRemoteChanges(): Promise<void> {
                     await db.runAsync(
                         `INSERT OR IGNORE INTO recipe_collections (recipe_id, collection_id) VALUES (?, ?)`,
                         [localRecipe.id, localCol.id]
+                    );
+                }
+            }
+        }
+
+        // 5. Pull meal plans
+        const { data: remotePlans, error: mpErr } = await supabase.from('meal_plans').select('*').eq('owner_id', user.id);
+        if (mpErr) throw mpErr;
+
+        if (remotePlans && remotePlans.length > 0) {
+            for (const rPlan of remotePlans) {
+                const localRecipe = await db.getFirstAsync<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rPlan.recipe_id]);
+                if (!localRecipe) continue;
+
+                const existing = await db.getFirstAsync<{ id: number }>("SELECT id FROM meal_plans WHERE remote_id = ?", [rPlan.id]);
+                if (existing) {
+                    await db.runAsync(
+                        `UPDATE meal_plans SET recipe_id=?, planned_date=?, meal_type=?, servings=? WHERE id=?`,
+                        [localRecipe.id, rPlan.planned_date, rPlan.meal_type, rPlan.servings, existing.id]
+                    );
+                } else {
+                    await db.runAsync(
+                        `INSERT INTO meal_plans (remote_id, recipe_id, planned_date, meal_type, servings) VALUES (?, ?, ?, ?, ?)`,
+                        [rPlan.id, localRecipe.id, rPlan.planned_date, rPlan.meal_type, rPlan.servings]
+                    );
+                }
+            }
+        }
+
+        // 6. Pull shopping items
+        const { data: remoteItems, error: siErr } = await supabase.from('shopping_items').select('*').eq('owner_id', user.id);
+        if (siErr) throw siErr;
+
+        if (remoteItems && remoteItems.length > 0) {
+            for (const rItem of remoteItems) {
+                let localRecipeId = null;
+                if (rItem.source_recipe_id) {
+                    const localRecipe = await db.getFirstAsync<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rItem.source_recipe_id]);
+                    localRecipeId = localRecipe?.id || null;
+                }
+
+                const existing = await db.getFirstAsync<{ id: number }>("SELECT id FROM shopping_items WHERE remote_id = ?", [rItem.id]);
+                if (existing) {
+                    await db.runAsync(
+                        `UPDATE shopping_items SET name=?, quantity=?, unit=?, is_checked=?, category=?, source_recipe_id=? WHERE id=?`,
+                        [rItem.name, rItem.quantity, rItem.unit, rItem.is_checked ? 1 : 0, rItem.category, localRecipeId, existing.id]
+                    );
+                } else {
+                    await db.runAsync(
+                        `INSERT INTO shopping_items (remote_id, name, quantity, unit, is_checked, category, source_recipe_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        [rItem.id, rItem.name, rItem.quantity, rItem.unit, rItem.is_checked ? 1 : 0, rItem.category, localRecipeId]
                     );
                 }
             }
