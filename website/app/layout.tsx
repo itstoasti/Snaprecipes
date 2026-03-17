@@ -16,11 +16,11 @@ export const metadata: Metadata = {
   },
   description:
     "Snap a photo or paste a link. Snap Recipes extracts and organizes recipes from anywhere. Never lose a recipe again.",
-  metadataBase: new URL("https://snaprecipes.xyz"),
+  metadataBase: new URL("https://www.snaprecipes.xyz"),
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://snaprecipes.xyz",
+    url: "https://www.snaprecipes.xyz",
     siteName: "Snap Recipes",
     title: "Snap Recipes - Save Any Recipe Instantly",
     description:
@@ -55,8 +55,8 @@ function GlobalSchema() {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Snap Recipes",
-    "url": "https://snaprecipes.xyz",
-    "logo": "https://snaprecipes.xyz/icon.png",
+    "url": "https://www.snaprecipes.xyz",
+    "logo": "https://www.snaprecipes.xyz/icon.png",
     "sameAs": [
       "https://play.google.com/store/apps/details?id=com.deanfieldz.yummy"
     ]
@@ -66,10 +66,10 @@ function GlobalSchema() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Snap Recipes",
-    "url": "https://snaprecipes.xyz",
+    "url": "https://www.snaprecipes.xyz",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://snaprecipes.xyz/recipes?q={search_term_string}",
+      "target": "https://www.snaprecipes.xyz/recipes?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   };

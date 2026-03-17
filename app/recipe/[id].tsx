@@ -230,7 +230,7 @@ export default function RecipeDetailScreen() {
                         <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
                     </Pressable>
 
-                    {/* Add to Collection button */}
+                    {/* Add to Cookbook button */}
                     <Pressable
                         onPress={() => setShowCollectionModal(true)}
                         className="absolute right-[120px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"

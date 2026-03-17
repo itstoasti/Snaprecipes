@@ -131,7 +131,7 @@ export default function CollectionPickerModal({
                                     <View style={{ alignSelf: "center", width: 40, height: 4, backgroundColor: "#6E6E85", borderRadius: 2, marginBottom: 20 }} />
 
                                     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4, marginTop: 8 }}>
-                                        <Text className="text-white font-sans-bold text-xl">Save to Collection</Text>
+                                        <Text className="text-white font-sans-bold text-xl">Add to Cookbook</Text>
                                         <Pressable
                                             onPress={() => setShowCreate(!showCreate)}
                                             style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#2A2A3A", alignItems: "center", justifyContent: "center" }}
@@ -140,7 +140,7 @@ export default function CollectionPickerModal({
                                         </Pressable>
                                     </View>
                                     <Text className="text-surface-400 font-sans text-sm mb-5">
-                                        Organize your recipes into custom folders
+                                        Group your recipes into themed cookbooks
                                     </Text>
 
                                     {showCreate && (
@@ -151,7 +151,7 @@ export default function CollectionPickerModal({
                                             <TextInput
                                                 value={newName}
                                                 onChangeText={setNewName}
-                                                placeholder="New collection name..."
+                                                placeholder="New cookbook name..."
                                                 placeholderTextColor="#6E6E85"
                                                 style={{ flex: 1, color: "#FFF", fontSize: 16, marginRight: 12 }}
                                                 autoFocus
@@ -176,10 +176,10 @@ export default function CollectionPickerModal({
                                     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 }}>
                                         <Ionicons name="folder-open-outline" size={48} color="#6E6E85" />
                                         <Text className="text-surface-300 font-sans text-center mt-4 mb-2 opacity-80">
-                                            You haven't created any collections yet.
+                                            You haven't created any cookbooks yet.
                                         </Text>
                                         <Text className="text-surface-500 font-sans text-xs text-center">
-                                            Go to the Collections tab to create one.
+                                            Go to the Library tab to create one.
                                         </Text>
                                     </View>
                                 ) : (

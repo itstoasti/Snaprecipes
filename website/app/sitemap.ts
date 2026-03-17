@@ -5,13 +5,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
     {
-      url: "https://snaprecipes.xyz",
+      url: "https://www.snaprecipes.xyz",
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 1,
     },
     {
-      url: "https://snaprecipes.xyz/recipes",
+      url: "https://www.snaprecipes.xyz/recipes",
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.9,
@@ -26,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .limit(1000);
 
   const recipePages: MetadataRoute.Sitemap = (recipes || []).map((recipe) => ({
-    url: `https://snaprecipes.xyz/recipes/${recipe.slug || recipe.id}`,
+    url: `https://www.snaprecipes.xyz/recipes/${recipe.slug || recipe.id}`,
     lastModified: new Date(recipe.created_at),
     changeFrequency: "monthly" as const,
     priority: 0.7,

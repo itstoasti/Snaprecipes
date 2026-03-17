@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: "/_next/",
     },
-    sitemap: "https://snaprecipes.xyz/sitemap.xml",
+    sitemap: "https://www.snaprecipes.xyz/sitemap.xml",
   };
 }

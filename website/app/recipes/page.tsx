@@ -40,13 +40,13 @@ function BreadcrumbJsonLd() {
                 "@type": "ListItem",
                 "position": 1,
                 "name": "Home",
-                "item": "https://snaprecipes.xyz"
+                "item": "https://www.snaprecipes.xyz"
             },
             {
                 "@type": "ListItem",
                 "position": 2,
                 "name": "Recipes",
-                "item": "https://snaprecipes.xyz/recipes"
+                "item": "https://www.snaprecipes.xyz/recipes"
             }
         ]
     };

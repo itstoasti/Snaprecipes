@@ -56,10 +56,10 @@ export default function LibraryScreen() {
 
     const tiles = [
         {
-            title: "Collections",
+            title: "Cookbooks",
             icon: "folder" as const,
             color: "#818CF8", // Indigo
-            description: "Recipe themes",
+            description: "Organize recipes",
             onPress: () => router.push("/library/collections"),
         },
         {

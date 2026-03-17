@@ -56,7 +56,7 @@ export default function CollectionsScreen() {
 
     const handleDelete = (id: number, name: string) => {
         Alert.alert(
-            "Delete Collection",
+            "Delete Cookbook",
             `Are you sure you want to delete "${name}"? Recipes won't be deleted.`,
             [
                 { text: "Cancel", style: "cancel" },
@@ -89,10 +89,10 @@ export default function CollectionsScreen() {
                     </Pressable>
                     <View>
                         <Text className="text-surface-400 font-sans text-xs uppercase tracking-widest">
-                            Organize
+                            Library
                         </Text>
                         <Text className="text-white font-sans-bold text-3xl mt-0.5">
-                            Collections
+                            Cookbooks
                         </Text>
                     </View>
                 </View>
@@ -115,7 +115,7 @@ export default function CollectionsScreen() {
                     <TextInput
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        placeholder="Search collections..."
+                        placeholder="Search cookbooks..."
                         placeholderTextColor="#6E6E85"
                         className="flex-1 text-white font-sans text-base py-3"
                         autoCorrect={false}
@@ -137,7 +137,7 @@ export default function CollectionsScreen() {
                     <TextInput
                         value={newName}
                         onChangeText={setNewName}
-                        placeholder="Collection name..."
+                        placeholder="Cookbook name..."
                         placeholderTextColor="#6E6E85"
                         className="flex-1 text-white font-sans text-base mr-3"
                         autoFocus
@@ -161,7 +161,7 @@ export default function CollectionsScreen() {
                     <View className="items-center justify-center pt-20">
                         <Ionicons name="folder-open-outline" size={56} color="#4A4A5E" />
                         <Text className="text-surface-400 font-sans text-sm mt-3 text-center">
-                            Create collections to organize your recipes
+                            Create cookbooks to organize your recipes
                         </Text>
                     </View>
                 }

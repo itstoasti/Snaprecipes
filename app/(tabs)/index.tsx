@@ -193,8 +193,8 @@ export default function HomeScreen() {
                 loading={loading}
                 onRefresh={handleRefresh}
                 {...(activeFilter.startsWith("col_") ? {
-                    emptyTitle: "This Collection is Empty",
-                    emptyMessage: "Open a recipe and tap the bookmark icon to add it to this collection.",
+                    emptyTitle: "This Cookbook is Empty",
+                    emptyMessage: "Open a recipe and tap the bookmark icon to add it to this cookbook.",
                 } : {})}
             />
 
