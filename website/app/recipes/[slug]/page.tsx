@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             title: `${recipe.title} | Snap Recipes`,
             description,
             type: "article",
-            url: `https://snaprecipes.xyz/recipes/${slug}`,
+            url: `https://www.snaprecipes.xyz/recipes/${slug}`,
             images: recipe.image_url ? [{ url: recipe.image_url, width: 1200, height: 630, alt: recipe.title }] : undefined,
             siteName: "Snap Recipes",
         },
@@ -69,11 +69,11 @@ function RecipeJsonLd({ recipe }: { recipe: PublicRecipe }) {
         cookTime: recipe.cook_time ? parseDurationToISO(recipe.cook_time) : undefined,
         recipeCategory: recipe.tags?.[0] || undefined,
         keywords: recipe.tags?.join(", ") || undefined,
-        url: `https://snaprecipes.xyz/recipes/${slug}`,
+        url: `https://www.snaprecipes.xyz/recipes/${slug}`,
         publisher: {
             "@type": "Organization",
             name: "Snap Recipes",
-            url: "https://snaprecipes.xyz",
+            url: "https://www.snaprecipes.xyz",
         },
     };
 
@@ -95,19 +95,19 @@ function BreadcrumbJsonLd({ recipe }: { recipe: PublicRecipe }) {
                 "@type": "ListItem",
                 "position": 1,
                 "name": "Home",
-                "item": "https://snaprecipes.xyz"
+                "item": "https://www.snaprecipes.xyz"
             },
             {
                 "@type": "ListItem",
                 "position": 2,
                 "name": "Recipes",
-                "item": "https://snaprecipes.xyz/recipes"
+                "item": "https://www.snaprecipes.xyz/recipes"
             },
             {
                 "@type": "ListItem",
                 "position": 3,
                 "name": recipe.title,
-                "item": `https://snaprecipes.xyz/recipes/${slug}`
+                "item": `https://www.snaprecipes.xyz/recipes/${slug}`
             }
         ]
     };
