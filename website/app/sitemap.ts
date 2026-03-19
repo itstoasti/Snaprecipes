@@ -27,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const recipePages: MetadataRoute.Sitemap = (recipes || []).map((recipe) => ({
     url: `https://www.snaprecipes.xyz/recipes/${recipe.slug || recipe.id}`,
-    lastModified: new Date(recipe.created_at),
+    lastModified: new Date(recipe.created_at).toISOString().split('T')[0],
     changeFrequency: "monthly" as const,
     priority: 0.7,
   }));
