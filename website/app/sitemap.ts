@@ -2,17 +2,19 @@ import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const today = new Date().toISOString().split('T')[0];
+
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: "https://www.snaprecipes.xyz",
-      lastModified: new Date(),
+      lastModified: today,
       changeFrequency: "weekly",
       priority: 1,
     },
     {
       url: "https://www.snaprecipes.xyz/recipes",
-      lastModified: new Date(),
+      lastModified: today,
       changeFrequency: "daily",
       priority: 0.9,
     },
