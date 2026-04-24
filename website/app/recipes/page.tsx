@@ -21,6 +21,7 @@ async function getRecipes(): Promise<PublicRecipe[]> {
     const { data, error } = await supabase
         .from("public_recipes")
         .select("*")
+        .not("image_url", "is", null)
         .order("created_at", { ascending: false })
         .limit(100);
 
