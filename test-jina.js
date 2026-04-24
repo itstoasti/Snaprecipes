@@ -1,26 +1,21 @@
+const fs = require('fs');
 
-async function test() {
+async function scrape(url) {
+    let markdownContent = "";
     try {
-        const url = "https://r.jina.ai/https://www.instagram.com/reel/C8q_wPkuJ2g/";
-        const res = await fetch(url, {
+        const response = await fetch(`https://r.jina.ai/${url}`, {
             headers: {
-                "X-Return-Format": "html"
-            }
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "text/event-stream, text/plain",
+            },
         });
-        const html = await res.text();
-        console.log("Jina HTML length:", html.length);
-        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]+)"[^>]*property="og:image"[^>]*>/i);
-        if (ogMatch) {
-            console.log("Found Jina og:image:", ogMatch[1]);
-        } else {
-            console.log("No og:image found in Jina HTML");
-            // let us look at all meta tags
-            const metas = html.match(/<meta[^>]*>/gi);
-            if (metas) console.log(metas.slice(0, 10));
-        }
+        markdownContent = await response.text();
     } catch (e) {
-        console.log(e);
+        console.error("Jina error", e);
     }
-}
-test();
 
+    console.log("MARKDOWN CONTENT PREVIEW:");
+    console.log(markdownContent.substring(markdownContent.indexOf("Ingredients") - 100, markdownContent.indexOf("Instructions") + 100));
+}
+
+scrape("https://pinchofyum.com/lemongrass-chicken-with-rice-and-zucchini");

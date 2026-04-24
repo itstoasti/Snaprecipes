@@ -50,8 +50,8 @@ export function useRecipes() {
         async (data: ExtractedRecipe, sourceUrl?: string, sourceType: Recipe["source_type"] = "url") => {
             const db = await getDatabase();
             const result = await db.runAsync(
-                `INSERT INTO recipes (title, description, image_url, source_url, source_type, servings, prep_time, cook_time)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO recipes (title, description, image_url, source_url, source_type, servings, prep_time, cook_time, calories, protein, fat, carbs, sugar, fiber, sodium)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.title,
                     data.description || null,
@@ -61,6 +61,13 @@ export function useRecipes() {
                     data.servings || 4,
                     data.prepTime || null,
                     data.cookTime || null,
+                    data.calories || null,
+                    data.protein || null,
+                    data.fat || null,
+                    data.carbs || null,
+                    data.sugar || null,
+                    data.fiber || null,
+                    data.sodium || null,
                 ]
             );
             const recipeId = result.lastInsertRowId;
@@ -69,9 +76,9 @@ export function useRecipes() {
             for (let i = 0; i < data.ingredients.length; i++) {
                 const ing = data.ingredients[i];
                 await db.runAsync(
-                    `INSERT INTO ingredients (recipe_id, text, quantity, unit, name, order_index)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-                    [recipeId, ing.text, ing.quantity || null, ing.unit || null, ing.name, i]
+                    `INSERT INTO ingredients (recipe_id, text, quantity, unit, name, section, order_index)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [recipeId, ing.text, ing.quantity || null, ing.unit || null, ing.name, ing.section || null, i]
                 );
             }
 
@@ -183,7 +190,7 @@ export function useRecipes() {
                 cook_time?: string;
                 image_url?: string;
             },
-            ingredients?: { id?: number; text: string; quantity?: string; unit?: string; name: string }[],
+            ingredients?: { id?: number; text: string; quantity?: string; unit?: string; name: string; section?: string }[],
             steps?: { id?: number; text: string; step_number: number }[]
         ) => {
             const db = await getDatabase();
@@ -249,14 +256,14 @@ export function useRecipes() {
                     if (ing.id && existingIds.has(ing.id)) {
                         // Update existing
                         await db.runAsync(
-                            `UPDATE ingredients SET text = ?, quantity = ?, unit = ?, name = ?, order_index = ? WHERE id = ?`,
-                            [ing.text, ing.quantity || null, ing.unit || null, ing.name, i, ing.id]
+                            `UPDATE ingredients SET text = ?, quantity = ?, unit = ?, name = ?, section = ?, order_index = ? WHERE id = ?`,
+                            [ing.text, ing.quantity || null, ing.unit || null, ing.name, ing.section || null, i, ing.id]
                         );
                     } else {
                         // Insert new
                         await db.runAsync(
-                            `INSERT INTO ingredients (recipe_id, text, quantity, unit, name, order_index) VALUES (?, ?, ?, ?, ?, ?)`,
-                            [recipeId, ing.text, ing.quantity || null, ing.unit || null, ing.name, i]
+                            `INSERT INTO ingredients (recipe_id, text, quantity, unit, name, section, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                            [recipeId, ing.text, ing.quantity || null, ing.unit || null, ing.name, ing.section || null, i]
                         );
                     }
                 }

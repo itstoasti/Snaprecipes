@@ -16,13 +16,20 @@ Return exactly ONE valid JSON object matching this schema structure. Do not omit
   "cookTime": "30 min",
   "ingredients": [
     // Extract ALL available ingredients as objects in this array
-    { "text": "full ingredient line", "quantity": "string", "unit": "string", "name": "string" }
+    { "text": "full ingredient line", "quantity": "string", "unit": "string", "name": "string", "section": "string or null" }
   ],
   "steps": [
     // Extract ALL available step-by-step instructions as objects in this array
-    { "text": "instruction step", "stepNumber": 1 }
+    { "text": "full step instruction", "stepNumber": 1 }
   ],
-  "tags": ["category list"]
+  "tags": ["tag1", "tag2"],
+  "calories": null,
+  "protein": null,
+  "fat": null,
+  "carbs": null,
+  "sugar": null,
+  "fiber": null,
+  "sodium": null
 }
 
 CRITICAL RULES:
@@ -32,7 +39,9 @@ CRITICAL RULES:
 4. Output raw JSON ONLY. No markdown blocks.
 5. NEVER truncate or abbreviate. Include EVERY SINGLE step and ingredient. If there are 10 steps, output all 10. If there are 30 ingredients, output all 30.
 6. For social media content (TikTok, Instagram), infer the recipe from the caption/description. The caption often describes the full recipe even without a structured format.
-7. For imageUrl: select the URL showing the finished food dish. NEVER use profile pictures, logos, or avatars.`;
+7. For imageUrl: select the URL showing the finished food dish. NEVER use profile pictures, logos, or avatars.
+8. INGREDIENT SECTIONS: If ingredients are grouped under headings or sub-headings in the "Rendered webpage content" (e.g. "#### Chicken:", "### Sauce:", "## Dressing:"), you MUST set the "section" field to that heading name. Clean the heading name (remove "#", colons, and "For the" prefix — e.g. "#### Sauce:" becomes "Sauce"). If an ingredient is NOT under a specific sub-heading, set "section" to null. CRITICAL: The appended JSON-LD structured data is flat and loses these groupings — you MUST rely on the markdown headers in the "Rendered webpage content" to determine the sections!
+9. NUTRITION: If the recipe page includes nutritional information (calories, protein, fat, carbs, sugar, fiber, sodium), extract the per-serving values as numbers. If nutrition info is not available, set all nutrition fields to null.`;
 
 /**
  * Server-side scrape: fetch the URL from the Deno edge function with browser headers.
@@ -482,6 +491,13 @@ Deno.serve(async (req: Request) => {
                         source_domain: sourceDomain,
                         content_hash: contentHash,
                         slug: slug,
+                        calories: parsedData.calories || null,
+                        protein: parsedData.protein || null,
+                        fat: parsedData.fat || null,
+                        carbs: parsedData.carbs || null,
+                        sugar: parsedData.sugar || null,
+                        fiber: parsedData.fiber || null,
+                        sodium: parsedData.sodium || null,
                     }, { onConflict: "content_hash", ignoreDuplicates: false });
 
                 if (insertErr) {

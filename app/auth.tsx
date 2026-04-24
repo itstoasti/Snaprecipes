@@ -23,10 +23,13 @@ export default function AuthScreen() {
             setLoading(false);
             Alert.alert("Sign Up Failed", error.message);
         } else {
-            console.log("[Auth] Sign up successful. Redirection will trigger sync.");
+            console.log("[Auth] Sign up successful. Running initial sync...");
+            try {
+                await initialSync();
+            } catch (e) {
+                console.warn("[Auth] Initial sync error (non-blocking):", e);
+            }
             setLoading(false);
-            Alert.alert("Welcome!", "Your account has been created and your recipes are syncing.");
-            initialSync();
             router.replace("/(tabs)/");
         }
     };
@@ -39,10 +42,13 @@ export default function AuthScreen() {
             setLoading(false);
             Alert.alert("Sign In Failed", error.message);
         } else {
-            console.log("[Auth] Sign in successful. Redirection will trigger sync.");
+            console.log("[Auth] Sign in successful. Running initial sync...");
+            try {
+                await initialSync();
+            } catch (e) {
+                console.warn("[Auth] Initial sync error (non-blocking):", e);
+            }
             setLoading(false);
-            initialSync();
-            // Replace with main tabs to avoid going back to a potentially stale paywall
             router.replace("/(tabs)/");
         }
     };

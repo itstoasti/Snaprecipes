@@ -26,6 +26,13 @@ async function pushSingleRecipe(
         servings: recipe.servings,
         prep_time: recipe.prep_time,
         cook_time: recipe.cook_time,
+        calories: recipe.calories,
+        protein: recipe.protein,
+        fat: recipe.fat,
+        carbs: recipe.carbs,
+        sugar: recipe.sugar,
+        fiber: recipe.fiber,
+        sodium: recipe.sodium,
         updated_at: recipe.updated_at || new Date().toISOString()
     };
 
@@ -530,8 +537,8 @@ export async function pullRemoteChanges(): Promise<void> {
                     console.log(`[Sync] Updating recipe ${existing.id} (remote is newer: ${rRecipe.updated_at} vs ${existing.updated_at})`);
                     localRecipeId = existing.id;
                     await db.runAsync(
-                        `UPDATE recipes SET title=?, description=?, image_url=?, source_url=?, source_type=?, servings=?, prep_time=?, cook_time=?, sync_status='synced', updated_at=? WHERE id=?`,
-                        [rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time, rRecipe.updated_at, existing.id]
+                        `UPDATE recipes SET title=?, description=?, image_url=?, source_url=?, source_type=?, servings=?, prep_time=?, cook_time=?, calories=?, protein=?, fat=?, carbs=?, sugar=?, fiber=?, sodium=?, sync_status='synced', updated_at=? WHERE id=?`,
+                        [rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time, rRecipe.calories, rRecipe.protein, rRecipe.fat, rRecipe.carbs, rRecipe.sugar, rRecipe.fiber, rRecipe.sodium, rRecipe.updated_at, existing.id]
                     );
                 } else {
                     console.log(`[Sync] Skipping recipe ${existing.id} (local is newer or equal: ${existing.updated_at} >= ${rRecipe.updated_at})`);
@@ -540,9 +547,9 @@ export async function pullRemoteChanges(): Promise<void> {
             } else {
                 // Insert OR IGNORE to prevent UNIQUE constraint crashes
                 const res = await db.runAsync(
-                    `INSERT OR IGNORE INTO recipes (remote_id, title, description, image_url, source_url, source_type, servings, prep_time, cook_time, sync_status) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
-                    [rRecipe.id, rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time]
+                    `INSERT OR IGNORE INTO recipes (remote_id, title, description, image_url, source_url, source_type, servings, prep_time, cook_time, calories, protein, fat, carbs, sugar, fiber, sodium, sync_status) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+                    [rRecipe.id, rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time, rRecipe.calories, rRecipe.protein, rRecipe.fat, rRecipe.carbs, rRecipe.sugar, rRecipe.fiber, rRecipe.sodium]
                 );
                 
                 if (res.lastInsertRowId === 0) {
@@ -563,7 +570,7 @@ export async function pullRemoteChanges(): Promise<void> {
                         await db.runAsync(`UPDATE ingredients SET text=?, quantity=?, unit=?, name=?, order_index=? WHERE id=?`, 
                             [rIng.text, rIng.quantity, rIng.unit, rIng.name, rIng.order_index, eIng.id]);
                     } else {
-                        await db.runAsync(`INSERT INTO ingredients (remote_id, recipe_id, text, quantity, unit, name, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+                        await db.runAsync(`INSERT OR REPLACE INTO ingredients (remote_id, recipe_id, text, quantity, unit, name, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
                             [rIng.id, localRecipeId, rIng.text, rIng.quantity, rIng.unit, rIng.name, rIng.order_index]);
                     }
                 }
@@ -577,7 +584,7 @@ export async function pullRemoteChanges(): Promise<void> {
                     if (eStep) {
                         await db.runAsync(`UPDATE steps SET text=?, step_number=? WHERE id=?`, [rStep.text, rStep.step_number, eStep.id]);
                     } else {
-                        await db.runAsync(`INSERT INTO steps (remote_id, recipe_id, text, step_number) VALUES (?, ?, ?, ?)`, 
+                        await db.runAsync(`INSERT OR REPLACE INTO steps (remote_id, recipe_id, text, step_number) VALUES (?, ?, ?, ?)`, 
                             [rStep.id, localRecipeId, rStep.text, rStep.step_number]);
                     }
                 }

@@ -23,4 +23,11 @@ export interface PublicRecipe {
   save_count: number;
   content_hash: string;
   created_at: string;
+  calories: number | null;
+  protein: number | null;
+  fat: number | null;
+  carbs: number | null;
+  sugar: number | null;
+  fiber: number | null;
+  sodium: number | null;
 }

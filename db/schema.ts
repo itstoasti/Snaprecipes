@@ -12,6 +12,13 @@ export interface Recipe {
     servings: number;
     prep_time: string | null;
     cook_time: string | null;
+    calories: number | null;
+    protein: number | null;
+    fat: number | null;
+    carbs: number | null;
+    sugar: number | null;
+    fiber: number | null;
+    sodium: number | null;
     created_at: string;
     updated_at: string;
     sync_status: "pending" | "synced" | "conflict";
@@ -25,6 +32,7 @@ export interface Ingredient {
     quantity: string | null;
     unit: string | null;
     name: string;
+    section: string | null;
     order_index: number;
     checked: boolean;
 }
@@ -98,12 +106,20 @@ export interface ExtractedRecipe {
         quantity?: string;
         unit?: string;
         name: string;
+        section?: string;
     }[];
     steps: {
         text: string;
         stepNumber: number;
     }[];
     tags?: string[];
+    calories?: number;
+    protein?: number;
+    fat?: number;
+    carbs?: number;
+    sugar?: number;
+    fiber?: number;
+    sodium?: number;
 }
 
 export const CREATE_TABLES_SQL = `
@@ -118,6 +134,13 @@ export const CREATE_TABLES_SQL = `
     servings INTEGER NOT NULL DEFAULT 4,
     prep_time TEXT,
     cook_time TEXT,
+    calories INTEGER,
+    protein REAL,
+    fat REAL,
+    carbs REAL,
+    sugar REAL,
+    fiber REAL,
+    sodium REAL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     sync_status TEXT NOT NULL DEFAULT 'pending'
@@ -131,6 +154,7 @@ export const CREATE_TABLES_SQL = `
     quantity TEXT,
     unit TEXT,
     name TEXT NOT NULL,
+    section TEXT,
     order_index INTEGER NOT NULL DEFAULT 0,
     checked INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE

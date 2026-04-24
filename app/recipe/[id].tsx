@@ -109,11 +109,6 @@ export default function RecipeDetailScreen() {
     const handleStartCooking = async () => {
         if (!recipe) return;
 
-        if (!isPro) {
-            router.push("/paywall");
-            return;
-        }
-
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         enterCookMode(recipe.id);
     };
@@ -317,34 +312,128 @@ export default function RecipeDetailScreen() {
                         />
                     </Animated.View>
 
+                    {/* Nutrition Facts */}
+                    {recipe.calories != null && (
+                        <Animated.View entering={FadeInDown.delay(325)} className="mb-6">
+                            <Text className="text-white font-sans-bold text-lg mb-3">Nutrition</Text>
+                            <View className="bg-surface-900 rounded-2xl px-4 py-4">
+                                <Text className="text-surface-500 font-sans text-xs mb-3">Per serving</Text>
+                                <View className="flex-row justify-between">
+                                    <View className="items-center flex-1">
+                                        <Text className="text-white font-sans-bold text-lg">
+                                            {Math.round((recipe.calories || 0) * multiplier)}
+                                        </Text>
+                                        <Text className="text-surface-400 font-sans text-xs mt-0.5">Calories</Text>
+                                    </View>
+                                    {recipe.protein != null && (
+                                        <View className="items-center flex-1">
+                                            <Text className="text-accent font-sans-bold text-lg">
+                                                {Math.round((recipe.protein || 0) * multiplier)}g
+                                            </Text>
+                                            <Text className="text-surface-400 font-sans text-xs mt-0.5">Protein</Text>
+                                        </View>
+                                    )}
+                                    {recipe.fat != null && (
+                                        <View className="items-center flex-1">
+                                            <Text className="text-yellow-400 font-sans-bold text-lg">
+                                                {Math.round((recipe.fat || 0) * multiplier)}g
+                                            </Text>
+                                            <Text className="text-surface-400 font-sans text-xs mt-0.5">Fat</Text>
+                                        </View>
+                                    )}
+                                    {recipe.carbs != null && (
+                                        <View className="items-center flex-1">
+                                            <Text className="text-blue-400 font-sans-bold text-lg">
+                                                {Math.round((recipe.carbs || 0) * multiplier)}g
+                                            </Text>
+                                            <Text className="text-surface-400 font-sans text-xs mt-0.5">Carbs</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {(recipe.sugar != null || recipe.fiber != null || recipe.sodium != null) && (
+                                    <View className="flex-row justify-between mt-3 pt-3 border-t border-surface-800">
+                                        {recipe.sugar != null && (
+                                            <View className="items-center flex-1">
+                                                <Text className="text-surface-300 font-sans-semibold text-sm">
+                                                    {Math.round((recipe.sugar || 0) * multiplier)}g
+                                                </Text>
+                                                <Text className="text-surface-500 font-sans text-xs mt-0.5">Sugar</Text>
+                                            </View>
+                                        )}
+                                        {recipe.fiber != null && (
+                                            <View className="items-center flex-1">
+                                                <Text className="text-surface-300 font-sans-semibold text-sm">
+                                                    {Math.round((recipe.fiber || 0) * multiplier)}g
+                                                </Text>
+                                                <Text className="text-surface-500 font-sans text-xs mt-0.5">Fiber</Text>
+                                            </View>
+                                        )}
+                                        {recipe.sodium != null && (
+                                            <View className="items-center flex-1">
+                                                <Text className="text-surface-300 font-sans-semibold text-sm">
+                                                    {Math.round((recipe.sodium || 0) * multiplier)}mg
+                                                </Text>
+                                                <Text className="text-surface-500 font-sans text-xs mt-0.5">Sodium</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+                        </Animated.View>
+                    )}
+
                     {/* Ingredients */}
                     <Animated.View entering={FadeInDown.delay(350)} className="mb-6">
                         <Text className="text-white font-sans-bold text-lg mb-3">Ingredients</Text>
                         <View className="bg-surface-900 rounded-2xl px-4 py-1">
-                            {ingredients.map((ing, index) => {
-                                const scaledQty = scaleQuantity(ing.quantity, multiplier);
-                                return (
-                                    <View
-                                        key={ing.id}
-                                        className={`flex-row items-center py-3 ${index < ingredients.length - 1 ? "border-b border-surface-800" : ""
-                                            }`}
-                                    >
-                                        <View className="min-w-[90px] flex-shrink-0 flex-row items-center mr-3">
-                                            <Text className="text-accent font-sans-bold text-sm">
-                                                {scaledQty}
+                            {(() => {
+                                // Group ingredients by section, preserving order
+                                const groups: { section: string | null; items: typeof ingredients }[] = [];
+                                let currentSection: string | null | undefined = undefined;
+                                for (const ing of ingredients) {
+                                    if (ing.section !== currentSection) {
+                                        currentSection = ing.section;
+                                        groups.push({ section: ing.section, items: [ing] });
+                                    } else {
+                                        groups[groups.length - 1].items.push(ing);
+                                    }
+                                }
+                                let flatIndex = 0;
+                                return groups.map((group, gi) => (
+                                    <View key={`section-${gi}`}>
+                                        {group.section ? (
+                                            <Text className="text-accent font-sans-bold text-sm uppercase tracking-wider pt-4 pb-2">
+                                                {group.section}
                                             </Text>
-                                            {ing.unit ? (
-                                                <Text className="text-surface-300 font-sans text-sm ml-1">
-                                                    {ing.unit}
-                                                </Text>
-                                            ) : null}
-                                        </View>
-                                        <Text className="text-white font-sans text-sm flex-1">
-                                            {ing.name}
-                                        </Text>
+                                        ) : null}
+                                        {group.items.map((ing, index) => {
+                                            const scaledQty = scaleQuantity(ing.quantity, multiplier);
+                                            const isLast = gi === groups.length - 1 && index === group.items.length - 1;
+                                            flatIndex++;
+                                            return (
+                                                <View
+                                                    key={ing.id}
+                                                    className={`flex-row items-center py-3 ${!isLast ? "border-b border-surface-800" : ""}`}
+                                                >
+                                                    <View className="min-w-[90px] flex-shrink-0 flex-row items-center mr-3">
+                                                        <Text className="text-accent font-sans-bold text-sm">
+                                                            {scaledQty}
+                                                        </Text>
+                                                        {ing.unit ? (
+                                                            <Text className="text-surface-300 font-sans text-sm ml-1">
+                                                                {ing.unit}
+                                                            </Text>
+                                                        ) : null}
+                                                    </View>
+                                                    <Text className="text-white font-sans text-sm flex-1">
+                                                        {ing.name}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
                                     </View>
-                                );
-                            })}
+                                ));
+                            })()}
                         </View>
                     </Animated.View>
 

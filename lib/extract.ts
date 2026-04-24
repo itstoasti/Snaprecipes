@@ -19,12 +19,20 @@ interface ExtractedRecipe {
         quantity?: string; // number as string, e.g. "1", "0.5", "1 1/2"
         unit?: string; // e.g. "cup", "tbsp", "g", "ml"
         name?: string; // e.g. "flour", "sugar"
+        section?: string; // e.g. "Chicken", "Sauce", "Dressing" or null
     }[];
     steps: {
         text: string; // full step instruction
         stepNumber: number;
     }[];
     tags?: string[]; // e.g. 'vegetarian', 'dessert', 'quick'
+    calories?: number; // per serving, e.g. 350
+    protein?: number; // grams per serving
+    fat?: number; // grams per serving
+    carbs?: number; // grams per serving
+    sugar?: number; // grams per serving
+    fiber?: number; // grams per serving
+    sodium?: number; // milligrams per serving
 }
 
 Here are the rules you MUST follow:
@@ -35,6 +43,8 @@ Here are the rules you MUST follow:
 - If an 'IMPORTANT' note about an 'imageUrl' is provided, you MUST use that URL if you cannot find a better food image in the content.
 - NEVER truncate or abbreviate. You MUST include EVERY SINGLE step and ingredient. If there are 10 steps, output all 10. If there are 30 ingredients, output all 30. Do not stop early.
 - For social media content (TikTok, Instagram), infer and reconstruct the full recipe from the caption/description. Captions often describe the full recipe in a narrative format — parse it into structured ingredients and steps.
+- INGREDIENT SECTIONS: If ingredients are grouped under headings or sub-headings in the "Rendered webpage content" (e.g. "#### Chicken:", "### Sauce:", "## Dressing:"), you MUST set the "section" field to that heading name. Clean the heading name (remove "#", colons, and "For the" prefix — e.g. "#### Sauce:" becomes "Sauce"). If an ingredient is NOT under a specific sub-heading, set "section" to null. CRITICAL: The appended JSON-LD structured data is flat and loses these groupings — you MUST rely on the markdown headers in the "Rendered webpage content" to determine the sections!
+- NUTRITION: If the recipe page includes nutritional information (calories, protein, fat, carbs, sugar, fiber, sodium), extract the per-serving values as numbers. If nutrition info is not available, set all nutrition fields to null.
 
 Here is the content to extract the recipe from:
 `;
@@ -246,6 +256,20 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
         console.warn(`Failed to fetch URL content via Jina: ${error}`);
     }
 
+    // Step 4: Always try to extract JSON-LD structured data (contains nutrition info that Jina misses)
+    let jsonLdContent = "";
+    if (!isTikTok) {
+        try {
+            const jsonLdData = await directFetchFallback(url);
+            if (jsonLdData && jsonLdData.includes("Structured Recipe Data")) {
+                jsonLdContent = jsonLdData;
+                if (__DEV__) console.log("[JSON-LD] Found structured recipe data with potential nutrition info");
+            }
+        } catch (e) {
+            if (__DEV__) console.log("JSON-LD extraction failed (non-blocking):", e);
+        }
+    }
+
     // Smart truncation: find the recipe-relevant section instead of blindly taking the first 15K chars
     // Recipe sites like AllRecipes have 30K+ chars of navigation/ads BEFORE the actual recipe
     let contentForAI = `Target URL: ${url}\n\n`;
@@ -253,6 +277,26 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
         contentForAI += `Rendered webpage content:\n\n${extractRecipeSection(markdownContent)}`;
     } else {
         contentForAI += `(Webpage content could not be directly extracted due to bot protections. Rely on the social metadata below if available.)`;
+    }
+
+    // Append JSON-LD structured data — this often contains nutrition info not in the rendered text
+    if (jsonLdContent) {
+        // If Jina scrape succeeded, we have the full text with section headers.
+        // We MUST strip the flat ingredient/instruction arrays from JSON-LD so the AI doesn't
+        // lazily copy them and lose the section groupings.
+        if (markdownContent && !scrapeFailed) {
+            try {
+                // Use regex to strip any prefix, making it more robust against prefix variations
+                const jsonStr = jsonLdContent.replace(/^--- Structured Recipe Data .* ---\n/i, "");
+                const parsedLd = JSON.parse(jsonStr);
+                delete parsedLd.recipeIngredient;
+                delete parsedLd.recipeInstructions;
+                jsonLdContent = `--- Structured Recipe Data (JSON-LD) ---\n${JSON.stringify(parsedLd, null, 2)}`;
+            } catch (e) {
+                if (__DEV__) console.log("Failed to strip JSON-LD ingredient list", e);
+            }
+        }
+        contentForAI += `\n\n${jsonLdContent}`;
     }
 
     if (socialCaption) {
@@ -429,11 +473,19 @@ function validateRecipe(data: any): ExtractedRecipe {
             quantity: ing.quantity || null,
             unit: ing.unit || null,
             name: ing.name || ing.text || `Ingredient ${i + 1}`,
+            section: ing.section || null,
         })),
         steps: validSteps.map((step: any, i: number) => ({
             text: step.text || step.instruction || step.description || `Step ${i + 1}`,
             stepNumber: step.stepNumber || step.number || i + 1,
         })),
         tags: Array.isArray(data.tags) ? data.tags : undefined,
+        calories: typeof data.calories === 'number' ? data.calories : (parseInt(data.calories) || undefined),
+        protein: typeof data.protein === 'number' ? data.protein : (parseFloat(data.protein) || undefined),
+        fat: typeof data.fat === 'number' ? data.fat : (parseFloat(data.fat) || undefined),
+        carbs: typeof data.carbs === 'number' ? data.carbs : (parseFloat(data.carbs) || undefined),
+        sugar: typeof data.sugar === 'number' ? data.sugar : (parseFloat(data.sugar) || undefined),
+        fiber: typeof data.fiber === 'number' ? data.fiber : (parseFloat(data.fiber) || undefined),
+        sodium: typeof data.sodium === 'number' ? data.sodium : (parseFloat(data.sodium) || undefined),
     };
 }

@@ -70,6 +70,16 @@ function RecipeJsonLd({ recipe }: { recipe: PublicRecipe }) {
         recipeCategory: recipe.tags?.[0] || undefined,
         keywords: recipe.tags?.join(", ") || undefined,
         url: `https://www.snaprecipes.xyz/recipes/${slug}`,
+        nutrition: recipe.calories ? {
+            "@type": "NutritionInformation",
+            calories: recipe.calories ? `${recipe.calories} calories` : undefined,
+            proteinContent: recipe.protein ? `${recipe.protein} g` : undefined,
+            fatContent: recipe.fat ? `${recipe.fat} g` : undefined,
+            carbohydrateContent: recipe.carbs ? `${recipe.carbs} g` : undefined,
+            sugarContent: recipe.sugar ? `${recipe.sugar} g` : undefined,
+            fiberContent: recipe.fiber ? `${recipe.fiber} g` : undefined,
+            sodiumContent: recipe.sodium ? `${recipe.sodium} mg` : undefined,
+        } : undefined,
         publisher: {
             "@type": "Organization",
             name: "Snap Recipes",
@@ -231,6 +241,63 @@ export default async function RecipePage({ params }: Props) {
                             </a>
                         </div>
                     </div>
+
+                    {/* Nutrition Facts */}
+                    {recipe.calories != null && (
+                        <div className="bg-surface-900 rounded-2xl border border-surface-800 p-6 mb-8">
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                Nutrition Facts
+                            </h2>
+                            <p className="text-surface-500 text-xs mb-4">Per serving</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className="text-center p-3 bg-surface-800/50 rounded-xl">
+                                    <p className="text-2xl font-bold text-white">{recipe.calories}</p>
+                                    <p className="text-xs text-surface-400 mt-1">Calories</p>
+                                </div>
+                                {recipe.protein != null && (
+                                    <div className="text-center p-3 bg-surface-800/50 rounded-xl">
+                                        <p className="text-2xl font-bold text-accent">{recipe.protein}g</p>
+                                        <p className="text-xs text-surface-400 mt-1">Protein</p>
+                                    </div>
+                                )}
+                                {recipe.fat != null && (
+                                    <div className="text-center p-3 bg-surface-800/50 rounded-xl">
+                                        <p className="text-2xl font-bold text-yellow-400">{recipe.fat}g</p>
+                                        <p className="text-xs text-surface-400 mt-1">Fat</p>
+                                    </div>
+                                )}
+                                {recipe.carbs != null && (
+                                    <div className="text-center p-3 bg-surface-800/50 rounded-xl">
+                                        <p className="text-2xl font-bold text-blue-400">{recipe.carbs}g</p>
+                                        <p className="text-xs text-surface-400 mt-1">Carbs</p>
+                                    </div>
+                                )}
+                            </div>
+                            {(recipe.sugar != null || recipe.fiber != null || recipe.sodium != null) && (
+                                <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-surface-800">
+                                    {recipe.sugar != null && (
+                                        <div className="text-center">
+                                            <p className="text-sm font-semibold text-surface-300">{recipe.sugar}g</p>
+                                            <p className="text-xs text-surface-500">Sugar</p>
+                                        </div>
+                                    )}
+                                    {recipe.fiber != null && (
+                                        <div className="text-center">
+                                            <p className="text-sm font-semibold text-surface-300">{recipe.fiber}g</p>
+                                            <p className="text-xs text-surface-500">Fiber</p>
+                                        </div>
+                                    )}
+                                    {recipe.sodium != null && (
+                                        <div className="text-center">
+                                            <p className="text-sm font-semibold text-surface-300">{recipe.sodium}mg</p>
+                                            <p className="text-xs text-surface-500">Sodium</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Ingredients & Steps */}
                     <div className="grid lg:grid-cols-3 gap-8">

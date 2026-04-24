@@ -13,9 +13,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
-import GlassContainer from "./GlassContainer";
 import type { Recipe, Ingredient, Step } from "@/db/schema";
 
 interface EditableIngredient {
@@ -24,6 +22,7 @@ interface EditableIngredient {
     quantity: string;
     unit: string;
     name: string;
+    section?: string;
 }
 
 interface EditableStep {
@@ -88,6 +87,7 @@ export default function EditRecipeModal({
                     quantity: ing.quantity || "",
                     unit: ing.unit || "",
                     name: ing.name,
+                    section: ing.section || undefined,
                 }))
             );
             setSteps(
@@ -203,246 +203,209 @@ export default function EditRecipeModal({
     return (
         <Modal
             visible={visible}
-            transparent
-            animationType="fade"
+            animationType="slide"
+            presentationStyle="fullScreen"
+            statusBarTranslucent
             onRequestClose={onClose}
         >
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
-                className="flex-1"
+                className="flex-1 bg-surface-950"
             >
-                <View className="flex-1">
+                {/* Header */}
+                <View className="flex-row items-center justify-between px-6 pt-14 pb-4 border-b border-surface-800">
+                    <Pressable onPress={onClose}>
+                        <Text className="text-surface-400 font-sans text-base">Cancel</Text>
+                    </Pressable>
+                    <Text className="text-white font-sans-bold text-lg">Edit Recipe</Text>
                     <Pressable
-                        onPress={onClose}
-                        className="flex-1 bg-black/60 justify-end"
+                        onPress={handleSave}
+                        disabled={saving}
                     >
-                        <Pressable onPress={(e) => e.stopPropagation()}>
-                            <Animated.View entering={SlideInDown.springify().damping(22).stiffness(120)}>
-                                <GlassContainer
-                                    style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "90%" }}
-                                    className="pb-8"
-                                >
-                                    {/* Handle */}
-                                    <View className="self-center w-10 h-1 bg-surface-500 rounded-full mt-3 mb-4" />
-
-                                    {/* Header */}
-                                    <View className="flex-row items-center justify-between px-6 mb-4">
-                                        <Text className="text-white font-sans-bold text-xl">Edit Recipe</Text>
-                                        <Pressable
-                                            onPress={onClose}
-                                            className="w-8 h-8 rounded-full bg-surface-800 items-center justify-center"
-                                        >
-                                            <Ionicons name="close" size={20} color="#9D9DB0" />
-                                        </Pressable>
-                                    </View>
-
-                                    <ScrollView
-                                        className="px-6"
-                                        showsVerticalScrollIndicator={false}
-                                        keyboardShouldPersistTaps="handled"
-                                    >
-                                        {/* Image Section */}
-                                        <Pressable onPress={handlePickImage} className="mb-5">
-                                            <View className="h-40 bg-surface-900 rounded-2xl overflow-hidden items-center justify-center">
-                                                {imageUrl && !hasError ? (
-                                                    <Image
-                                                        source={{ uri: imageUrl }}
-                                                        style={{ width: "100%", height: "100%" }}
-                                                        contentFit="cover"
-                                                        onError={() => setHasError(true)}
-                                                    />
-                                                ) : (
-                                                    <Image
-                                                        source={require("../assets/placeholder.png")}
-                                                        style={{ width: "100%", height: "100%" }}
-                                                        contentFit="contain"
-                                                    />
-                                                )}
-                                                <View className="absolute bottom-2 right-2 bg-black/60 rounded-full p-2">
-                                                    <Ionicons name="camera" size={16} color="#FFF" />
-                                                </View>
-                                            </View>
-                                        </Pressable>
-
-                                        {/* Title */}
-                                        <View className="mb-4">
-                                            <Text className="text-surface-300 font-sans text-sm mb-2">Title</Text>
-                                            <TextInput
-                                                value={title}
-                                                onChangeText={setTitle}
-                                                placeholder="Recipe name"
-                                                placeholderTextColor="#6E6E85"
-                                                className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
-                                            />
-                                        </View>
-
-                                        {/* Description */}
-                                        <View className="mb-4">
-                                            <Text className="text-surface-300 font-sans text-sm mb-2">Description</Text>
-                                            <TextInput
-                                                value={description}
-                                                onChangeText={setDescription}
-                                                placeholder="Brief description"
-                                                placeholderTextColor="#6E6E85"
-                                                multiline
-                                                numberOfLines={3}
-                                                className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
-                                                style={{ minHeight: 80, textAlignVertical: "top" }}
-                                            />
-                                        </View>
-
-                                        {/* Servings, Prep Time, Cook Time */}
-                                        <View className="flex-row gap-3 mb-5">
-                                            <View className="flex-1">
-                                                <Text className="text-surface-300 font-sans text-sm mb-2">Servings</Text>
-                                                <TextInput
-                                                    value={servings}
-                                                    onChangeText={setServings}
-                                                    placeholder="4"
-                                                    placeholderTextColor="#6E6E85"
-                                                    keyboardType="number-pad"
-                                                    className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
-                                                />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="text-surface-300 font-sans text-sm mb-2">Prep Time</Text>
-                                                <TextInput
-                                                    value={prepTime}
-                                                    onChangeText={setPrepTime}
-                                                    placeholder="15 min"
-                                                    placeholderTextColor="#6E6E85"
-                                                    className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
-                                                />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="text-surface-300 font-sans text-sm mb-2">Cook Time</Text>
-                                                <TextInput
-                                                    value={cookTime}
-                                                    onChangeText={setCookTime}
-                                                    placeholder="30 min"
-                                                    placeholderTextColor="#6E6E85"
-                                                    className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
-                                                />
-                                            </View>
-                                        </View>
-
-                                        {/* Ingredients Section */}
-                                        <View className="mb-5">
-                                            <View className="flex-row items-center justify-between mb-3">
-                                                <Text className="text-white font-sans-bold text-lg">Ingredients</Text>
-                                                <Pressable
-                                                    onPress={addIngredient}
-                                                    className="flex-row items-center bg-accent/20 px-3 py-1.5 rounded-full"
-                                                >
-                                                    <Ionicons name="add" size={16} color="#FF6B35" />
-                                                    <Text className="text-accent font-sans-semibold text-sm ml-1">Add</Text>
-                                                </Pressable>
-                                            </View>
-
-                                            {ingredients.map((ing, index) => (
-                                                <View key={index} className="flex-row items-center gap-2 mb-2">
-                                                    <TextInput
-                                                        value={ing.quantity}
-                                                        onChangeText={(v) => updateIngredient(index, "quantity", v)}
-                                                        placeholder="1"
-                                                        placeholderTextColor="#6E6E85"
-                                                        className="w-14 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm text-center"
-                                                    />
-                                                    <TextInput
-                                                        value={ing.unit}
-                                                        onChangeText={(v) => updateIngredient(index, "unit", v)}
-                                                        placeholder="cup"
-                                                        placeholderTextColor="#6E6E85"
-                                                        className="w-16 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm"
-                                                    />
-                                                    <TextInput
-                                                        value={ing.name}
-                                                        onChangeText={(v) => updateIngredient(index, "name", v)}
-                                                        placeholder="Ingredient name"
-                                                        placeholderTextColor="#6E6E85"
-                                                        className="flex-1 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm"
-                                                    />
-                                                    <Pressable
-                                                        onPress={() => removeIngredient(index)}
-                                                        className="w-8 h-8 items-center justify-center"
-                                                    >
-                                                        <Ionicons name="close-circle" size={22} color="#EF4444" />
-                                                    </Pressable>
-                                                </View>
-                                            ))}
-                                        </View>
-
-                                        {/* Steps Section */}
-                                        <View className="mb-8">
-                                            <View className="flex-row items-center justify-between mb-3">
-                                                <Text className="text-white font-sans-bold text-lg">Instructions</Text>
-                                                <Pressable
-                                                    onPress={addStep}
-                                                    className="flex-row items-center bg-accent/20 px-3 py-1.5 rounded-full"
-                                                >
-                                                    <Ionicons name="add" size={16} color="#FF6B35" />
-                                                    <Text className="text-accent font-sans-semibold text-sm ml-1">Add</Text>
-                                                </Pressable>
-                                            </View>
-
-                                            {steps.map((step, index) => (
-                                                <View key={index} className="flex-row items-start gap-2 mb-3">
-                                                    <View className="w-8 h-8 rounded-full bg-accent/15 items-center justify-center mt-1">
-                                                        <Text className="text-accent font-sans-bold text-sm">
-                                                            {index + 1}
-                                                        </Text>
-                                                    </View>
-                                                    <TextInput
-                                                        value={step.text}
-                                                        onChangeText={(v) => updateStep(index, v)}
-                                                        placeholder="Describe this step..."
-                                                        placeholderTextColor="#6E6E85"
-                                                        multiline
-                                                        className="flex-1 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm"
-                                                        style={{ minHeight: 60, textAlignVertical: "top" }}
-                                                    />
-                                                    <Pressable
-                                                        onPress={() => removeStep(index)}
-                                                        className="w-8 h-8 items-center justify-center mt-1"
-                                                    >
-                                                        <Ionicons name="close-circle" size={22} color="#EF4444" />
-                                                    </Pressable>
-                                                </View>
-                                            ))}
-                                        </View>
-
-                                        {/* Action Buttons */}
-                                        <View className="flex-row gap-3 mb-6">
-                                            <Pressable
-                                                onPress={onClose}
-                                                className="flex-1 py-4 bg-surface-800 rounded-xl items-center"
-                                                disabled={saving}
-                                            >
-                                                <Text className="text-white font-sans-semibold text-base">Cancel</Text>
-                                            </Pressable>
-                                            <Pressable
-                                                onPress={handleSave}
-                                                className="flex-1 py-4 bg-accent rounded-xl items-center flex-row justify-center"
-                                                disabled={saving}
-                                            >
-                                                {saving ? (
-                                                    <ActivityIndicator size="small" color="#FFF" />
-                                                ) : (
-                                                    <>
-                                                        <Ionicons name="checkmark" size={20} color="#FFF" />
-                                                        <Text className="text-white font-sans-semibold text-base ml-2">
-                                                            Save Changes
-                                                        </Text>
-                                                    </>
-                                                )}
-                                            </Pressable>
-                                        </View>
-                                    </ScrollView>
-                                </GlassContainer>
-                            </Animated.View>
-                        </Pressable>
+                        {saving ? (
+                            <ActivityIndicator size="small" color="#FF6B35" />
+                        ) : (
+                            <Text className="text-accent font-sans-bold text-base">Save</Text>
+                        )}
                     </Pressable>
                 </View>
+
+                <ScrollView
+                    className="flex-1 px-6"
+                    contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* Image Section */}
+                    <Pressable onPress={handlePickImage} className="mb-5">
+                        <View className="h-40 bg-surface-900 rounded-2xl overflow-hidden items-center justify-center">
+                            {imageUrl && !hasError ? (
+                                <Image
+                                    source={{ uri: imageUrl }}
+                                    style={{ width: "100%", height: "100%" }}
+                                    contentFit="cover"
+                                    onError={() => setHasError(true)}
+                                />
+                            ) : (
+                                <Image
+                                    source={require("../assets/placeholder.png")}
+                                    style={{ width: "100%", height: "100%" }}
+                                    contentFit="contain"
+                                />
+                            )}
+                            <View className="absolute bottom-2 right-2 bg-black/60 rounded-full p-2">
+                                <Ionicons name="camera" size={16} color="#FFF" />
+                            </View>
+                        </View>
+                    </Pressable>
+
+                    {/* Title */}
+                    <View className="mb-4">
+                        <Text className="text-surface-300 font-sans text-sm mb-2">Title</Text>
+                        <TextInput
+                            value={title}
+                            onChangeText={setTitle}
+                            placeholder="Recipe name"
+                            placeholderTextColor="#6E6E85"
+                            className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
+                        />
+                    </View>
+
+                    {/* Description */}
+                    <View className="mb-4">
+                        <Text className="text-surface-300 font-sans text-sm mb-2">Description</Text>
+                        <TextInput
+                            value={description}
+                            onChangeText={setDescription}
+                            placeholder="Brief description"
+                            placeholderTextColor="#6E6E85"
+                            multiline
+                            numberOfLines={3}
+                            className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
+                            style={{ minHeight: 80, textAlignVertical: "top" }}
+                        />
+                    </View>
+
+                    {/* Servings, Prep Time, Cook Time */}
+                    <View className="flex-row gap-3 mb-5">
+                        <View className="flex-1">
+                            <Text className="text-surface-300 font-sans text-sm mb-2">Servings</Text>
+                            <TextInput
+                                value={servings}
+                                onChangeText={setServings}
+                                placeholder="4"
+                                placeholderTextColor="#6E6E85"
+                                keyboardType="number-pad"
+                                className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
+                            />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-surface-300 font-sans text-sm mb-2">Prep Time</Text>
+                            <TextInput
+                                value={prepTime}
+                                onChangeText={setPrepTime}
+                                placeholder="15 min"
+                                placeholderTextColor="#6E6E85"
+                                className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
+                            />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-surface-300 font-sans text-sm mb-2">Cook Time</Text>
+                            <TextInput
+                                value={cookTime}
+                                onChangeText={setCookTime}
+                                placeholder="30 min"
+                                placeholderTextColor="#6E6E85"
+                                className="bg-surface-800 rounded-xl px-4 py-3 text-white font-sans text-base"
+                            />
+                        </View>
+                    </View>
+
+                    {/* Ingredients Section */}
+                    <View className="mb-5">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <Text className="text-white font-sans-bold text-lg">Ingredients</Text>
+                            <Pressable
+                                onPress={addIngredient}
+                                className="flex-row items-center bg-accent/20 px-3 py-1.5 rounded-full"
+                            >
+                                <Ionicons name="add" size={16} color="#FF6B35" />
+                                <Text className="text-accent font-sans-semibold text-sm ml-1">Add</Text>
+                            </Pressable>
+                        </View>
+
+                        {ingredients.map((ing, index) => (
+                            <View key={index} className="flex-row items-center gap-2 mb-2">
+                                <TextInput
+                                    value={ing.quantity}
+                                    onChangeText={(v) => updateIngredient(index, "quantity", v)}
+                                    placeholder="1"
+                                    placeholderTextColor="#6E6E85"
+                                    className="w-14 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm text-center"
+                                />
+                                <TextInput
+                                    value={ing.unit}
+                                    onChangeText={(v) => updateIngredient(index, "unit", v)}
+                                    placeholder="cup"
+                                    placeholderTextColor="#6E6E85"
+                                    className="w-16 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm"
+                                />
+                                <TextInput
+                                    value={ing.name}
+                                    onChangeText={(v) => updateIngredient(index, "name", v)}
+                                    placeholder="Ingredient name"
+                                    placeholderTextColor="#6E6E85"
+                                    className="flex-1 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm"
+                                />
+                                <Pressable
+                                    onPress={() => removeIngredient(index)}
+                                    className="w-8 h-8 items-center justify-center"
+                                >
+                                    <Ionicons name="close-circle" size={22} color="#EF4444" />
+                                </Pressable>
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Steps Section */}
+                    <View className="mb-8">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <Text className="text-white font-sans-bold text-lg">Instructions</Text>
+                            <Pressable
+                                onPress={addStep}
+                                className="flex-row items-center bg-accent/20 px-3 py-1.5 rounded-full"
+                            >
+                                <Ionicons name="add" size={16} color="#FF6B35" />
+                                <Text className="text-accent font-sans-semibold text-sm ml-1">Add</Text>
+                            </Pressable>
+                        </View>
+
+                        {steps.map((step, index) => (
+                            <View key={index} className="flex-row items-start gap-2 mb-3">
+                                <View className="w-8 h-8 rounded-full bg-accent/15 items-center justify-center mt-1">
+                                    <Text className="text-accent font-sans-bold text-sm">
+                                        {index + 1}
+                                    </Text>
+                                </View>
+                                <TextInput
+                                    value={step.text}
+                                    onChangeText={(v) => updateStep(index, v)}
+                                    placeholder="Describe this step..."
+                                    placeholderTextColor="#6E6E85"
+                                    multiline
+                                    className="flex-1 bg-surface-800 rounded-lg px-3 py-2.5 text-white font-sans text-sm"
+                                    style={{ minHeight: 60, textAlignVertical: "top" }}
+                                />
+                                <Pressable
+                                    onPress={() => removeStep(index)}
+                                    className="w-8 h-8 items-center justify-center mt-1"
+                                >
+                                    <Ionicons name="close-circle" size={22} color="#EF4444" />
+                                </Pressable>
+                            </View>
+                        ))}
+                    </View>
+                </ScrollView>
             </KeyboardAvoidingView>
         </Modal>
     );

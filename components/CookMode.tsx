@@ -66,63 +66,87 @@ export default function CookMode({
                     <Text className="text-surface-400 font-sans-semibold text-sm uppercase tracking-wider mb-4">
                         Ingredients
                     </Text>
-                    {ingredients.map((ing, index) => {
-                        const isChecked = checkedIngredients.has(ing.id);
-                        const scaledQty = scaleQuantity(ing.quantity, multiplier);
-                        return (
-                            <Animated.View key={ing.id} entering={SlideInUp.delay(index * 40).springify()}>
-                                <Pressable
-                                    onPress={() => onToggleIngredient(ing.id)}
-                                    className={`flex-row items-center py-3.5 border-b border-surface-800 ${isChecked ? "opacity-40" : ""
-                                        }`}
-                                >
-                                    {/* Checkbox */}
-                                    <View
-                                        className={`w-7 h-7 rounded-lg mr-4 items-center justify-center ${isChecked ? "bg-mint" : "border-2 border-surface-500"
-                                            }`}
-                                    >
-                                        {isChecked && (
-                                            <Ionicons name="checkmark" size={18} color="#0A0A0F" />
-                                        )}
-                                    </View>
-
-                                    {/* Quantity and Unit Column */}
-                                    <View className="min-w-[110px] flex-shrink-0 flex-row items-baseline mr-1">
-                                        {scaledQty ? (
-                                            <Text
-                                                className={`font-sans-bold text-xl mr-1.5 ${isChecked
-                                                    ? "text-surface-500 line-through"
-                                                    : "text-accent"
-                                                    }`}
-                                            >
-                                                {scaledQty}
-                                            </Text>
-                                        ) : null}
-                                        {ing.unit ? (
-                                            <Text
-                                                className={`font-sans text-base ${isChecked
-                                                    ? "text-surface-500 line-through"
-                                                    : "text-surface-400"
-                                                    }`}
-                                            >
-                                                {ing.unit}
-                                            </Text>
-                                        ) : null}
-                                    </View>
-
-                                    {/* Name */}
-                                    <Text
-                                        className={`font-sans text-lg flex-1 leading-snug ${isChecked
-                                            ? "text-surface-500 line-through"
-                                            : "text-white"
-                                            }`}
-                                    >
-                                        {ing.name}
+                    {(() => {
+                        // Group ingredients by section, preserving order
+                        const groups: { section: string | null; items: typeof ingredients }[] = [];
+                        let currentSection: string | null | undefined = undefined;
+                        for (const ing of ingredients) {
+                            if (ing.section !== currentSection) {
+                                currentSection = ing.section;
+                                groups.push({ section: ing.section, items: [ing] });
+                            } else {
+                                groups[groups.length - 1].items.push(ing);
+                            }
+                        }
+                        let animIndex = 0;
+                        return groups.map((group, gi) => (
+                            <View key={`cook-section-${gi}`}>
+                                {group.section ? (
+                                    <Text className="text-accent font-sans-bold text-xs uppercase tracking-widest pt-5 pb-2">
+                                        {group.section}
                                     </Text>
-                                </Pressable>
-                            </Animated.View>
-                        );
-                    })}
+                                ) : null}
+                                {group.items.map((ing) => {
+                                    const isChecked = checkedIngredients.has(ing.id);
+                                    const scaledQty = scaleQuantity(ing.quantity, multiplier);
+                                    const currentAnimIndex = animIndex++;
+                                    return (
+                                        <Animated.View key={ing.id} entering={SlideInUp.delay(currentAnimIndex * 40).springify()}>
+                                            <Pressable
+                                                onPress={() => onToggleIngredient(ing.id)}
+                                                className={`flex-row items-center py-3.5 border-b border-surface-800 ${isChecked ? "opacity-40" : ""
+                                                    }`}
+                                            >
+                                                {/* Checkbox */}
+                                                <View
+                                                    className={`w-7 h-7 rounded-lg mr-4 items-center justify-center ${isChecked ? "bg-mint" : "border-2 border-surface-500"
+                                                        }`}
+                                                >
+                                                    {isChecked && (
+                                                        <Ionicons name="checkmark" size={18} color="#0A0A0F" />
+                                                    )}
+                                                </View>
+
+                                                {/* Quantity and Unit Column */}
+                                                <View className="min-w-[110px] flex-shrink-0 flex-row items-baseline mr-1">
+                                                    {scaledQty ? (
+                                                        <Text
+                                                            className={`font-sans-bold text-xl mr-1.5 ${isChecked
+                                                                ? "text-surface-500 line-through"
+                                                                : "text-accent"
+                                                                }`}
+                                                        >
+                                                            {scaledQty}
+                                                        </Text>
+                                                    ) : null}
+                                                    {ing.unit ? (
+                                                        <Text
+                                                            className={`font-sans text-base ${isChecked
+                                                                ? "text-surface-500 line-through"
+                                                                : "text-surface-400"
+                                                                }`}
+                                                        >
+                                                            {ing.unit}
+                                                        </Text>
+                                                    ) : null}
+                                                </View>
+
+                                                {/* Name */}
+                                                <Text
+                                                    className={`font-sans text-lg flex-1 leading-snug ${isChecked
+                                                        ? "text-surface-500 line-through"
+                                                        : "text-white"
+                                                        }`}
+                                                >
+                                                    {ing.name}
+                                                </Text>
+                                            </Pressable>
+                                        </Animated.View>
+                                    );
+                                })}
+                            </View>
+                        ));
+                    })()}
                 </View>
 
                 {/* Steps Section */}

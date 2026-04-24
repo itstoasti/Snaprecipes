@@ -49,7 +49,35 @@ async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
             }
         }
     } catch (error) {
-        console.warn("Auto-migration failed:", error);
+        console.warn("Auto-migration (remote_id) failed:", error);
+    }
+
+    // Migration: Add 'section' column to ingredients for grouped ingredient support
+    try {
+        const ingInfo = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(ingredients)`);
+        if (ingInfo && !ingInfo.some(c => c.name === 'section')) {
+            console.log('Migrating local database: adding section to ingredients...');
+            await database.execAsync(`ALTER TABLE ingredients ADD COLUMN section TEXT;`);
+        }
+    } catch (error) {
+        console.warn("Auto-migration (section) failed:", error);
+    }
+
+    // Migration: Add nutrition columns to recipes
+    try {
+        const recipeInfo = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(recipes)`);
+        if (recipeInfo && !recipeInfo.some(c => c.name === 'calories')) {
+            console.log('Migrating local database: adding nutrition columns to recipes...');
+            await database.execAsync(`ALTER TABLE recipes ADD COLUMN calories INTEGER;`);
+            await database.execAsync(`ALTER TABLE recipes ADD COLUMN protein REAL;`);
+            await database.execAsync(`ALTER TABLE recipes ADD COLUMN fat REAL;`);
+            await database.execAsync(`ALTER TABLE recipes ADD COLUMN carbs REAL;`);
+            await database.execAsync(`ALTER TABLE recipes ADD COLUMN sugar REAL;`);
+            await database.execAsync(`ALTER TABLE recipes ADD COLUMN fiber REAL;`);
+            await database.execAsync(`ALTER TABLE recipes ADD COLUMN sodium REAL;`);
+        }
+    } catch (error) {
+        console.warn("Auto-migration (nutrition) failed:", error);
     }
 
     return database;
