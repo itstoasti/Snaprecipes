@@ -17,11 +17,30 @@ Digitize physical recipes in seconds.
 - **OCR + AI Analysis**: Take a photo of a cookbook, magazine, or even a handwritten note.
 - **Intelligent Formatting**: AI-powered parsing ensures quantities, units, and clear instructions are captured perfectly.
 
+### 🥗 Automated Nutrition Facts
+No more guessing. SnapRecipes automatically extracts and displays full nutritional profiles for your saved recipes.
+- **Macro Tracking**: View Calories, Protein, Fat, and Carbs at a glance.
+- **Micro Detail**: Tracks Sugar, Fiber, and Sodium levels.
+- **Dynamic Scaling**: Nutrition facts automatically update when you use the serving scaler.
+
+### 🛒 Smart Shopping Lists
+Never forget an ingredient again. The most advanced shopping list experience for home cooks.
+- **Recipe Integration**: Add all ingredients from a recipe to your list with one tap.
+- **Intelligent Aggregation**: Automatically merges similar items (e.g., "1 cup flour" from one recipe + "2 cups flour" from another = "3 cups flour" on your list).
+- **Meal Plan Sync**: Automatically generate a complete shopping list for your entire week's meal plan.
+- **Categorized View**: Items are organized by grocery section (Produce, Dairy, Pantry, etc.) for efficient shopping.
+
+### 📅 Advanced Meal Planning
+Plan your week with ease and stay organized.
+- **Calendar View**: Schedule recipes for specific dates (Breakfast, Lunch, or Dinner).
+- **Serving Awareness**: Adjust planned servings per day, which automatically updates your generated shopping list.
+- **Batch Preparation**: Designed to support "Meal Prep" workflows with dedicated list generation.
+
 ### 👨‍🍳 Interactive Cook Mode
 A dedicated, distraction-free interface for the kitchen.
 - **Step-by-Step Guidance**: Check off steps as you go so you never lose your place.
 - **Ingredient Checklist**: Track what you've already added.
-- **Dynamic Serving Scaling**: Instantly multiply portions (2x, 3x, or half); the AI automatically recalculates all ingredient quantities.
+- **Dynamic Serving Scaling**: Instantly multiply portions (2x, 3x, or half); the AI automatically recalculates all ingredient quantities in real-time.
 - **Glassmorphism UI**: A premium, blur-heavy aesthetic that feels modern and high-end.
 
 ### 🌍 Community Feed (Web)
@@ -62,11 +81,13 @@ Browse and discover recipes shared by the community at [snaprecipes.xyz](https:/
 
 ```text
 ├── app/                  # Expo Router screens (App Tabs, Auth, Onboarding)
+│   ├── library/          # Advanced tools: Shopping List, Meal Prep
+│   └── recipe/           # Detailed views: Cook Mode, Serving Scaler
 ├── website/              # Next.js web application (Public Feed, Marketing)
 ├── components/           # Shared UI components (Glassmorphism, CookMode, etc.)
 ├── db/                   # SQLite schema and database clients
-├── hooks/                # Custom hooks (useRecipes, useSync, useRevenueCat)
-├── lib/                  # Core logic (AI Extraction, Image Caching, Scraping)
+├── hooks/                # Custom hooks (useRecipes, useShoppingList, useMealPlans)
+├── lib/                  # Core logic (AI Extraction, Image Caching, Sync)
 ├── supabase/             # Edge Functions and Database migrations
 └── assets/               # Branding, icons, and static images
 ```
@@ -74,10 +95,11 @@ Browse and discover recipes shared by the community at [snaprecipes.xyz](https:/
 ---
 
 ## 🚀 Recent Updates
-- **🚀 Fixed Website Image Rendering**: Implemented a global image optimization bypass to resolve hosting constraints and ensure placeholder reliability.
-- **🖼️ Image Caching Pipeline**: Built a robust system to download and persist social media images from Instagram/TikTok to permanent storage.
-- **🔍 Community Feed Filtering**: Updated the website to automatically omit recipes with broken or missing images for a cleaner browsing experience.
-- **🎨 Premium UI Overhaul**: Implemented a consistent dark-mode aesthetic with glassmorphism and smooth Framer Motion animations across web and mobile.
+- **🥗 Nutrition & Macros**: Added automated extraction and real-time scaling for nutritional data.
+- **🛒 Shopping List 2.0**: Implemented intelligent ingredient aggregation and meal-plan integration.
+- **📅 Meal Planning Engine**: Launched a new system for scheduling recipes and managing meal prep.
+- **🖼️ Image Caching Pipeline**: Built a robust system to download and persist social media images to permanent storage.
+- **🚀 Website Optimization**: Launched the public community feed with SEO optimization and ad-free browsing.
 
 ---
 
