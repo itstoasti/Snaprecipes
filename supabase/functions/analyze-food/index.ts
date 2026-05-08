@@ -22,37 +22,36 @@ Return exactly ONE valid JSON object matching this schema:
 }
 
 CRITICAL IDENTIFICATION RULES:
-1. FOOD NAME PRECISION: Use the most specific, descriptive name you can. NEVER use a generic name when a more specific one applies:
-   - BAD: "Donut" → GOOD: "Glazed Cinnamon Roll Donut"
-   - BAD: "Chicken" → GOOD: "Grilled Chicken Breast, Skinless"
-   - BAD: "Salad" → GOOD: "Caesar Salad with Croutons and Parmesan"
-   - BAD: "Coffee" → GOOD: "Latte, Whole Milk, 16oz"
-   Include the preparation method (grilled, fried, baked), variety (Fuji apple vs Granny Smith), toppings, glazes, fillings, and style.
+1. STRICT LITERALISM: ONLY estimate the exact ingredients provided. DO NOT assume extra ingredients like butter, oil, milk, or seasoning unless explicitly mentioned or visible in an image.
+   - If the user says "scrambled eggs", return plain scrambled eggs. DO NOT return "scrambled eggs with butter and milk".
+   - If the user says "chicken breast", return plain grilled/baked chicken breast. DO NOT assume oil or breading unless specified.
 
-2. For TEXT QUERIES: Cross-reference your knowledge of USDA FoodData Central nutritional data. Return the most commonly consumed version of that food unless the user specifies otherwise. Always use realistic serving sizes.
+2. FOOD NAME PRECISION: Use the most specific, descriptive name you can based ONLY on the input.
+   Include the preparation method ONLY if specified (grilled, fried, baked).
 
-3. For IMAGES — LOOK CAREFULLY:
+3. For TEXT QUERIES: Cross-reference your knowledge of USDA FoodData Central nutritional data. Return the most commonly consumed version of that food that matches the user's string EXACTLY. Always use realistic serving sizes.
+
+4. For IMAGES — LOOK CAREFULLY:
    a. First, mentally describe every detail you see: shape, color, texture, glaze, frosting, toppings, layers, size relative to surroundings.
-   b. Identify the SPECIFIC type/variant — not just the category. A cinnamon roll-shaped donut with glaze is NOT the same as a plain glazed ring donut.
+   b. Identify the SPECIFIC type/variant — not just the category.
    c. Estimate portion size using visual cues (plate size, hand for scale, utensils, packaging).
    d. If you see multiple items, list each one separately.
    e. Note the preparation method visible (fried = darker/crispier vs baked = lighter).
 
-4. NUTRITIONAL ACCURACY:
+5. NUTRITIONAL ACCURACY:
    - All macro values are per the stated serving size.
    - Protein, fat, carbs in grams.
    - Use standard USDA serving sizes when possible.
-   - When estimating for restaurant/bakery items, account for the fact that they typically contain MORE fat, carbs, and calories than home-prepared versions.
    - Round to 1 decimal place for macros, whole numbers for calories.
 
-5. CONFIDENCE LEVELS:
+6. CONFIDENCE LEVELS:
    - "high": Common food, clearly identified, USDA data available
    - "medium": Food identified but portion estimated, or slight ambiguity in preparation
    - "low": Unclear image, unusual food, or significant estimation required
 
-6. If multiple items are in a query (e.g. "chicken rice and beans"), return separate items in the array.
+7. If multiple items are in a query (e.g. "chicken rice and beans"), return separate items in the array.
 
-7. Output raw JSON only. No markdown code blocks. No extra text.`;
+8. Output raw JSON only. No markdown code blocks. No extra text.`;
 
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") {

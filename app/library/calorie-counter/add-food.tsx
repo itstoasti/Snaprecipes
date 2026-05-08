@@ -66,9 +66,9 @@ export default function AddFoodScreen() {
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Smart Search: local DB first, then AI ──
+    // ── Database Search: local + community ──
     const performSearch = useCallback(async (q: string) => {
         if (!q.trim()) {
-            // Show frequent items when empty
             try {
                 const frequent = await searchCustomFoods("");
                 setSearchResults(frequent.map((f: any) => ({ ...f, source: "local" as const })));
@@ -85,17 +85,16 @@ export default function AddFoodScreen() {
         setAiLookedUp(false);
 
         try {
-            // Step 1: Search local custom_foods
-            let localResults: any[] = [];
-            try {
-                localResults = await searchCustomFoods(q);
-            } catch (e) {
-                console.warn("Local food search failed (table may not exist yet):", e);
-            }
+            let combinedResults: FoodResult[] = [];
 
-            if (localResults.length > 0) {
-                setSearchResults(localResults.map((f: any) => ({ ...f, source: "local" as const })));
-                return;
+            // Step 1: Search local custom_foods
+            try {
+                const localResults = await searchCustomFoods(q);
+                if (localResults.length > 0) {
+                    combinedResults = localResults.map((f: any) => ({ ...f, source: "local" as const }));
+                }
+            } catch (e) {
+                console.warn("Local food search failed:", e);
             }
 
             // Step 2: Search community global_foods in Supabase
@@ -105,7 +104,7 @@ export default function AddFoodScreen() {
 
                 if (supabaseUrl && supabaseKey) {
                     const response = await fetch(
-                        `${supabaseUrl}/rest/v1/global_foods?food_name_lower=ilike.*${encodeURIComponent(q.toLowerCase())}*&order=lookup_count.desc&limit=5`,
+                        `${supabaseUrl}/rest/v1/global_foods?food_name_lower=ilike.*${encodeURIComponent(q.toLowerCase())}*&order=lookup_count.desc&limit=10`,
                         {
                             headers: {
                                 "apikey": supabaseKey,
@@ -117,12 +116,18 @@ export default function AddFoodScreen() {
                     if (response.ok) {
                         const globalData = await response.json();
                         if (globalData && globalData.length > 0) {
-                            setSearchResults(globalData.map((f: any) => ({
+                            const communityItems = globalData.map((f: any) => ({
                                 ...f,
                                 source: "community" as const,
-                            })));
+                            }));
+                            
+                            // Merge and de-duplicate (prefer local hits if name matches exactly)
+                            const localNames = new Set(combinedResults.map(r => r.food_name.toLowerCase()));
+                            const newCommunityItems = communityItems.filter((f: any) => !localNames.has(f.food_name.toLowerCase()));
+                            
+                            combinedResults = [...combinedResults, ...newCommunityItems];
 
-                            // Increment lookup count asynchronously
+                            // Increment lookup count for the best community match asynchronously
                             const topMatch = globalData[0];
                             fetch(`${supabaseUrl}/rpc/increment_lookup_count`, {
                                 method: 'POST',
@@ -133,24 +138,37 @@ export default function AddFoodScreen() {
                                 },
                                 body: JSON.stringify({ row_id: topMatch.id })
                             }).catch(() => {});
-                            setAiLookedUp(true);
-                            return;
                         }
-                    } else {
-                        console.warn("Global search HTTP error:", await response.text().catch(() => ""));
                     }
                 }
             } catch (e) {
                 console.warn("Global food search failed:", e);
             }
 
-            // Step 3: No local or global results — ask AI to estimate nutrition
+            setSearchResults(combinedResults);
+        } catch (e) {
+            console.warn("Search failed:", e);
             setSearchResults([]);
+        } finally {
+            setSearching(false);
+        }
+    }, [searchCustomFoods]);
+
+    // ── Manual AI Trigger ──
+    const triggerAiSearch = useCallback(async () => {
+        const q = searchQuery.trim();
+        if (!q) return;
+
+        setSearching(true);
+        setAiLookedUp(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        try {
             const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
             const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
             if (!supabaseUrl || !supabaseKey) {
-                console.warn("Supabase env vars not set, cannot call AI");
+                Alert.alert("Error", "Configuration error. Please try again later.");
                 return;
             }
 
@@ -170,7 +188,7 @@ export default function AddFoodScreen() {
             if (!response.ok) {
                 const errText = await response.text().catch(() => "unknown");
                 console.warn("AI lookup failed:", response.status, errText);
-                setAiLookedUp(true);
+                Alert.alert("AI Error", "Failed to get estimation from AI. Please try again or enter manually.");
                 return;
             }
 
@@ -188,18 +206,22 @@ export default function AddFoodScreen() {
                 source: "ai" as const,
             }));
 
-            setSearchResults(items);
-            setAiLookedUp(true);
+            // If we found something, clear results and show only AI results
+            if (items.length > 0) {
+                setSearchResults(items);
+                setAiLookedUp(true);
+            } else {
+                Alert.alert("Not Found", "AI couldn't identify this food. Try a more specific name.");
+            }
         } catch (e) {
-            console.warn("Food search failed:", e);
-            setSearchResults([]);
-            setAiLookedUp(true);
+            console.warn("AI search failed:", e);
+            Alert.alert("Error", "Something went wrong with the AI search.");
         } finally {
             setSearching(false);
         }
-    }, [searchCustomFoods]);
+    }, [searchQuery]);
 
-    // Debounced search handler — shows loading immediately, fires AI after short pause
+    // Debounced search handler — Database only
     const handleSearchInput = useCallback((q: string) => {
         setSearchQuery(q);
         if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -207,10 +229,8 @@ export default function AddFoodScreen() {
             performSearch("");
             return;
         }
-        // Show loading state immediately so user knows something is happening
         setSearching(true);
-        // Fire search after 400ms pause in typing
-        searchTimer.current = setTimeout(() => performSearch(q), 400);
+        searchTimer.current = setTimeout(() => performSearch(q), 300);
     }, [performSearch]);
 
     // Load frequent foods on mount
@@ -393,12 +413,21 @@ export default function AddFoodScreen() {
                         )}
                     </View>
 
-                    {/* AI status indicator */}
-                    {searching && (
+                    {/* Status indicators */}
+                    {searching && !aiLookedUp && (
                         <Animated.View entering={FadeIn} className="flex-row items-center mb-3 px-1">
                             <ActivityIndicator size="small" color="#EF4444" />
                             <Text className="text-surface-400 font-sans text-xs ml-2">
-                                Looking up nutrition info with AI...
+                                Searching database...
+                            </Text>
+                        </Animated.View>
+                    )}
+
+                    {searching && aiLookedUp && (
+                        <Animated.View entering={FadeIn} className="flex-row items-center mb-3 px-1">
+                            <ActivityIndicator size="small" color="#FBBF24" />
+                            <Text className="text-amber-400 font-sans text-xs ml-2">
+                                AI is estimating nutrition...
                             </Text>
                         </Animated.View>
                     )}
@@ -441,12 +470,43 @@ export default function AddFoodScreen() {
                             ) : null
                         }
                         ListEmptyComponent={
-                            !searching && !searchQuery.trim() ? (
+                            !searching && searchQuery.trim() ? (
+                                <View className="items-center justify-center py-12 px-10">
+                                    <Ionicons name="search-outline" size={40} color="#4A4A5E" />
+                                    <Text className="text-white font-sans mt-4 text-center text-sm">
+                                        No results found for "{searchQuery}"
+                                    </Text>
+                                    <Pressable 
+                                        onPress={triggerAiSearch}
+                                        className="mt-6 bg-amber-400/20 border border-amber-400/30 px-6 py-3 rounded-2xl flex-row items-center"
+                                    >
+                                        <Ionicons name="sparkles" size={18} color="#FBBF24" />
+                                        <Text className="text-amber-400 font-sans-bold ml-2">Ask AI to Estimate</Text>
+                                    </Pressable>
+                                </View>
+                            ) : !searching && !searchQuery.trim() ? (
                                 <View className="items-center justify-center py-16 opacity-40">
                                     <Ionicons name="nutrition" size={48} color="#FFFFFF" />
                                     <Text className="text-white font-sans mt-4 text-center text-sm">
-                                        Type any food to search.{"\n"}AI will auto-fill nutrition if it's new!
+                                        Type any food to search.
                                     </Text>
+                                </View>
+                            ) : null
+                        }
+                        ListFooterComponent={
+                            !searching && searchQuery.trim().length > 0 && searchResults.length > 0 && !aiLookedUp ? (
+                                <View className="mt-4 px-1">
+                                    <View className="h-[1px] bg-white/5 w-full mb-6" />
+                                    <Text className="text-surface-500 font-sans text-xs text-center mb-4">
+                                        Don't see the right match?
+                                    </Text>
+                                    <Pressable 
+                                        onPress={triggerAiSearch}
+                                        className="bg-amber-400/10 border border-amber-400/20 p-4 rounded-2xl flex-row items-center justify-center"
+                                    >
+                                        <Ionicons name="sparkles" size={16} color="#FBBF24" />
+                                        <Text className="text-amber-400 font-sans-bold ml-2 text-sm">Ask AI to estimate "{searchQuery}"</Text>
+                                    </Pressable>
                                 </View>
                             ) : null
                         }
