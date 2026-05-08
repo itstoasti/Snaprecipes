@@ -97,7 +97,31 @@ export default function AddFoodScreen() {
                 return;
             }
 
-            // Step 2: No local results — ask AI to estimate nutrition
+            // Step 2: Search community global_foods in Supabase
+            try {
+                const { data: globalData, error: globalError } = await supabase
+                    .from("global_foods")
+                    .select("*")
+                    .ilike("food_name_lower", `%${q.toLowerCase()}%`)
+                    .order("lookup_count", { ascending: false })
+                    .limit(5);
+
+                if (!globalError && globalData && globalData.length > 0) {
+                    setSearchResults(globalData.map((f: any) => ({
+                        ...f,
+                        source: "ai" as const, // Treat as AI source so the UI renders it consistently
+                    })));
+                    
+                    // Increment lookup count asynchronously
+                    const topMatch = globalData[0];
+                    supabase.rpc('increment_lookup_count', { row_id: topMatch.id }).catch(() => {});
+                    return;
+                }
+            } catch (e) {
+                console.warn("Global food search failed:", e);
+            }
+
+            // Step 3: No local or global results — ask AI to estimate nutrition
             setSearchResults([]);
             const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
             const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
