@@ -153,14 +153,11 @@ export default function AddFoodScreen() {
                 return;
             }
 
-            const { data: { session } } = await supabase.auth.getSession();
-            const authToken = session?.access_token || supabaseKey;
-
             const response = await fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`,
+                    "Authorization": `Bearer ${supabaseKey}`,
                     "apikey": supabaseKey,
                 },
                 body: JSON.stringify({ textDescription: q }),
