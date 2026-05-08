@@ -100,23 +100,44 @@ export default function AddFoodScreen() {
 
             // Step 2: Search community global_foods in Supabase
             try {
-                const { data: globalData, error: globalError } = await supabase
-                    .from("global_foods")
-                    .select("*")
-                    .ilike("food_name_lower", `%${q.toLowerCase()}%`)
-                    .order("lookup_count", { ascending: false })
-                    .limit(5);
+                const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+                const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-                if (!globalError && globalData && globalData.length > 0) {
-                    setSearchResults(globalData.map((f: any) => ({
-                        ...f,
-                        source: "community" as const,
-                    })));
-                    
-                    // Increment lookup count asynchronously
-                    const topMatch = globalData[0];
-                    supabase.rpc('increment_lookup_count', { row_id: topMatch.id }).catch(() => {});
-                    return;
+                if (supabaseUrl && supabaseKey) {
+                    const response = await fetch(
+                        `${supabaseUrl}/rest/v1/global_foods?food_name_lower=ilike.*${encodeURIComponent(q.toLowerCase())}*&order=lookup_count.desc&limit=5`,
+                        {
+                            headers: {
+                                "apikey": supabaseKey,
+                                "Authorization": `Bearer ${supabaseKey}`,
+                            },
+                        }
+                    );
+
+                    if (response.ok) {
+                        const globalData = await response.json();
+                        if (globalData && globalData.length > 0) {
+                            setSearchResults(globalData.map((f: any) => ({
+                                ...f,
+                                source: "community" as const,
+                            })));
+
+                            // Increment lookup count asynchronously
+                            const topMatch = globalData[0];
+                            fetch(`${supabaseUrl}/rpc/increment_lookup_count`, {
+                                method: 'POST',
+                                headers: {
+                                    "apikey": supabaseKey,
+                                    "Authorization": `Bearer ${supabaseKey}`,
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify({ row_id: topMatch.id })
+                            }).catch(() => {});
+                            return;
+                        }
+                    } else {
+                        console.warn("Global search HTTP error:", await response.text().catch(() => ""));
+                    }
                 }
             } catch (e) {
                 console.warn("Global food search failed:", e);
