@@ -93,6 +93,48 @@ export interface ShoppingItem {
     created_at: string;
 }
 
+export interface FoodLog {
+    id: number;
+    remote_id: string | null;
+    food_name: string;
+    brand: string | null;
+    serving_size: string | null;
+    serving_qty: number;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    sugar: number | null;
+    fiber: number | null;
+    sodium: number | null;
+    meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+    log_date: string; // YYYY-MM-DD
+    source_type: "recipe" | "search" | "barcode" | "photo" | "manual";
+    source_recipe_id: number | null;
+    image_url: string | null;
+    barcode: string | null;
+    created_at: string;
+}
+
+export interface CustomFood {
+    id: number;
+    remote_id: string | null;
+    food_name: string;
+    brand: string | null;
+    serving_size: string | null;
+    barcode: string | null;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    sugar: number | null;
+    fiber: number | null;
+    sodium: number | null;
+    image_url: string | null;
+    use_count: number;
+    created_at: string;
+}
+
 // Structured recipe data from extraction
 export interface ExtractedRecipe {
     title: string;
@@ -234,4 +276,52 @@ export const CREATE_TABLES_SQL = `
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (source_recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
   );
+
+  CREATE TABLE IF NOT EXISTS food_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
+    food_name TEXT NOT NULL,
+    brand TEXT,
+    serving_size TEXT,
+    serving_qty REAL NOT NULL DEFAULT 1,
+    calories REAL NOT NULL DEFAULT 0,
+    protein REAL NOT NULL DEFAULT 0,
+    fat REAL NOT NULL DEFAULT 0,
+    carbs REAL NOT NULL DEFAULT 0,
+    sugar REAL,
+    fiber REAL,
+    sodium REAL,
+    meal_type TEXT NOT NULL DEFAULT 'snack',
+    log_date TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT 'manual',
+    source_recipe_id INTEGER,
+    image_url TEXT,
+    barcode TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (source_recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS custom_foods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_id TEXT UNIQUE,
+    food_name TEXT NOT NULL,
+    brand TEXT,
+    serving_size TEXT,
+    barcode TEXT,
+    calories REAL NOT NULL DEFAULT 0,
+    protein REAL NOT NULL DEFAULT 0,
+    fat REAL NOT NULL DEFAULT 0,
+    carbs REAL NOT NULL DEFAULT 0,
+    sugar REAL,
+    fiber REAL,
+    sodium REAL,
+    image_url TEXT,
+    use_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_food_logs_date ON food_logs(log_date);
+  CREATE INDEX IF NOT EXISTS idx_food_logs_meal ON food_logs(log_date, meal_type);
+  CREATE INDEX IF NOT EXISTS idx_custom_foods_barcode ON custom_foods(barcode);
+  CREATE INDEX IF NOT EXISTS idx_custom_foods_name ON custom_foods(food_name);
 `;

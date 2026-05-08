@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { View, Text, Platform, StatusBar, Image } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, Platform, StatusBar, Image, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideInUp, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming, Easing, withSequence } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 export default function DemoScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Animation Values
     const urlY = useSharedValue(50);
@@ -15,6 +16,11 @@ export default function DemoScreen() {
     const sparkleScale = useSharedValue(0);
     const cardScale = useSharedValue(0.9);
     const cardOpacity = useSharedValue(0);
+
+    const goNext = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        router.replace("/onboarding/first-save");
+    };
 
     useEffect(() => {
         // 1. URL drops in (Header reads: Paste any link. Extract instantly.)
@@ -36,11 +42,13 @@ export default function DemoScreen() {
         cardOpacity.value = withDelay(3200, withTiming(1, { duration: 600 }));
 
         // 5. Give them time to admire the clean parsed card before final transition
-        const timer = setTimeout(() => {
+        timerRef.current = setTimeout(() => {
             router.replace("/onboarding/first-save");
         }, 6500);
 
-        return () => clearTimeout(timer);
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        };
     }, [router]);
 
     const urlStyle = useAnimatedStyle(() => ({
@@ -61,7 +69,8 @@ export default function DemoScreen() {
     }));
 
     return (
-        <View
+        <Pressable
+            onPress={goNext}
             className="flex-1 bg-surface-950 items-center justify-center px-6"
             style={{ paddingTop: Math.max(insets.top, Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0) }}
         >
@@ -115,6 +124,11 @@ export default function DemoScreen() {
                 </Animated.View>
 
             </View>
-        </View>
+
+            {/* Tap hint */}
+            <Animated.View entering={FadeIn.delay(1000).duration(800)} style={{ position: "absolute", bottom: insets.bottom + 24 }}>
+                <Text className="text-surface-500 font-sans text-xs">Tap anywhere to continue</Text>
+            </Animated.View>
+        </Pressable>
     );
 }

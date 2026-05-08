@@ -77,6 +77,13 @@ export default function LibraryScreen() {
             onPress: () => router.push("/library/shopping-list"),
         },
         {
+            title: "Calorie Counter",
+            icon: "flame" as const,
+            color: "#EF4444", // Red
+            description: "Track daily macros",
+            onPress: () => router.push("/library/calorie-counter"),
+        },
+        {
             title: "All Recipes",
             icon: "book" as const,
             color: "#FF6B35", // Orange

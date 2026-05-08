@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { View, Text, Platform, StatusBar, Image } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, Platform, StatusBar, Image, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeIn, FadeOut, SlideInDown, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,17 +8,26 @@ import { Ionicons } from "@expo/vector-icons";
 export default function WelcomeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const goNext = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        router.replace("/onboarding/demo");
+    };
 
     // Automatically transition to the next demo screen after reading time
     useEffect(() => {
-        const timer = setTimeout(() => {
+        timerRef.current = setTimeout(() => {
             router.replace("/onboarding/demo");
-        }, 4500); // Increased from 3500 so they can actually read it
-        return () => clearTimeout(timer);
+        }, 4500);
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        };
     }, [router]);
 
     return (
-        <View
+        <Pressable
+            onPress={goNext}
             className="flex-1 bg-surface-950 items-center justify-center px-6"
             style={{ paddingTop: Math.max(insets.top, Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0) }}
         >
@@ -45,6 +54,11 @@ export default function WelcomeScreen() {
                     <Text className="text-white font-sans-semibold text-xl">No 10-page life stories.</Text>
                 </Animated.View>
             </View>
-        </View>
+
+            {/* Tap hint */}
+            <Animated.View entering={FadeIn.delay(2500).duration(800)} style={{ position: "absolute", bottom: insets.bottom + 24 }}>
+                <Text className="text-surface-500 font-sans text-xs">Tap anywhere to continue</Text>
+            </Animated.View>
+        </Pressable>
     );
 }
