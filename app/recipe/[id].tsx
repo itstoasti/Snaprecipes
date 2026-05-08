@@ -350,34 +350,7 @@ export default function RecipeDetailScreen() {
                                         </View>
                                     )}
                                 </View>
-                                {(recipe.sugar != null || recipe.fiber != null || recipe.sodium != null) && (
-                                    <View className="flex-row justify-between mt-3 pt-3 border-t border-surface-800">
-                                        {recipe.sugar != null && (
-                                            <View className="items-center flex-1">
-                                                <Text className="text-surface-300 font-sans-semibold text-sm">
-                                                    {Math.round((recipe.sugar || 0) * multiplier)}g
-                                                </Text>
-                                                <Text className="text-surface-500 font-sans text-xs mt-0.5">Sugar</Text>
-                                            </View>
-                                        )}
-                                        {recipe.fiber != null && (
-                                            <View className="items-center flex-1">
-                                                <Text className="text-surface-300 font-sans-semibold text-sm">
-                                                    {Math.round((recipe.fiber || 0) * multiplier)}g
-                                                </Text>
-                                                <Text className="text-surface-500 font-sans text-xs mt-0.5">Fiber</Text>
-                                            </View>
-                                        )}
-                                        {recipe.sodium != null && (
-                                            <View className="items-center flex-1">
-                                                <Text className="text-surface-300 font-sans-semibold text-sm">
-                                                    {Math.round((recipe.sodium || 0) * multiplier)}mg
-                                                </Text>
-                                                <Text className="text-surface-500 font-sans text-xs mt-0.5">Sodium</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
+
                             </View>
                         </Animated.View>
                     )}
