@@ -432,7 +432,7 @@ export default function AddFoodScreen() {
                                         <View className="flex-1">
                                             <Text className="text-white font-sans-bold text-sm" numberOfLines={1}>{item.food_name}</Text>
                                             <Text className="text-surface-500 font-sans text-[10px] mt-0.5">
-                                                {item.serving_size || "1 serving"} • {Math.round(item.protein)}g P • {Math.round(item.carbs)}g C • {Math.round(item.fat)}g F
+                                                {item.serving_size || "1 serving"} • {Math.round(item.protein)}g Protein • {Math.round(item.carbs)}g Carbs • {Math.round(item.fat)}g Fat
                                             </Text>
                                         </View>
                                         <View className="items-center mr-2">
