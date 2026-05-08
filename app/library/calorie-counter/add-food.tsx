@@ -27,7 +27,8 @@ interface FoodResult {
     sugar?: number | null;
     fiber?: number | null;
     sodium?: number | null;
-    source: "local" | "ai";
+    sodium?: number | null;
+    source: "local" | "ai" | "community";
 }
 
 interface QuickAddState {
@@ -109,7 +110,7 @@ export default function AddFoodScreen() {
                 if (!globalError && globalData && globalData.length > 0) {
                     setSearchResults(globalData.map((f: any) => ({
                         ...f,
-                        source: "ai" as const, // Treat as AI source so the UI renders it consistently
+                        source: "community" as const,
                     })));
                     
                     // Increment lookup count asynchronously
@@ -380,11 +381,20 @@ export default function AddFoodScreen() {
                         </Animated.View>
                     )}
 
-                    {aiLookedUp && searchResults.length > 0 && (
+                    {aiLookedUp && searchResults.length > 0 && searchResults[0].source === "ai" && (
                         <Animated.View entering={FadeIn} className="flex-row items-center mb-2 px-1">
                             <Ionicons name="sparkles" size={14} color="#FBBF24" />
                             <Text className="text-amber-400 font-sans text-xs ml-1.5">
                                 AI-estimated nutrition — tap to log & save to your database
+                            </Text>
+                        </Animated.View>
+                    )}
+
+                    {aiLookedUp && searchResults.length > 0 && searchResults[0].source === "community" && (
+                        <Animated.View entering={FadeIn} className="flex-row items-center mb-2 px-1">
+                            <Ionicons name="globe" size={14} color="#34D399" />
+                            <Text className="text-emerald-400 font-sans text-xs ml-1.5">
+                                Community database — instant result
                             </Text>
                         </Animated.View>
                     )}
@@ -422,11 +432,19 @@ export default function AddFoodScreen() {
                             <Animated.View entering={FadeInDown.delay(index * 30)}>
                                 <Pressable onPress={() => handleLogFood(item)}>
                                     <GlassContainer className="flex-row items-center p-3.5 mb-2 rounded-2xl overflow-hidden"
-                                        style={item.source === "ai" ? { borderColor: "rgba(251,191,36,0.2)" } : undefined}
+                                        style={
+                                            item.source === "ai" ? { borderColor: "rgba(251,191,36,0.2)" } :
+                                            item.source === "community" ? { borderColor: "rgba(52,211,153,0.2)" } : undefined
+                                        }
                                     >
                                         {item.source === "ai" && (
                                             <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(251,191,36,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
                                                 <Ionicons name="sparkles" size={16} color="#FBBF24" />
+                                            </View>
+                                        )}
+                                        {item.source === "community" && (
+                                            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(52,211,153,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                                <Ionicons name="globe" size={16} color="#34D399" />
                                             </View>
                                         )}
                                         <View className="flex-1">
