@@ -14,10 +14,7 @@ Return exactly ONE valid JSON object matching this schema:
       "calories": 95,
       "protein": 0.5,
       "fat": 0.3,
-      "carbs": 25,
-      "sugar": 19,
-      "fiber": 4.4,
-      "sodium": 2
+      "carbs": 25
     }
   ],
   "confidence": "high" | "medium" | "low",
@@ -43,10 +40,10 @@ CRITICAL IDENTIFICATION RULES:
 
 4. NUTRITIONAL ACCURACY:
    - All macro values are per the stated serving size.
-   - Protein, fat, carbs, sugar, fiber in grams. Sodium in milligrams.
+   - Protein, fat, carbs in grams.
    - Use standard USDA serving sizes when possible.
-   - When estimating for restaurant/bakery items, account for the fact that they typically contain MORE fat, sugar, and calories than home-prepared versions.
-   - Round to 1 decimal place for macros, whole numbers for calories and sodium.
+   - When estimating for restaurant/bakery items, account for the fact that they typically contain MORE fat, carbs, and calories than home-prepared versions.
+   - Round to 1 decimal place for macros, whole numbers for calories.
 
 5. CONFIDENCE LEVELS:
    - "high": Common food, clearly identified, USDA data available
