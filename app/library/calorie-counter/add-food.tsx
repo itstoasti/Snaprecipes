@@ -133,6 +133,7 @@ export default function AddFoodScreen() {
                                 },
                                 body: JSON.stringify({ row_id: topMatch.id })
                             }).catch(() => {});
+                            setAiLookedUp(true);
                             return;
                         }
                     } else {
@@ -153,11 +154,14 @@ export default function AddFoodScreen() {
                 return;
             }
 
+            const { data: { session } } = await supabase.auth.getSession();
+            const authToken = session?.access_token || supabaseKey;
+
             const response = await fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${supabaseKey}`,
+                    "Authorization": `Bearer ${authToken}`,
                     "apikey": supabaseKey,
                 },
                 body: JSON.stringify({ textDescription: q }),
