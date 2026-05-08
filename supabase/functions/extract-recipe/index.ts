@@ -359,7 +359,7 @@ Deno.serve(async (req: Request) => {
 
         } else {
             // ----- Gemini Logic -----
-            const targetModel = geminiModel || "gemini-1.5-flash";
+            const targetModel = geminiModel || "gemini-3-flash-preview";
             const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${activeKey}`;
 
             const payload: any = {
