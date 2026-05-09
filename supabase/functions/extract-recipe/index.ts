@@ -23,10 +23,10 @@ Return exactly ONE valid JSON object matching this schema structure. Do not omit
     { "text": "full step instruction", "stepNumber": 1 }
   ],
   "tags": ["tag1", "tag2"],
-  "calories": null,
-  "protein": null,
-  "fat": null,
-  "carbs": null
+  "calories": 450, // per serving; ESTIMATE if missing from text
+  "protein": 25,  // in grams; ESTIMATE if missing from text
+  "fat": 15,      // in grams; ESTIMATE if missing from text
+  "carbs": 50      // in grams; ESTIMATE if missing from text
 }
 
 CRITICAL RULES:
@@ -38,7 +38,7 @@ CRITICAL RULES:
 6. For social media content (TikTok, Instagram), infer the recipe from the caption/description. The caption often describes the full recipe even without a structured format.
 7. For imageUrl: select the URL showing the finished food dish. NEVER use profile pictures, logos, or avatars.
 8. INGREDIENT SECTIONS: If ingredients are grouped under headings or sub-headings in the "Rendered webpage content" (e.g. "#### Chicken:", "### Sauce:", "## Dressing:"), you MUST set the "section" field to that heading name. Clean the heading name (remove "#", colons, and "For the" prefix — e.g. "#### Sauce:" becomes "Sauce"). If an ingredient is NOT under a specific sub-heading, set "section" to null. CRITICAL: The appended JSON-LD structured data is flat and loses these groupings — you MUST rely on the markdown headers in the "Rendered webpage content" to determine the sections!
-9. NUTRITION & STRICT LITERALISM: If the recipe page includes nutritional information, extract the per-serving values as numbers. If nutrition info is NOT available, you MUST ESTIMATE the per-serving values based ONLY on the extracted ingredients. STRICT LITERALISM: DO NOT assume extra ingredients like butter, oil, milk, or seasoning during estimation unless they are explicitly listed in the ingredient list. Your estimation must be a clinical, literal reflection of the provided ingredients only. Never return null — always provide your best accurate estimation.`;
+9. NUTRITIONAL ACCURACY & MANDATORY ESTIMATION: If the recipe page includes nutritional information, extract the per-serving values as numbers. If nutrition info is NOT available, you MUST ESTIMATE the per-serving values based ONLY on the extracted ingredients. STRICT LITERALISM: DO NOT assume extra ingredients like butter, oil, milk, or seasoning during estimation unless they are explicitly listed in the ingredient list. Your estimation must be a clinical, literal reflection of the provided ingredients only. NEVER return null or zero for calories, protein, fat, or carbs if ingredients are present — always provide a realistic, best-effort calculation. Accuracy is critical for user health tracking.`;
 
 /**
  * Server-side scrape: fetch the URL from the Deno edge function with browser headers.

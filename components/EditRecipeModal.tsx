@@ -59,12 +59,12 @@ export default function EditRecipeModal({
     onSave,
     onClose,
 }: EditRecipeModalProps) {
-    const [title, setTitle] = useState(recipe.title);
-    const [description, setDescription] = useState(recipe.description || "");
-    const [servings, setServings] = useState(recipe.servings.toString());
-    const [prepTime, setPrepTime] = useState(recipe.prep_time || "");
-    const [cookTime, setCookTime] = useState(recipe.cook_time || "");
-    const [imageUrl, setImageUrl] = useState(recipe.image_url || "");
+    const [title, setTitle] = useState(recipe?.title || "");
+    const [description, setDescription] = useState(recipe?.description || "");
+    const [servings, setServings] = useState((recipe?.servings || 4).toString());
+    const [prepTime, setPrepTime] = useState(recipe?.prep_time || "");
+    const [cookTime, setCookTime] = useState(recipe?.cook_time || "");
+    const [imageUrl, setImageUrl] = useState(recipe?.image_url || "");
     const [ingredients, setIngredients] = useState<EditableIngredient[]>([]);
     const [steps, setSteps] = useState<EditableStep[]>([]);
     const [saving, setSaving] = useState(false);
@@ -72,10 +72,10 @@ export default function EditRecipeModal({
 
     // Reset form when modal opens with new recipe
     useEffect(() => {
-        if (visible) {
-            setTitle(recipe.title);
+        if (visible && recipe) {
+            setTitle(recipe.title || "");
             setDescription(recipe.description || "");
-            setServings(recipe.servings.toString());
+            setServings((recipe.servings || 4).toString());
             setPrepTime(recipe.prep_time || "");
             setCookTime(recipe.cook_time || "");
             setImageUrl(recipe.image_url || "");

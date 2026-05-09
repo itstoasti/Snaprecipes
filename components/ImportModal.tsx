@@ -10,7 +10,10 @@ import {
     KeyboardAvoidingView,
     Platform,
     Keyboard,
+    Dimensions,
 } from "react-native";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Animated, {
@@ -269,18 +272,16 @@ export default function ImportModal({ visible, onClose }: ImportModalProps) {
         >
             <Pressable
                 onPress={handleClose}
-                className="flex-1 bg-black/60 justify-end"
+                className="flex-1 bg-black/60 justify-center items-center p-6"
             >
                 <Pressable onPress={(e) => e.stopPropagation()}>
                     <Animated.View
-                        entering={SlideInDown.springify().damping(26).stiffness(70)}
+                        entering={FadeIn.duration(300)}
+                        style={{ width: SCREEN_WIDTH - 40 }}
                     >
                         <GlassContainer
-                            style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
-                            className="p-6 pb-12"
+                            className="p-8 rounded-[40px] overflow-hidden"
                         >
-                            {/* Handle */}
-                            <View className="self-center w-10 h-1 bg-surface-500 rounded-full mb-5" />
 
                             {mode === "api_error" ? (
                                 <Animated.View entering={FadeIn}>
@@ -363,10 +364,10 @@ export default function ImportModal({ visible, onClose }: ImportModalProps) {
                                 </Animated.View>
                             ) : mode === "choose" ? (
                                 <>
-                                    <Text className="text-white font-sans-bold text-xl mb-1">
+                                    <Text className="text-white font-sans-bold text-2xl mb-2">
                                         Import Recipe
                                     </Text>
-                                    <Text className="text-surface-400 font-sans text-sm mb-6">
+                                    <Text className="text-surface-400 font-sans text-base mb-8">
                                         Choose how you'd like to add a recipe
                                     </Text>
 
@@ -445,10 +446,10 @@ export default function ImportModal({ visible, onClose }: ImportModalProps) {
                                         <ExtractionLoader />
                                     ) : (
                                         <Animated.View entering={FadeIn}>
-                                            <Text className="text-white font-sans-bold text-xl mb-1">
+                                            <Text className="text-white font-sans-bold text-2xl mb-2">
                                                 Paste Recipe URL
                                             </Text>
-                                            <Text className="text-surface-400 font-sans text-sm mb-4">
+                                            <Text className="text-surface-400 font-sans text-base mb-6">
                                                 Works with most recipe websites and social media
                                             </Text>
 

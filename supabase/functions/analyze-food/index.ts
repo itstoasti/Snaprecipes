@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY") || "";
+const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
 const FOOD_ANALYSIS_PROMPT = `You are an expert clinical dietitian and food identification specialist. Your job is to identify foods with extreme precision and provide USDA-grade nutritional data. Accuracy is critical — users depend on this for health and diet tracking.
 
@@ -9,7 +10,8 @@ Return exactly ONE valid JSON object matching this schema:
 {
   "items": [
     {
-      "food_name": "the MOST SPECIFIC name possible (see rules below)",
+      "food_name": "the MOST SPECIFIC product name possible (e.g. 'Honey Wheat Bread', 'Double Espresso')",
+      "brand": "the manufacturer/brand name if known or applicable (e.g. 'Nature's Own', 'Starbucks', 'Trader Joe's')",
       "serving_size": "standard serving with weight (e.g. '1 medium (182g)', '1 cup (240ml)', '100g')",
       "calories": 95,
       "protein": 0.5,
@@ -50,6 +52,8 @@ CRITICAL IDENTIFICATION RULES:
    - "low": Unclear image, unusual food, or significant estimation required
 
 7. If multiple items are in a query (e.g. "chicken rice and beans"), return separate items in the array.
+8. BARCODE QUERIES: If the query is "Product with barcode XXXXX", this means the global database didn't have nutrition data. Do NOT hallucinate a product. Only identify it if you are 100% CERTAIN of the barcode-to-product mapping. If unsure, return confidence low and generic macros for a placeholder.
+9. PEANUT BUTTER RULE: 1 serving is ALWAYS ~32g (2 tbsp), which is ~190 calories. If the data looks like 500-600 calories, you are returning the 100g weight. FIX IT.
 
 8. Output raw JSON only. No markdown code blocks. No extra text.`;
 
@@ -59,14 +63,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        if (!GEMINI_KEY) {
-            return new Response(JSON.stringify({ error: "Missing GEMINI_API_KEY" }), {
-                status: 500,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-        }
-
-        const { imageBase64, textDescription } = await req.json();
+        const { imageBase64, textDescription, provider = "gemini" } = await req.json();
 
         if (!imageBase64 && !textDescription) {
             return new Response(JSON.stringify({ error: "Provide imageBase64 or textDescription" }), {
@@ -75,44 +72,102 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_KEY}`;
+        let aiText = "";
 
-        const parts: any[] = [{ text: FOOD_ANALYSIS_PROMPT }];
+        if (provider === "openai") {
+            if (!OPENAI_KEY) {
+                return new Response(JSON.stringify({ error: "Missing OPENAI_API_KEY" }), {
+                    status: 500,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
 
-        if (imageBase64) {
-            parts.push({
-                inline_data: { mime_type: "image/jpeg", data: imageBase64 },
+            const messages: any[] = [
+                { role: "system", content: FOOD_ANALYSIS_PROMPT },
+            ];
+
+            if (imageBase64) {
+                messages.push({
+                    role: "user",
+                    content: [
+                        { type: "text", text: "Identify the food in this image and provide nutritional data." },
+                        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
+                    ]
+                });
+            } else {
+                messages.push({
+                    role: "user",
+                    content: `Provide accurate nutritional information for: "${textDescription}"`
+                });
+            }
+
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${OPENAI_KEY}`,
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o",
+                    messages,
+                    response_format: { type: "json_object" },
+                    temperature: 0.1,
+                }),
             });
-        } else if (textDescription) {
-            parts.push({
-                text: `\n\nProvide accurate nutritional information for: "${textDescription}"`,
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`OpenAI Error: ${err}`);
+            }
+
+            const data = await response.json();
+            aiText = data.choices?.[0]?.message?.content;
+
+        } else {
+            // Default to Gemini
+            if (!GEMINI_KEY) {
+                return new Response(JSON.stringify({ error: "Missing GEMINI_API_KEY" }), {
+                    status: 500,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
+
+            const parts: any[] = [{ text: FOOD_ANALYSIS_PROMPT }];
+            if (imageBase64) {
+                parts.push({
+                    inline_data: { mime_type: "image/jpeg", data: imageBase64 },
+                });
+            } else if (textDescription) {
+                parts.push({
+                    text: `\n\nProvide accurate nutritional information for: "${textDescription}"`,
+                });
+            }
+
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 8192,
+                        responseMimeType: "application/json",
+                    },
+                    contents: [{ parts }],
+                }),
             });
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`Gemini Error: ${err}`);
+            }
+
+            const data = await response.json();
+            aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
         }
 
-        const payload = {
-            generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 8192,
-                responseMimeType: "application/json",
-            },
-            contents: [{ parts }],
-        };
-
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const err = await response.text();
-            throw new Error(`Gemini Error: ${err}`);
-        }
-
-        const data = await response.json();
-        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!aiText) throw new Error("Empty response from Gemini");
+        if (!aiText) throw new Error("Empty response from AI");
 
         let parsed;
         try {

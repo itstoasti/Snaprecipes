@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeOut, SlideInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import GlassContainer from "./GlassContainer";
 import { scaleQuantity } from "./ServingScaler";
 import type { Ingredient, Step } from "@/db/schema";
@@ -71,7 +72,7 @@ export default function CookMode({
                         const groups: { section: string | null; items: typeof ingredients }[] = [];
                         let currentSection: string | null | undefined = undefined;
                         for (const ing of ingredients) {
-                            if (ing.section !== currentSection) {
+                            if (groups.length === 0 || ing.section !== currentSection) {
                                 currentSection = ing.section;
                                 groups.push({ section: ing.section, items: [ing] });
                             } else {
@@ -196,23 +197,26 @@ export default function CookMode({
             </ScrollView>
 
             {/* Exit Button */}
-            <View
-                className="absolute bottom-0 left-0 right-0 p-6"
-                style={{ paddingBottom: Math.max(insets.bottom, 20) + 10 }}
-            >
-                <GlassContainer
-                    style={{ borderRadius: 20, overflow: "hidden" }}
+            <View className="absolute bottom-0 left-0 right-0">
+                <LinearGradient
+                    colors={["transparent", "rgba(10,10,15,0.8)", "rgba(10,10,15,1)"]}
+                    className="pt-12 px-6"
+                    style={{ paddingBottom: Math.max(insets.bottom, 20) + 10 }}
                 >
-                    <Pressable
-                        onPress={onExit}
-                        className="flex-row items-center justify-center py-4"
+                    <GlassContainer
+                        style={{ borderRadius: 20, overflow: "hidden" }}
                     >
-                        <Ionicons name="close-circle" size={22} color="#FF6B35" />
-                        <Text className="text-accent font-sans-semibold text-base ml-2">
-                            Exit Cook Mode
-                        </Text>
-                    </Pressable>
-                </GlassContainer>
+                        <Pressable
+                            onPress={onExit}
+                            className="flex-row items-center justify-center py-4"
+                        >
+                            <Ionicons name="close-circle" size={22} color="#FF6B35" />
+                            <Text className="text-accent font-sans-semibold text-base ml-2">
+                                Exit Cook Mode
+                            </Text>
+                        </Pressable>
+                    </GlassContainer>
+                </LinearGradient>
             </View>
         </Animated.View>
     );

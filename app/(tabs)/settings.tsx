@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { useRouter } from "expo-router";
-import { View, Text, Pressable, Platform, TextInput, Alert, KeyboardAvoidingView, ScrollView, Linking, Image } from "react-native";
+import { useRouter, Stack } from "expo-router";
+import { View, Text, Pressable, Platform, TextInput, Alert, KeyboardAvoidingView, ScrollView, Linking, Image, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import * as Haptics from "expo-haptics";
 import GlassContainer from "@/components/GlassContainer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown, FadeInRight, FadeIn, FadeOut } from "react-native-reanimated";
 import { supabase } from "@/lib/supabase";
 import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
 import { clearDatabase } from "@/db/client";
 import type { Session } from "@supabase/supabase-js";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { useRecipes } from "@/hooks/useRecipes";
-import { AI_PROVIDER_STORE } from "@/lib/constants";
+import { AI_PROVIDER_STORE, USER_GOALS_STORE } from "@/lib/constants";
 import StatusModal from "@/components/StatusModal";
+import { BlurView } from "expo-blur";
 
 function SettingRow({
     icon,
@@ -70,9 +72,33 @@ export default function SettingsScreen() {
         message: "",
     });
 
+    // Health & Goals State
+    const [showGoalModal, setShowGoalModal] = useState(false);
+    const [healthData, setHealthData] = useState({
+        weight: "",
+        height: "", // cm
+        heightFt: "",
+        heightIn: "",
+        age: "",
+        gender: "male",
+        activity: "moderate", // sedentary, light, moderate, active, very_active
+        goal: "maintain", // lose, maintain, gain
+        unitSystem: "imperial", // imperial, metric
+    });
+    const [currentGoals, setCurrentGoals] = useState<any>(null);
+
     useEffect(() => {
         SecureStore.getItemAsync(AI_PROVIDER_STORE).then(val => {
             if (val === "openai") setAiProvider("openai");
+        });
+
+        // Load existing goals
+        SecureStore.getItemAsync(USER_GOALS_STORE).then(val => {
+            if (val) {
+                const parsed = JSON.parse(val);
+                setHealthData(parsed.healthData || healthData);
+                setCurrentGoals(parsed.goals);
+            }
         });
 
         // Fetch session on mount
@@ -103,21 +129,104 @@ export default function SettingsScreen() {
         }
     };
 
+    const calculateGoals = () => {
+        let weightKg = 0;
+        let heightCm = 0;
+
+        if (healthData.unitSystem === "imperial") {
+            const lbs = parseFloat(healthData.weight);
+            const ft = parseFloat(healthData.heightFt);
+            const inch = parseFloat(healthData.heightIn) || 0;
+
+            if (!lbs || !ft) {
+                Alert.alert("Missing Info", "Please fill in weight and height (feet) to calculate your goals.");
+                return;
+            }
+            weightKg = lbs * 0.453592;
+            heightCm = (ft * 30.48) + (inch * 2.54);
+        } else {
+            const kg = parseFloat(healthData.weight);
+            const cm = parseFloat(healthData.height);
+
+            if (!kg || !cm) {
+                Alert.alert("Missing Info", "Please fill in weight and height to calculate your goals.");
+                return;
+            }
+            weightKg = kg;
+            heightCm = cm;
+        }
+
+        const a = parseInt(healthData.age);
+
+        if (!a) {
+            Alert.alert("Missing Info", "Please fill in your age to calculate your goals.");
+            return;
+        }
+
+        // BMR (Mifflin-St Jeor)
+        let bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * a);
+        if (healthData.gender === "male") bmr += 5;
+        else bmr -= 161;
+
+        // Activity Multiplier
+        const multipliers: any = {
+            sedentary: 1.2,
+            light: 1.375,
+            moderate: 1.55,
+            active: 1.725,
+            very_active: 1.9
+        };
+        let tdee = bmr * (multipliers[healthData.activity] || 1.55);
+
+        // Goal Adjustment
+        if (healthData.goal === "lose") tdee -= 500;
+        if (healthData.goal === "gain") tdee += 300;
+
+        const newGoals = {
+            calories: Math.round(tdee),
+            protein: Math.round(weightKg * 1.8), // Standard active protein goal (1.8g/kg)
+            fat: Math.round((tdee * 0.25) / 9), // 25% calories from fat
+            carbs: Math.round((tdee - (weightKg * 1.8 * 4) - ((tdee * 0.25))) / 4) // Remaining calories from carbs
+        };
+
+        const payload = {
+            healthData,
+            goals: newGoals,
+            updated_at: new Date().toISOString()
+        };
+
+        SecureStore.setItemAsync(USER_GOALS_STORE, JSON.stringify(payload));
+        setCurrentGoals(newGoals);
+        setShowGoalModal(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        setModal({
+            visible: true,
+            type: "success",
+            title: "Goals Updated!",
+            message: `Your new daily target is ${newGoals.calories} kcal. The calorie counter has been updated.`
+        });
+    };
+
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             className="flex-1 bg-surface-950"
-            style={{ paddingTop: Math.max(insets.top, 20) + 10 }}
         >
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}>
-                <Text className="text-surface-400 font-sans text-xs uppercase tracking-widest">
-                    App
-                </Text>
-                <Text className="text-white font-sans-bold text-3xl mt-0.5 mb-6">
-                    Settings
-                </Text>
+            <Stack.Screen options={{ 
+                headerShown: true, 
+                title: "Settings",
+                headerStyle: { backgroundColor: "#0A0A0F" },
+                headerTintColor: "#FFF",
+                headerTitleStyle: { fontFamily: "Inter_700Bold" }
+            }} />
 
-                {/* SnapRecipes Pro Upgrade/Active Banner */}
+            <ScrollView 
+                className="flex-1 px-5 pt-4"
+                contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* SnapRecipes Pro */}
                 {isReady && isPro ? (
                     <View className="flex-row items-center bg-surface-900 border border-emerald-500/30 p-4 rounded-2xl mb-8">
                         <View className="w-12 h-12 rounded-full bg-emerald-500/20 items-center justify-center mr-4">
@@ -144,79 +253,7 @@ export default function SettingsScreen() {
                     </Pressable>
                 )}
 
-                {/* AI Engine Preference */}
-                <Text className="text-white font-sans-semibold text-lg mb-3">AI Extraction Engine</Text>
-                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24 }}>
-                    <View className="p-5">
-                        <Text className="text-surface-400 font-sans text-sm mb-4 leading-5">
-                            Choose the underlying AI model used to extract recipes from websites and photos.
-                        </Text>
-                        <View className="flex-row bg-surface-950 p-1 rounded-xl">
-                            <Pressable
-                                onPress={() => {
-                                    setAiProvider("gemini");
-                                    SecureStore.setItemAsync(AI_PROVIDER_STORE, "gemini");
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                }}
-                                className={`flex-1 py-3 rounded-lg items-center ${aiProvider === "gemini" ? "bg-surface-800" : ""}`}
-                            >
-                                <Text className={`font-sans-semibold ${aiProvider === "gemini" ? "text-white" : "text-surface-500"}`}>Gemini Flash</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => {
-                                    setAiProvider("openai");
-                                    SecureStore.setItemAsync(AI_PROVIDER_STORE, "openai");
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                }}
-                                className={`flex-1 py-3 rounded-lg items-center ${aiProvider === "openai" ? "bg-surface-800" : ""}`}
-                            >
-                                <Text className={`font-sans-semibold ${aiProvider === "openai" ? "text-white" : "text-surface-500"}`}>GPT-4o</Text>
-                            </Pressable>
-                        </View>
-                    </View>
-                </GlassContainer>
 
-                {/* Maintenance Tools */}
-                <Text className="text-white font-sans-semibold text-lg mb-3">Maintenance</Text>
-                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24, padding: 0 }}>
-                    <View className="p-5">
-                        <Text className="text-surface-400 font-sans text-sm mb-4 leading-5">
-                            Fix recipes with broken images (common with Instagram and TikTok). This will attempt to re-save the image to your permanent storage.
-                        </Text>
-                        <Pressable
-                            onPress={async () => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                setSyncing(true);
-                                try {
-                                    const count = await repairBrokenImages();
-                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                    setModal({
-                                        visible: true,
-                                        type: "success",
-                                        title: "Repair Complete",
-                                        message: `Successfully repaired ${count} broken images! Your library is back in shape.`
-                                    });
-                                } catch (e: any) {
-                                    setModal({
-                                        visible: true,
-                                        type: "error",
-                                        title: "Repair Failed",
-                                        message: e.message || "An error occurred during repair."
-                                    });
-                                } finally {
-                                    setSyncing(false);
-                                }
-                            }}
-                            disabled={syncing}
-                            className={`w-full py-4 rounded-xl items-center bg-surface-800 border-surface-700 border flex-row justify-center ${syncing ? 'opacity-50' : ''}`}
-                        >
-                            <Ionicons name="construct" size={18} color="#FF6B35" />
-                            <Text className="text-white font-sans-bold text-base ml-2">
-                                {syncing ? "Repairing..." : "Repair Broken Images"}
-                            </Text>
-                        </Pressable>
-                    </View>
-                </GlassContainer>
 
                 {/* Account & Sync */}
                 <Text className="text-white font-sans-semibold text-lg mb-3">Account & Cloud Sync</Text>
@@ -338,6 +375,80 @@ export default function SettingsScreen() {
                     </View>
                 </GlassContainer>
 
+                {/* Health & Goals */}
+                <Text className="text-white font-sans-semibold text-lg mb-3">Health & Goals</Text>
+                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24, padding: 0 }}>
+                    <View className="p-5">
+                        <View className="flex-row items-center justify-between mb-4">
+                            <View className="flex-1 mr-4">
+                                <Text className="text-white font-sans-bold text-base mb-1">
+                                    {currentGoals ? `${currentGoals.calories} kcal` : "Standard 2000 kcal"}
+                                </Text>
+                                <Text className="text-surface-400 font-sans text-xs leading-4">
+                                    {currentGoals ? "Based on your personalized health profile." : "Using a generic daily baseline. Personalize it for better results."}
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={() => setShowGoalModal(true)}
+                                className="bg-accent px-4 py-2 rounded-xl"
+                            >
+                                <Text className="text-white font-sans-bold text-xs">Customize</Text>
+                            </Pressable>
+                        </View>
+
+                        {currentGoals && (
+                            <View className="flex-row justify-between bg-surface-950/50 p-3 rounded-xl border border-surface-800/50">
+                                <View className="items-center">
+                                    <Text className="text-blue-400 font-sans-bold text-xs">{currentGoals.protein}g</Text>
+                                    <Text className="text-surface-500 font-sans text-[9px]">Protein</Text>
+                                </View>
+                                <View className="items-center">
+                                    <Text className="text-amber-400 font-sans-bold text-xs">{currentGoals.carbs}g</Text>
+                                    <Text className="text-surface-500 font-sans text-[9px]">Carbs</Text>
+                                </View>
+                                <View className="items-center">
+                                    <Text className="text-pink-400 font-sans-bold text-xs">{currentGoals.fat}g</Text>
+                                    <Text className="text-surface-500 font-sans text-[9px]">Fat</Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                </GlassContainer>
+
+                {/* AI Engine Section */}
+                <Text className="text-white font-sans-semibold text-lg mb-3">AI Extraction Engine</Text>
+                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24 }}>
+                    <View className="p-5">
+                        <Text className="text-surface-400 font-sans text-sm mb-4 leading-5">
+                            Choose the underlying AI model used to extract recipes from websites and photos.
+                        </Text>
+                        <View className="flex-row bg-surface-950 p-1 rounded-xl">
+                            <Pressable
+                                onPress={() => {
+                                    setAiProvider("gemini");
+                                    SecureStore.setItemAsync(AI_PROVIDER_STORE, "gemini");
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                                className={`flex-1 py-3 rounded-lg items-center ${aiProvider === "gemini" ? "bg-surface-800" : ""}`}
+                            >
+                                <Text className={`font-sans-semibold ${aiProvider === "gemini" ? "text-white" : "text-surface-500"}`}>Gemini Flash</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => {
+                                    setAiProvider("openai");
+                                    SecureStore.setItemAsync(AI_PROVIDER_STORE, "openai");
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                                className={`flex-1 py-3 rounded-lg items-center ${aiProvider === "openai" ? "bg-surface-800" : ""}`}
+                            >
+                                <Text className={`font-sans-semibold ${aiProvider === "openai" ? "text-white" : "text-surface-500"}`}>GPT-4o</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </GlassContainer>
+
+
+
                 {/* App Info */}
                 <Text className="text-white font-sans-semibold text-lg mb-3">About</Text>
                 <View className="bg-surface-900 rounded-2xl px-5 mb-6">
@@ -372,6 +483,175 @@ export default function SettingsScreen() {
                 message={modal.message}
                 onClose={() => setModal(prev => ({ ...prev, visible: false }))}
             />
+
+            {/* Health & Goals Modal */}
+            <Modal
+                visible={showGoalModal}
+                transparent
+                animationType="none"
+                statusBarTranslucent
+            >
+                <View className="flex-1">
+                    <Animated.View 
+                        entering={FadeIn} 
+                        exiting={FadeOut}
+                        className="absolute inset-0 bg-black/60"
+                    />
+                    <BlurView intensity={30} tint="dark" className="flex-1 justify-center px-6">
+                        <Animated.View 
+                            entering={FadeInDown}
+                            className="w-full"
+                        >
+                            <GlassContainer className="p-6 rounded-[32px] border border-white/10">
+                                <View className="flex-row justify-between items-center mb-6">
+                                    <Text className="text-white font-sans-bold text-xl">Health Profile</Text>
+                                    <Pressable 
+                                        onPress={() => setShowGoalModal(false)}
+                                        className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
+                                    >
+                                        <Ionicons name="close" size={20} color="white" />
+                                    </Pressable>
+                                </View>
+
+                                <ScrollView className="max-h-[450px]" showsVerticalScrollIndicator={false}>
+                                    <View className="mb-4">
+                                        <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">Unit System</Text>
+                                        <View className="flex-row bg-surface-950 p-1 rounded-2xl border border-surface-800">
+                                            {[
+                                                { id: 'imperial', label: 'Imperial (lbs, ft)' },
+                                                { id: 'metric', label: 'Metric (kg, cm)' }
+                                            ].map(u => (
+                                                <Pressable
+                                                    key={u.id}
+                                                    onPress={() => setHealthData(p => ({ ...p, unitSystem: u.id as any }))}
+                                                    className={`flex-1 py-2.5 rounded-xl items-center ${healthData.unitSystem === u.id ? 'bg-surface-800' : ''}`}
+                                                >
+                                                    <Text className={`font-sans-semibold text-xs ${healthData.unitSystem === u.id ? 'text-white' : 'text-surface-500'}`}>{u.label}</Text>
+                                                </Pressable>
+                                            ))}
+                                        </View>
+                                    </View>
+
+                                    <View className="flex-row gap-3 mb-4">
+                                        <View className="flex-[1.2]">
+                                            <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">
+                                                Weight ({healthData.unitSystem === 'imperial' ? 'lbs' : 'kg'})
+                                            </Text>
+                                            <TextInput
+                                                value={healthData.weight}
+                                                onChangeText={v => setHealthData(p => ({ ...p, weight: v }))}
+                                                placeholder={healthData.unitSystem === 'imperial' ? "165" : "75"}
+                                                placeholderTextColor="#4A4A5E"
+                                                keyboardType="numeric"
+                                                className="bg-surface-950 border border-surface-800 text-white p-4 rounded-2xl font-sans"
+                                            />
+                                        </View>
+                                        
+                                        {healthData.unitSystem === 'imperial' ? (
+                                            <View className="flex-[2] flex-row gap-2">
+                                                <View className="flex-1">
+                                                    <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">Ft</Text>
+                                                    <TextInput
+                                                        value={healthData.heightFt}
+                                                        onChangeText={v => setHealthData(p => ({ ...p, heightFt: v }))}
+                                                        placeholder="5"
+                                                        placeholderTextColor="#4A4A5E"
+                                                        keyboardType="numeric"
+                                                        className="bg-surface-950 border border-surface-800 text-white p-4 rounded-2xl font-sans"
+                                                    />
+                                                </View>
+                                                <View className="flex-1">
+                                                    <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">In</Text>
+                                                    <TextInput
+                                                        value={healthData.heightIn}
+                                                        onChangeText={v => setHealthData(p => ({ ...p, heightIn: v }))}
+                                                        placeholder="10"
+                                                        placeholderTextColor="#4A4A5E"
+                                                        keyboardType="numeric"
+                                                        className="bg-surface-950 border border-surface-800 text-white p-4 rounded-2xl font-sans"
+                                                    />
+                                                </View>
+                                            </View>
+                                        ) : (
+                                            <View className="flex-1">
+                                                <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">Height (cm)</Text>
+                                                <TextInput
+                                                    value={healthData.height}
+                                                    onChangeText={v => setHealthData(p => ({ ...p, height: v }))}
+                                                    placeholder="180"
+                                                    placeholderTextColor="#4A4A5E"
+                                                    keyboardType="numeric"
+                                                    className="bg-surface-950 border border-surface-800 text-white p-4 rounded-2xl font-sans"
+                                                />
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <View className="mb-4">
+                                        <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">Age</Text>
+                                        <TextInput
+                                            value={healthData.age}
+                                            onChangeText={v => setHealthData(p => ({ ...p, age: v }))}
+                                            placeholder="28"
+                                            placeholderTextColor="#4A4A5E"
+                                            keyboardType="numeric"
+                                            className="bg-surface-950 border border-surface-800 text-white p-4 rounded-2xl font-sans"
+                                        />
+                                    </View>
+
+                                    <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">Gender</Text>
+                                    <View className="flex-row bg-surface-950 p-1 rounded-2xl mb-4 border border-surface-800">
+                                        {['male', 'female'].map(g => (
+                                            <Pressable
+                                                key={g}
+                                                onPress={() => setHealthData(p => ({ ...p, gender: g }))}
+                                                className={`flex-1 py-3 rounded-xl items-center ${healthData.gender === g ? 'bg-surface-800' : ''}`}
+                                            >
+                                                <Text className={`font-sans-semibold capitalize ${healthData.gender === g ? 'text-white' : 'text-surface-500'}`}>{g}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+
+                                    <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">Activity Level</Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+                                        <View className="flex-row bg-surface-950 p-1 rounded-2xl border border-surface-800" style={{ gap: 4 }}>
+                                            {['sedentary', 'light', 'moderate', 'active', 'very_active'].map(a => (
+                                                <Pressable
+                                                    key={a}
+                                                    onPress={() => setHealthData(p => ({ ...p, activity: a }))}
+                                                    className={`px-4 py-3 rounded-xl items-center ${healthData.activity === a ? 'bg-surface-800' : ''}`}
+                                                >
+                                                    <Text className={`font-sans-semibold capitalize ${healthData.activity === a ? 'text-white' : 'text-surface-500'}`}>{a.replace('_', ' ')}</Text>
+                                                </Pressable>
+                                            ))}
+                                        </View>
+                                    </ScrollView>
+
+                                    <Text className="text-surface-400 font-sans-bold text-[10px] uppercase mb-1.5 ml-1">Your Goal</Text>
+                                    <View className="flex-row bg-surface-950 p-1 rounded-2xl mb-6 border border-surface-800">
+                                        {['lose', 'maintain', 'gain'].map(g => (
+                                            <Pressable
+                                                key={g}
+                                                onPress={() => setHealthData(p => ({ ...p, goal: g }))}
+                                                className={`flex-1 py-3 rounded-xl items-center ${healthData.goal === g ? 'bg-surface-800' : ''}`}
+                                            >
+                                                <Text className={`font-sans-semibold capitalize ${healthData.goal === g ? 'text-white' : 'text-surface-500'}`}>{g}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                </ScrollView>
+
+                                <Pressable
+                                    onPress={calculateGoals}
+                                    className="bg-accent py-4 rounded-2xl items-center shadow-lg shadow-accent/20"
+                                >
+                                    <Text className="text-white font-sans-bold text-base">Calculate & Save Goals</Text>
+                                </Pressable>
+                            </GlassContainer>
+                        </Animated.View>
+                    </BlurView>
+                </View>
+            </Modal>
         </KeyboardAvoidingView>
     );
 }

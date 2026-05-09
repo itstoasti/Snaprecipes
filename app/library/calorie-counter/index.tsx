@@ -7,6 +7,7 @@ import {
     ScrollView,
     Modal,
     Dimensions,
+    Alert,
 } from "react-native";
 import { useRouter, Stack, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -89,6 +90,8 @@ export default function CalorieCounterScreen() {
 
     // ── Move-meal modal state ──
     const [moveTarget, setMoveTarget] = useState<{ logId: number; foodName: string; mealType: string } | null>(null);
+
+    const [showGoalInfo, setShowGoalInfo] = useState(false);
 
     const handleMoveMeal = useCallback(
         (logId: number, foodName: string, currentMealType: string) => {
@@ -322,6 +325,18 @@ export default function CalorieCounterScreen() {
                         }}
                         className="p-5 mb-6"
                     >
+                        <View className="flex-row justify-between items-center mb-1">
+                            <Text className="text-surface-500 font-sans text-[10px] uppercase tracking-widest">Daily Goals</Text>
+                            <Pressable 
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    setShowGoalInfo(true);
+                                }}
+                                hitSlop={10}
+                            >
+                                <Ionicons name="information-circle-outline" size={18} color="#9D9DB0" />
+                            </Pressable>
+                        </View>
                         <View className="items-center mb-4">
                             <MacroRing
                                 label="Calories"
@@ -473,6 +488,41 @@ export default function CalorieCounterScreen() {
                     </View>
                 </Modal>
             )}
+            {/* Goals Info Modal */}
+            <Modal visible={showGoalInfo} transparent animationType="fade">
+                <BlurView intensity={40} tint="dark" className="flex-1 items-center justify-center px-8">
+                    <Animated.View entering={FadeInDown} exiting={FadeOut}>
+                        <GlassContainer className="w-full p-7 rounded-[32px] border border-white/10 overflow-hidden">
+                            <View className="items-center mb-4">
+                                <View className="w-14 h-14 rounded-full bg-accent/15 items-center justify-center mb-5">
+                                    <Ionicons name="information-circle" size={32} color="#FF6B35" />
+                                </View>
+                                <Text className="text-white font-sans-bold text-2xl mb-3 text-center">Personalized Goals</Text>
+                                <Text className="text-surface-400 font-sans text-base text-center leading-6 mb-8 px-2">
+                                    The 2000 kcal baseline is just a general standard. For results tailored to your body type and activity, fill out your profile in settings.
+                                </Text>
+                            </View>
+                            <View className="gap-3">
+                                <Pressable 
+                                    onPress={() => {
+                                        setShowGoalInfo(false);
+                                        router.push("/settings");
+                                    }}
+                                    className="bg-accent py-4 rounded-2xl items-center shadow-lg shadow-accent/20"
+                                >
+                                    <Text className="text-white font-sans-bold text-base">Go to Settings</Text>
+                                </Pressable>
+                                <Pressable 
+                                    onPress={() => setShowGoalInfo(false)}
+                                    className="py-3 items-center"
+                                >
+                                    <Text className="text-surface-500 font-sans-bold text-sm">Maybe Later</Text>
+                                </Pressable>
+                            </View>
+                        </GlassContainer>
+                    </Animated.View>
+                </BlurView>
+            </Modal>
         </View>
     );
 }

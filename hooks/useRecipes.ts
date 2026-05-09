@@ -312,11 +312,125 @@ export function useRecipes() {
         [loadRecipes]
     );
 
+    const getCommunityRecipeById = useCallback(async (id: string) => {
+        const { data, error } = await supabase
+            .from("public_recipes")
+            .select("*")
+            .eq("id", id)
+            .single();
+
+        if (error || !data) {
+            console.error("Failed to fetch community recipe:", error);
+            return null;
+        }
+
+        // Map public_recipes schema to internal Recipe/Ingredient/Step schema
+        const recipe: Recipe = {
+            id: 0, // Placeholder
+            title: data.title,
+            description: data.description,
+            image_url: data.image_url,
+            source_url: data.source_url,
+            source_type: "url",
+            servings: data.servings,
+            prep_time: data.prep_time,
+            cook_time: data.cook_time,
+            calories: data.calories,
+            protein: data.protein,
+            fat: data.fat,
+            carbs: data.carbs,
+            sugar: data.sugar,
+            fiber: data.fiber,
+            sodium: data.sodium,
+            sync_status: "synced",
+            created_at: data.created_at,
+            updated_at: data.created_at
+        };
+
+        const ingredients: Ingredient[] = (data.ingredients || []).map((ing: any, idx: number) => ({
+            id: idx,
+            recipe_id: 0,
+            text: ing.text,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            name: ing.name,
+            section: ing.section,
+            order_index: idx
+        }));
+
+        const steps: Step[] = (data.steps || []).map((step: any, idx: number) => ({
+            id: idx,
+            recipe_id: 0,
+            text: step.text,
+            step_number: step.step_number || (idx + 1)
+        }));
+
+        return { recipe, ingredients, steps };
+    }, []);
+
+    const saveCommunityRecipe = useCallback(async (publicId: string) => {
+        const data = await getCommunityRecipeById(publicId);
+        if (!data) return null;
+
+        const newId = await insertRecipe({
+            title: data.recipe.title,
+            description: data.recipe.description || "",
+            imageUrl: data.recipe.image_url || "",
+            servings: data.recipe.servings,
+            prepTime: data.recipe.prep_time || "",
+            cookTime: data.recipe.cook_time || "",
+            calories: data.recipe.calories,
+            protein: data.recipe.protein,
+            fat: data.recipe.fat,
+            carbs: data.recipe.carbs,
+            ingredients: data.ingredients.map(i => ({
+                text: i.text,
+                name: i.name,
+                quantity: i.quantity || "",
+                unit: i.unit || "",
+                section: i.section || ""
+            })),
+            steps: data.steps.map(s => ({
+                text: s.text,
+                stepNumber: s.step_number
+            }))
+        }, data.recipe.source_url || undefined, "url");
+
+        return newId;
+    }, [getCommunityRecipeById, insertRecipe]);
+
+    const searchCommunityRecipes = useCallback(async (query: string) => {
+        if (!query.trim()) {
+            const { data, error } = await supabase
+                .from("public_recipes")
+                .select("*")
+                .not("calories", "is", null)
+                .order("created_at", { ascending: false })
+                .limit(20);
+            if (error) throw error;
+            return data || [];
+        }
+
+        const { data, error } = await supabase
+            .from("public_recipes")
+            .select("*")
+            .not("calories", "is", null)
+            .ilike("title", `%${query}%`)
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+        if (error) throw error;
+        return data || [];
+    }, []);
+
     return {
         recipes,
         loading,
         loadRecipes,
         getRecipeById,
+        getCommunityRecipeById,
+        searchCommunityRecipes,
+        saveCommunityRecipe,
         insertRecipe,
         deleteRecipe,
         updateRecipe,

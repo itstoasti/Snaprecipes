@@ -1,213 +1,224 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, Platform, TextInput, Pressable } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
-import { useRecipes } from "@/hooks/useRecipes";
-import { useCollections } from "@/hooks/useCollections";
-import RecipeFeed from "@/components/RecipeFeed";
-import FilterBar from "@/components/FilterBar";
-import FloatingActionButton from "@/components/FloatingActionButton";
-import ImportModal from "@/components/ImportModal";
-import { getDatabase } from "@/db/client";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { useState, useCallback } from "react";
+import { View, Text, ScrollView, Pressable, Image, Dimensions, ActivityIndicator } from "react-native";
+import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
-import { useRevenueCat } from "@/hooks/useRevenueCat";
-import { canExtractRecipe } from "@/lib/usage";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
+import { useRecipes } from "@/hooks/useRecipes";
+import { useFoodLog } from "@/hooks/useFoodLog";
+import { useCollections } from "@/hooks/useCollections";
+import { useFocusEffect } from "@react-navigation/native";
+import { supabase } from "@/lib/supabase";
+import ImportModal from "@/components/ImportModal";
 
-interface TagItem {
-    id: number;
-    name: string;
-}
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-export default function HomeScreen() {
-    const { recipes, loading, loadRecipes } = useRecipes();
-    const { collections } = useCollections();
-    const [showImport, setShowImport] = useState(false);
-    const [activeFilter, setActiveFilter] = useState("all");
-    const [tags, setTags] = useState<TagItem[]>([]);
-    const [filteredRecipes, setFilteredRecipes] = useState(recipes);
-    const [searchQuery, setSearchQuery] = useState("");
+export default function GroupedDashboard() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { isPro } = useRevenueCat();
-    const params = useLocalSearchParams();
+    const { recipes, loadRecipes } = useRecipes();
+    const { dailyTotals, refresh: refreshLogs } = useFoodLog();
+    const { collections } = useCollections();
+    
+    const [trending, setTrending] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showImport, setShowImport] = useState(false);
 
-    // Load tags
-    useEffect(() => {
-        (async () => {
-            const db = await getDatabase();
-            const t = await db.getAllAsync<TagItem>("SELECT * FROM tags ORDER BY name");
-            setTags(t);
-        })();
-    }, [recipes]);
-
-    // Refresh recipes data on every focus, but do NOT reset the filter here.
-    // Filter is controlled separately to avoid overriding the user's manual selection.
     useFocusEffect(
         useCallback(() => {
             loadRecipes();
-        }, [loadRecipes])
+            refreshLogs();
+            fetchTrending();
+        }, [loadRecipes, refreshLogs])
     );
 
-    // Apply incoming filter param from Collections tab — only when the param actually changes.
-    useEffect(() => {
-        if (params.filter && typeof params.filter === "string") {
-            setActiveFilter(params.filter);
-        }
-    }, [params.filter]);
-
-    // When the user manually picks a filter, clear the route param so it
-    // doesn't re-apply on the next focus event and override their choice.
-    const handleFilterSelect = useCallback((filterId: string) => {
-        router.setParams({ filter: undefined });
-        setActiveFilter(filterId);
-    }, [router]);
-
-    // Apply filter and search
-    useEffect(() => {
-        const applyFilter = async () => {
-            let results: any[] = [];
-
-            if (activeFilter === "all") {
-                results = recipes;
-            } else {
-                if (activeFilter.startsWith("col_")) {
-                    const colId = parseInt(activeFilter.replace("col_", ""));
-                    const db = await getDatabase();
-                    results = await db.getAllAsync<any>(
-                        `SELECT r.* FROM recipes r
-               INNER JOIN recipe_collections rc ON r.id = rc.recipe_id
-               WHERE rc.collection_id = ? ORDER BY r.created_at DESC`,
-                        [colId]
-                    );
-                } else if (activeFilter.startsWith("tag_")) {
-                    const tagId = parseInt(activeFilter.replace("tag_", ""));
-                    const db = await getDatabase();
-                    results = await db.getAllAsync<any>(
-                        `SELECT r.* FROM recipes r
-               INNER JOIN recipe_tags rt ON r.id = rt.recipe_id
-               WHERE rt.tag_id = ? ORDER BY r.created_at DESC`,
-                        [tagId]
-                    );
-                } else {
-                    results = recipes;
-                }
-            }
-
-            // Apply search query
-            if (searchQuery.trim()) {
-                const query = searchQuery.toLowerCase().trim();
-                results = results.filter((r: any) =>
-                    r.title?.toLowerCase().includes(query) ||
-                    r.description?.toLowerCase().includes(query)
-                );
-            }
-
-            setFilteredRecipes(results);
-        };
-        applyFilter();
-    }, [activeFilter, recipes, searchQuery]);
-
-    const filterItems = [
-        { id: "all", label: "All Recipes", type: "all" as const },
-        ...collections.map((c) => ({
-            id: `col_${c.id}`,
-            label: c.name,
-            type: "collection" as const,
-        })),
-        ...tags.map((t) => ({
-            id: `tag_${t.id}`,
-            label: t.name,
-            type: "tag" as const,
-        })),
-    ];
-
-    const handleRefresh = useCallback(async () => {
+    const fetchTrending = async () => {
         try {
-            await pushPendingChanges();
-            await pullRemoteChanges();
-        } catch (e) {
-            console.log("Manual sync failed:", e);
-        } finally {
-            await loadRecipes();
-        }
-    }, [loadRecipes]);
+            const { data } = await supabase
+                .from("public_recipes")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(50);
+            
+            if (data && data.length > 0) {
+                // Use a seeded shuffle based on the date so it only changes daily
+                const dateStr = new Date().toISOString().split("T")[0];
+                // Simple deterministic "shuffle" using the date string as a seed
+                let seed = 0;
+                for (let i = 0; i < dateStr.length; i++) {
+                    seed += dateStr.charCodeAt(i);
+                }
+                
+                const dailySelection = [...data]
+                    .map((item, i) => ({ item, sort: (Math.sin(seed + i) * 10000) % 1 }))
+                    .sort((a, b) => a.sort - b.sort)
+                    .map(({ item }) => item);
 
-    const checkUsageAndOpenModal = async () => {
-        const allowed = await canExtractRecipe(isPro);
-        if (allowed) {
-            setShowImport(true);
-        } else {
-            router.push("/paywall");
+                setTrending(dailySelection.slice(0, 4));
+            } else {
+                setTrending([]);
+            }
+        } catch (e) {
+            console.error("Failed to fetch trending:", e);
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <View
-            className="flex-1 bg-surface-950"
-            style={{ paddingTop: Math.max(insets.top, 20) + 10 }}
-        >
-            {/* Header */}
-            <View className="px-5 mb-4">
-                <Text className="text-surface-400 font-sans text-xs uppercase tracking-widest">
-                    Your Kitchen
-                </Text>
-                <Text className="text-white font-sans-bold text-3xl mt-0.5">
-                    Recipes
-                </Text>
-            </View>
-
-            {/* Search Bar */}
-            <View className="px-5 mb-4">
-                <View className="flex-row items-center bg-surface-900 rounded-2xl px-4 py-1 border border-surface-800">
-                    <Ionicons name="search" size={20} color="#6E6E85" className="mr-2" />
-                    <TextInput
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholder="Search recipes (e.g., chicken)..."
-                        placeholderTextColor="#6E6E85"
-                        className="flex-1 text-white font-sans text-base py-3"
-                        autoCorrect={false}
-                    />
-                    {searchQuery.length > 0 && (
-                        <Pressable onPress={() => setSearchQuery("")} className="p-2 -mr-2">
-                            <Ionicons name="close-circle" size={18} color="#6E6E85" />
-                        </Pressable>
-                    )}
-                </View>
-            </View>
-
-            {/* Filters */}
-            {filterItems.length > 1 && (
-                <FilterBar
-                    filters={filterItems}
-                    activeFilter={activeFilter}
-                    onFilterSelect={handleFilterSelect}
-                />
-            )}
-
-            {/* Recipe Grid */}
-            <RecipeFeed
-                recipes={filteredRecipes}
-                loading={loading}
-                onRefresh={handleRefresh}
-                {...(activeFilter.startsWith("col_") ? {
-                    emptyTitle: "This Cookbook is Empty",
-                    emptyMessage: "Open a recipe and tap the bookmark icon to add it to this cookbook.",
-                } : {})}
-            />
-
-            {/* FAB */}
-            <FloatingActionButton onPress={checkUsageAndOpenModal} />
-
-            {/* Import Modal */}
-            <ImportModal
-                visible={showImport}
-                onClose={() => {
-                    setShowImport(false);
-                    loadRecipes();
+        <View className="flex-1 bg-surface-950">
+            <Stack.Screen options={{ headerShown: false }} />
+            
+            <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ 
+                    paddingTop: Math.max(insets.top, 20) + 10,
+                    paddingBottom: 120,
+                    paddingHorizontal: 20
                 }}
+            >
+                {/* Header Area */}
+                <View className="flex-row justify-between items-center mb-6">
+                    <View>
+                        <Text className="text-surface-500 font-sans text-xs uppercase tracking-widest mb-1">SnapRecipe</Text>
+                        <Text className="text-white font-sans-bold text-3xl">Dashboard</Text>
+                    </View>
+                    <Pressable 
+                        onPress={() => router.push("/settings")}
+                        className="w-12 h-12 rounded-2xl bg-surface-900 border border-white/5 items-center justify-center"
+                    >
+                        <Ionicons name="person-outline" size={24} color="white" />
+                    </Pressable>
+                </View>
+
+                {/* ── RECIPE MANAGEMENT (Main Purpose) ── */}
+                <View className="mb-10">
+                    <Pressable 
+                        onPress={() => setShowImport(true)}
+                        className="w-full bg-accent rounded-[40px] p-8 justify-between shadow-lg shadow-accent/20"
+                        style={{ height: 180 }}
+                    >
+                        <View className="flex-row justify-between items-start">
+                            <View className="w-12 h-12 rounded-2xl bg-white/20 items-center justify-center">
+                                <Ionicons name="cloud-download" size={28} color="white" />
+                            </View>
+                            <Ionicons name="sparkles" size={20} color="white" className="opacity-40" />
+                        </View>
+                        <View>
+                            <Text className="text-white font-sans-bold text-2xl leading-tight">Import New Recipe</Text>
+                            <Text className="text-white/70 font-sans text-sm mt-1">URL, Video, or Photo</Text>
+                        </View>
+                    </Pressable>
+                </View>
+
+                {/* ── CALORIE & FOOD LOGGING (Secondary Cluster) ── */}
+                <View className="mb-10">
+                    <View className="flex-row items-center mb-4 px-1">
+                        <Text className="text-surface-400 font-sans-bold text-xs uppercase tracking-widest">Nutrition Tracking</Text>
+                        <View className="flex-1 h-[1px] bg-white/5 ml-4" />
+                    </View>
+
+                    <View className="flex-row" style={{ gap: 12 }}>
+                        {/* Detailed Calorie Tile */}
+                        <Pressable 
+                            onPress={() => router.push("/library/calorie-counter")}
+                            className="flex-[2] bg-surface-900 rounded-[32px] p-6 border border-white/5"
+                        >
+                            <View className="flex-row justify-between items-center mb-4">
+                                <Ionicons name="flame" size={20} color="#FF6B35" />
+                                <Text className="text-surface-500 font-sans-bold text-[10px]">DAILY</Text>
+                            </View>
+                            <Text className="text-white font-sans-bold text-3xl">{Math.round(dailyTotals.calories)}</Text>
+                            <Text className="text-surface-500 font-sans text-[11px] mb-4">kcal today</Text>
+                            <View className="h-1.5 bg-white/5 rounded-full overflow-hidden flex-row">
+                                <View style={{ flex: dailyTotals.protein || 1, backgroundColor: '#60A5FA' }} className="h-full" />
+                                <View style={{ flex: dailyTotals.carbs || 1, backgroundColor: '#FBBF24' }} className="h-full mx-[1px]" />
+                                <View style={{ flex: dailyTotals.fat || 1, backgroundColor: '#F472B6' }} className="h-full" />
+                            </View>
+                        </Pressable>
+
+                        {/* Food Logging Actions */}
+                        <View style={{ gap: 12 }} className="flex-1">
+                            <Pressable 
+                                onPress={() => router.push("/library/calorie-counter/scan")}
+                                className="flex-1 bg-surface-900 rounded-[28px] p-4 border border-white/5 items-center justify-center"
+                            >
+                                <Ionicons name="scan" size={20} color="#FBBF24" />
+                                <Text className="text-white font-sans-bold text-[10px] mt-2">Scan</Text>
+                            </Pressable>
+                            <Pressable 
+                                onPress={() => router.push("/library/calorie-counter/add-food")}
+                                className="flex-1 bg-surface-900 rounded-[28px] p-4 border border-white/5 items-center justify-center"
+                            >
+                                <Ionicons name="search" size={20} color="#60A5FA" />
+                                <Text className="text-white font-sans-bold text-[10px] mt-2">Log</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+
+                {/* ── DISCOVERY & KITCHEN ── */}
+                <View className="mb-10">
+                    <View className="flex-row justify-between items-center mb-4 px-1">
+                        <Text className="text-white font-sans-bold text-xl">My Recipes</Text>
+                        <Pressable onPress={() => router.push("/(tabs)/recipes")}>
+                            <Text className="text-accent font-sans-semibold text-xs">VIEW ALL</Text>
+                        </Pressable>
+                    </View>
+                    <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        style={{ marginHorizontal: -20 }}
+                        contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+                    >
+                        {recipes.slice(0, 4).map((recipe) => (
+                            <Pressable 
+                                key={recipe.id}
+                                onPress={() => router.push(`/recipe/${recipe.id}`)}
+                                style={{ width: 140 }}
+                                className="bg-surface-900 rounded-[28px] overflow-hidden border border-white/5"
+                            >
+                                <View className="h-28">
+                                    <Image source={{ uri: recipe.image_url }} className="w-full h-full" />
+                                </View>
+                                <View className="p-3">
+                                    <Text className="text-white font-sans-bold text-[11px]" numberOfLines={1}>{recipe.title}</Text>
+                                </View>
+                            </Pressable>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <View className="mb-10">
+                    <View className="flex-row justify-between items-center mb-4 px-1">
+                        <Text className="text-white font-sans-bold text-xl">Community Recipes</Text>
+                        <Pressable onPress={() => router.push("/library/community")}>
+                            <Ionicons name="arrow-forward" size={20} color="#FF6B35" />
+                        </Pressable>
+                    </View>
+                    <View style={{ gap: 12 }}>
+                        {trending.slice(0, 3).map((item) => (
+                            <Pressable 
+                                key={item.id}
+                                onPress={() => router.push({ pathname: "/recipe/[id]", params: { id: item.id, isCommunity: 'true' } })}
+                                className="bg-surface-900 rounded-[32px] p-4 border border-white/5 flex-row items-center"
+                            >
+                                <Image source={{ uri: item.image_url }} className="w-14 h-14 rounded-2xl mr-4" />
+                                <View className="flex-1">
+                                    <Text className="text-white font-sans-bold text-sm" numberOfLines={1}>{item.title}</Text>
+                                    <Text className="text-surface-500 font-sans text-[10px] mt-1">{item.save_count} saves</Text>
+                                </View>
+                                <Ionicons name="heart-outline" size={18} color="#F472B6" />
+                            </Pressable>
+                        ))}
+                    </View>
+                </View>
+
+            </ScrollView>
+
+            <ImportModal 
+                visible={showImport} 
+                onClose={() => setShowImport(false)} 
             />
         </View>
     );

@@ -12,6 +12,8 @@ import { supabase } from "@/lib/supabase";
 import GlassContainer from "@/components/GlassContainer";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import * as SecureStore from "expo-secure-store";
+import { AI_PROVIDER_STORE } from "@/lib/constants";
 
 type Tab = "search" | "scan" | "quick" | "recipe";
 
@@ -27,8 +29,7 @@ interface FoodResult {
     sugar?: number | null;
     fiber?: number | null;
     sodium?: number | null;
-    sodium?: number | null;
-    source: "local" | "ai" | "community";
+    source: "local" | "ai" | "community" | "global";
 }
 
 interface QuickAddState {
@@ -52,7 +53,10 @@ export default function AddFoodScreen() {
     const mealType = (params.mealType || "snack") as "breakfast" | "lunch" | "dinner" | "snack";
 
     const { addFoodLog, searchCustomFoods, saveCustomFood } = useFoodLog();
-    const { recipes } = useRecipes();
+    const { recipes, searchCommunityRecipes } = useRecipes();
+    const [recipeTab, setRecipeTab] = useState<"mine" | "community">("mine");
+    const [communityRecipes, setCommunityRecipes] = useState<any[]>([]);
+    const [loadingCommunity, setLoadingCommunity] = useState(false);
 
     const [tab, setTab] = useState<Tab>("search");
     const [searchQuery, setSearchQuery] = useState("");
@@ -103,8 +107,9 @@ export default function AddFoodScreen() {
                 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
                 if (supabaseUrl && supabaseKey) {
+                    const queryParam = encodeURIComponent(q.toLowerCase());
                     const response = await fetch(
-                        `${supabaseUrl}/rest/v1/global_foods?food_name_lower=ilike.*${encodeURIComponent(q.toLowerCase())}*&order=lookup_count.desc&limit=10`,
+                        `${supabaseUrl}/rest/v1/global_foods?or=(food_name_lower.ilike.*${queryParam}*,brand_lower.ilike.*${queryParam}*)&order=lookup_count.desc&limit=10`,
                         {
                             headers: {
                                 "apikey": supabaseKey,
@@ -145,7 +150,81 @@ export default function AddFoodScreen() {
                 console.warn("Global food search failed:", e);
             }
 
-            setSearchResults(combinedResults);
+            // Step 3: Search Open Food Facts (Global Database)
+            if (combinedResults.length < 5) {
+                try {
+                    const offResp = await fetch(
+                        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10`
+                    );
+                    if (offResp.ok) {
+                        const offData = await offResp.json();
+                        if (offData.products && offData.products.length > 0) {
+                            const offItems: FoodResult[] = offData.products
+                                .filter((p: any) => p.product_name || p.generic_name)
+                                .map((p: any) => {
+                                    const n = p.nutriments || {};
+                                    return {
+                                        food_name: p.product_name || p.generic_name || "Unknown Product",
+                                        brand: p.brands || null,
+                                        serving_size: p.serving_size || p.quantity || "1 serving",
+                                        calories: Math.round(n["energy-kcal_serving"] || n["energy-kcal_100g"] || 0),
+                                        protein: Math.round((n.proteins_serving || n.proteins_100g || 0) * 10) / 10,
+                                        fat: Math.round((n.fat_serving || n.fat_100g || 0) * 10) / 10,
+                                        carbs: Math.round((n.carbohydrates_serving || n.carbohydrates_100g || 0) * 10) / 10,
+                                        sugar: n.sugars_serving || n.sugars_100g || null,
+                                        fiber: n.fiber_serving || n.fiber_100g || null,
+                                        sodium: n.sodium_serving ? Math.round(n.sodium_serving * 1000) : null,
+                                        source: "global" as const,
+                                    };
+                                });
+                            
+                            const existingNames = new Set(combinedResults.map(r => r.food_name.toLowerCase()));
+                            const uniqueOffItems = offItems.filter(f => !existingNames.has(f.food_name.toLowerCase()));
+                            combinedResults = [...combinedResults, ...uniqueOffItems];
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Global database search failed:", e);
+                }
+            }
+            
+            // Final Step: Smart Ranking & Filtering
+            const queryLower = q.toLowerCase().trim();
+            const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+            
+            combinedResults = combinedResults.sort((a, b) => {
+                const nameA = a.food_name.toLowerCase();
+                const nameB = b.food_name.toLowerCase();
+                
+                // 1. Exact match is king
+                if (nameA === queryLower) return -1;
+                if (nameB === queryLower) return 1;
+                
+                // 2. "Starts with" is queen
+                if (nameA.startsWith(queryLower) && !nameB.startsWith(queryLower)) return -1;
+                if (nameB.startsWith(queryLower) && !nameA.startsWith(queryLower)) return 1;
+                
+                // 3. Keyword density (how many words from query appear in name)
+                const countA = queryWords.filter(w => nameA.includes(w)).length;
+                const countB = queryWords.filter(w => nameB.includes(w)).length;
+                if (countA !== countB) return countB - countA;
+                
+                // 4. Source priority: local > community > global
+                const sourceOrder = { local: 0, community: 1, global: 2, ai: 3 };
+                return sourceOrder[a.source] - sourceOrder[b.source];
+            });
+
+            // 5. Semantic De-noising (e.g. if searching for bread, deprioritize tortillas/wraps)
+            if (queryLower.includes("bread")) {
+                const isNoisy = (name: string) => 
+                    name.includes("tortilla") || name.includes("wrap") || name.includes("pita") || name.includes("flatbread");
+                
+                const clearResults = combinedResults.filter(r => !isNoisy(r.food_name.toLowerCase()));
+                const noisyResults = combinedResults.filter(r => isNoisy(r.food_name.toLowerCase()));
+                combinedResults = [...clearResults, ...noisyResults];
+            }
+
+            setSearchResults(combinedResults.slice(0, 15));
         } catch (e) {
             console.warn("Search failed:", e);
             setSearchResults([]);
@@ -174,6 +253,7 @@ export default function AddFoodScreen() {
 
             const { data: { session } } = await supabase.auth.getSession();
             const authToken = session?.access_token || supabaseKey;
+            const provider = await SecureStore.getItemAsync(AI_PROVIDER_STORE) || "gemini";
 
             const response = await fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
                 method: "POST",
@@ -182,7 +262,10 @@ export default function AddFoodScreen() {
                     "Authorization": `Bearer ${authToken}`,
                     "apikey": supabaseKey,
                 },
-                body: JSON.stringify({ textDescription: q }),
+                body: JSON.stringify({ 
+                    textDescription: q,
+                    provider
+                }),
             });
 
             if (!response.ok) {
@@ -242,8 +325,8 @@ export default function AddFoodScreen() {
     const handleLogFood = useCallback(async (food: FoodResult) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        // If this came from AI, save to local custom_foods so it's cached for next time
-        if (food.source === "ai") {
+        // If this came from AI or Global database, save to local custom_foods so it's cached for next time
+        if (food.source === "ai" || food.source === "global") {
             await saveCustomFood({
                 food_name: food.food_name,
                 brand: food.brand || null,
@@ -258,6 +341,31 @@ export default function AddFoodScreen() {
                 sodium: food.sodium || null,
                 image_url: null,
             });
+
+            // If it's a global item, also "contribute" it to our community database via analyze-food pipeline
+            // This builds our community database without using expensive Gemini tokens
+            if (food.source === "global") {
+                const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+                const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+                if (supabaseUrl && supabaseKey) {
+                    fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
+                        method: 'POST',
+                        headers: {
+                            "Content-Type": "application/json",
+                            "apikey": supabaseKey,
+                            "Authorization": `Bearer ${supabaseKey}`,
+                        },
+                        body: JSON.stringify({ 
+                            textDescription: food.food_name,
+                            _silent_contribution: true,
+                            _contributed_item: {
+                                ...food,
+                                source: "community"
+                            }
+                        })
+                    }).catch(() => {});
+                }
+            }
         }
 
         await addFoodLog({
@@ -320,17 +428,39 @@ export default function AddFoodScreen() {
     const handleLogRecipe = useCallback(async (recipe: any) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         await addFoodLog({
-            food_name: recipe.title, brand: null,
-            serving_size: `1/${recipe.servings} recipe`, serving_qty: 1,
+            food_name: recipe.title, brand: "SnapRecipe",
+            serving_size: recipe.servings ? `1/${recipe.servings} recipe` : "1 serving", 
+            serving_qty: 1,
             calories: recipe.calories || 0, protein: recipe.protein || 0,
             fat: recipe.fat || 0, carbs: recipe.carbs || 0,
             sugar: recipe.sugar || null, fiber: recipe.fiber || null,
             sodium: recipe.sodium || null, meal_type: mealType, log_date: logDate,
-            source_type: "recipe", source_recipe_id: recipe.id,
+            source_type: "recipe", source_recipe_id: recipe.id > 0 ? recipe.id : null,
             image_url: recipe.image_url || null, barcode: null,
         });
         router.back();
     }, [addFoodLog, mealType, logDate, router]);
+
+    const handleRecipeSearch = useCallback(async (text: string) => {
+        setRecipeSearch(text);
+        if (recipeTab === "community") {
+            setLoadingCommunity(true);
+            try {
+                const results = await searchCommunityRecipes(text);
+                setCommunityRecipes(results);
+            } catch (error) {
+                console.error("Community recipe search failed:", error);
+            } finally {
+                setLoadingCommunity(false);
+            }
+        }
+    }, [recipeTab, searchCommunityRecipes]);
+
+    useEffect(() => {
+        if (tab === "recipe" && recipeTab === "community" && communityRecipes.length === 0) {
+            handleRecipeSearch(recipeSearch);
+        }
+    }, [tab, recipeTab, communityRecipes.length, handleRecipeSearch, recipeSearch]);
 
     // ── Navigate to scanner ──
     const handleOpenScanner = useCallback((mode: "photo" | "barcode") => {
@@ -402,7 +532,6 @@ export default function AddFoodScreen() {
                             placeholder='Type any food... e.g. "apple" or "chicken breast"'
                             placeholderTextColor="#4A4A5E"
                             className="flex-1 text-white font-sans ml-2"
-                            autoFocus
                             returnKeyType="search"
                             onSubmitEditing={() => performSearch(searchQuery)}
                         />
@@ -526,14 +655,37 @@ export default function AddFoodScreen() {
                                         )}
                                         {item.source === "community" && (
                                             <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(52,211,153,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
-                                                <Ionicons name="globe" size={16} color="#34D399" />
+                                                <Ionicons name="people" size={16} color="#34D399" />
+                                            </View>
+                                        )}
+                                        {item.source === "global" && (
+                                            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(96,165,250,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                                <Ionicons name="globe" size={16} color="#60A5FA" />
                                             </View>
                                         )}
                                         <View className="flex-1">
+                                            {item.brand && (
+                                                <Text className="text-surface-500 font-sans text-[10px] uppercase tracking-tighter" numberOfLines={1}>
+                                                    {item.brand}
+                                                </Text>
+                                            )}
                                             <Text className="text-white font-sans-bold text-sm" numberOfLines={1}>{item.food_name}</Text>
-                                            <Text className="text-surface-500 font-sans text-[10px] mt-0.5">
-                                                {item.serving_size || "1 serving"} • {Math.round(item.protein)}g Protein • {Math.round(item.carbs)}g Carbs • {Math.round(item.fat)}g Fat
-                                            </Text>
+                                            <View className="flex-row items-center mt-1">
+                                                <Text className="text-surface-500 font-sans text-[10px] mr-2">
+                                                    {item.serving_size || "1 serving"}
+                                                </Text>
+                                                <View className="flex-row items-center" style={{ gap: 8 }}>
+                                                    <Text style={{ color: "#60A5FA", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+                                                        {Math.round(item.protein)}g Protein
+                                                    </Text>
+                                                    <Text style={{ color: "#FBBF24", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+                                                        {Math.round(item.carbs)}g Carbs
+                                                    </Text>
+                                                    <Text style={{ color: "#F472B6", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+                                                        {Math.round(item.fat)}g Fat
+                                                    </Text>
+                                                </View>
+                                            </View>
                                         </View>
                                         <View className="items-center mr-2">
                                             <Text className="text-white font-sans-bold text-sm">{Math.round(item.calories)}</Text>
@@ -612,18 +764,46 @@ export default function AddFoodScreen() {
             {/* ══════════ RECIPE TAB ══════════ */}
             {tab === "recipe" && (
                 <View className="flex-1 px-5">
+                    {/* Inner Tabs for Recipe Source */}
+                    <View className="flex-row bg-surface-900/50 p-1 rounded-2xl mb-4 border border-surface-800/50">
+                        <Pressable
+                            onPress={() => setRecipeTab("mine")}
+                            className={`flex-1 flex-row items-center justify-center py-2 rounded-xl ${recipeTab === "mine" ? "bg-surface-800 shadow-sm" : ""}`}
+                        >
+                            <Ionicons name="book" size={14} color={recipeTab === "mine" ? "#FFFFFF" : "#6E6E85"} />
+                            <Text className={`font-sans-bold text-xs ml-2 ${recipeTab === "mine" ? "text-white" : "text-surface-400"}`}>My Recipes</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setRecipeTab("community")}
+                            className={`flex-1 flex-row items-center justify-center py-2 rounded-xl ${recipeTab === "community" ? "bg-surface-800 shadow-sm" : ""}`}
+                        >
+                            <Ionicons name="globe" size={14} color={recipeTab === "community" ? "#FFFFFF" : "#6E6E85"} />
+                            <Text className={`font-sans-bold text-xs ml-2 ${recipeTab === "community" ? "text-white" : "text-surface-400"}`}>Community</Text>
+                        </Pressable>
+                    </View>
+
                     <View className="flex-row items-center bg-surface-900 px-3 py-2.5 rounded-2xl mb-4">
                         <Ionicons name="search" size={18} color="#4A4A5E" />
-                        <TextInput value={recipeSearch} onChangeText={setRecipeSearch} placeholder="Search your recipes..." placeholderTextColor="#4A4A5E" className="flex-1 text-white font-sans ml-2" />
+                        <TextInput 
+                            value={recipeSearch} 
+                            onChangeText={handleRecipeSearch} 
+                            placeholder={recipeTab === "mine" ? "Search your recipes..." : "Search community recipes..."} 
+                            placeholderTextColor="#4A4A5E" 
+                            className="flex-1 text-white font-sans ml-2" 
+                        />
+                        {loadingCommunity && <ActivityIndicator size="small" color="#EF4444" className="ml-2" />}
                     </View>
+
                     <FlatList
-                        data={filteredRecipes}
+                        data={recipeTab === "mine" ? filteredRecipes : communityRecipes}
                         keyExtractor={(item) => item.id.toString()}
                         showsVerticalScrollIndicator={false}
                         ListEmptyComponent={() => (
                             <View className="items-center justify-center py-16 opacity-40">
-                                <Ionicons name="book-outline" size={48} color="#FFFFFF" />
-                                <Text className="text-white font-sans mt-4 text-center">No recipes with nutrition data found.</Text>
+                                <Ionicons name={recipeTab === "mine" ? "book-outline" : "globe-outline"} size={48} color="#FFFFFF" />
+                                <Text className="text-white font-sans mt-4 text-center">
+                                    {recipeTab === "mine" ? "No recipes with nutrition data found." : "No community recipes found."}
+                                </Text>
                             </View>
                         )}
                         renderItem={({ item, index }) => (
@@ -637,9 +817,18 @@ export default function AddFoodScreen() {
                                         </View>
                                         <View className="flex-1">
                                             <Text className="text-white font-sans-bold text-sm" numberOfLines={1}>{item.title}</Text>
-                                            <Text className="text-surface-400 font-sans text-[10px] mt-0.5">
-                                                {item.calories} cal • {item.protein}g P • {item.carbs}g C • {item.fat}g F
-                                            </Text>
+                                            <View className="flex-row items-center mt-1.5" style={{ gap: 8 }}>
+                                                <Text className="text-surface-500 font-sans text-[10px] mr-1">{item.calories} kcal</Text>
+                                                <Text style={{ color: "#60A5FA", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+                                                    {Math.round(item.protein)}g Protein
+                                                </Text>
+                                                <Text style={{ color: "#FBBF24", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+                                                    {Math.round(item.carbs)}g Carbs
+                                                </Text>
+                                                <Text style={{ color: "#F472B6", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+                                                    {Math.round(item.fat)}g Fat
+                                                </Text>
+                                            </View>
                                         </View>
                                         <Ionicons name="add-circle" size={22} color="#EF4444" />
                                     </GlassContainer>

@@ -92,11 +92,11 @@ export default function LibraryScreen() {
             },
         },
         {
-            title: "All Recipes",
-            icon: "book" as const,
+            title: "Community",
+            icon: "globe" as const,
             color: "#FF6B35", // Orange
-            description: "Your cookbook",
-            onPress: () => router.push("/(tabs)/"),
+            description: "Discover recipes",
+            onPress: () => router.push("/library/community"),
         },
     ];
 

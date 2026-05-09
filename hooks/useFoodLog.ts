@@ -3,6 +3,9 @@ import { getDatabase } from "@/db/client";
 import type { FoodLog, CustomFood } from "@/db/schema";
 import { format } from "@/lib/dateUtils";
 
+import * as SecureStore from "expo-secure-store";
+import { USER_GOALS_STORE } from "@/lib/constants";
+
 export interface DailyTotals {
     calories: number;
     protein: number;
@@ -30,13 +33,28 @@ const DEFAULT_GOALS: DailyGoals = {
 export function useFoodLog(selectedDate?: Date) {
     const [logs, setLogs] = useState<FoodLog[]>([]);
     const [loading, setLoading] = useState(true);
-    const [goals] = useState<DailyGoals>(DEFAULT_GOALS);
+    const [goals, setGoals] = useState<DailyGoals>(DEFAULT_GOALS);
 
     const dateStr = format(selectedDate || new Date(), "yyyy-MM-dd");
+
+    const loadGoals = useCallback(async () => {
+        try {
+            const saved = await SecureStore.getItemAsync(USER_GOALS_STORE);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.goals) {
+                    setGoals(parsed.goals);
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to load goals:", e);
+        }
+    }, []);
 
     const loadLogs = useCallback(async () => {
         try {
             setLoading(true);
+            await loadGoals();
             const db = await getDatabase();
             const results = await db.getAllAsync<FoodLog>(
                 `SELECT * FROM food_logs WHERE log_date = ? ORDER BY
@@ -157,12 +175,12 @@ export function useFoodLog(selectedDate?: Date) {
             const db = await getDatabase();
             if (!query.trim()) {
                 return db.getAllAsync<CustomFood>(
-                    "SELECT * FROM custom_foods ORDER BY use_count DESC LIMIT 20"
+                    "SELECT * FROM custom_foods ORDER BY use_count DESC LIMIT 6"
                 );
             }
             return db.getAllAsync<CustomFood>(
-                "SELECT * FROM custom_foods WHERE food_name LIKE ? ORDER BY use_count DESC LIMIT 30",
-                [`%${query}%`]
+                "SELECT * FROM custom_foods WHERE food_name LIKE ? OR brand LIKE ? ORDER BY use_count DESC LIMIT 30",
+                [`%${query}%`, `%${query}%`]
             );
         } catch (e) {
             console.warn("searchCustomFoods error:", e);

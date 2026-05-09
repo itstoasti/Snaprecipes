@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown, SlideInUp } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import GlassContainer from "@/components/GlassContainer";
@@ -38,9 +39,9 @@ function isVideoUrl(url: string | null): boolean {
 }
 
 export default function RecipeDetailScreen() {
-    const { id, isNew } = useLocalSearchParams<{ id: string, isNew?: string }>();
+    const { id, isNew, isCommunity } = useLocalSearchParams<{ id: string, isNew?: string, isCommunity?: string }>();
     const router = useRouter();
-    const { getRecipeById, deleteRecipe, updateRecipe } = useRecipes();
+    const { getRecipeById, getCommunityRecipeById, saveCommunityRecipe, deleteRecipe, updateRecipe } = useRecipes();
     const { isPro } = useRevenueCat();
     const {
         isCookMode,
@@ -71,14 +72,21 @@ export default function RecipeDetailScreen() {
     const loadData = useCallback(async () => {
         if (!id) return;
         setLoading(true);
-        const data = await getRecipeById(parseInt(id));
+        
+        let data;
+        if (isCommunity === "true") {
+            data = await getCommunityRecipeById(id);
+        } else {
+            data = await getRecipeById(parseInt(id));
+        }
+
         if (data) {
             setRecipe(data.recipe);
             setIngredients(data.ingredients);
             setSteps(data.steps);
         }
         setLoading(false);
-    }, [id, getRecipeById]);
+    }, [id, isCommunity, getRecipeById, getCommunityRecipeById]);
 
     useEffect(() => {
         loadData();
@@ -139,6 +147,28 @@ export default function RecipeDetailScreen() {
         if (!recipe) return;
         await updateRecipe(recipe.id, updates, newIngredients, newSteps);
         await loadData();
+    };
+
+    const handleSaveToLibrary = async () => {
+        if (!id) return;
+        setLoading(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        try {
+            const newId = await saveCommunityRecipe(id);
+            if (newId) {
+                Alert.alert(
+                    "Success", 
+                    "Recipe saved to your library!",
+                    [{ text: "View Library", onPress: () => router.push("/(tabs)/") }]
+                );
+            }
+        } catch (error) {
+            console.error("Failed to save community recipe:", error);
+            Alert.alert("Error", "Failed to save recipe. Please try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (loading || !recipe) {
@@ -225,32 +255,45 @@ export default function RecipeDetailScreen() {
                         <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
                     </Pressable>
 
-                    {/* Add to Cookbook button */}
-                    <Pressable
-                        onPress={() => setShowCollectionModal(true)}
-                        className="absolute right-[120px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
-                        style={{ top: Math.max(insets.top, 20) + 12 }}
-                    >
-                        <Ionicons name="folder-outline" size={20} color="#FFFFFF" />
-                    </Pressable>
+                    {/* Action buttons */}
+                    {isCommunity === "true" ? (
+                        <Pressable
+                            onPress={handleSaveToLibrary}
+                            className="absolute right-4 w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                            style={{ top: Math.max(insets.top, 20) + 12 }}
+                        >
+                            <Ionicons name="bookmark" size={20} color="#FF6B35" />
+                        </Pressable>
+                    ) : (
+                        <>
+                            {/* Add to Cookbook button */}
+                            <Pressable
+                                onPress={() => setShowCollectionModal(true)}
+                                className="absolute right-[120px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                                style={{ top: Math.max(insets.top, 20) + 12 }}
+                            >
+                                <Ionicons name="folder-outline" size={20} color="#FFFFFF" />
+                            </Pressable>
 
-                    {/* Edit button */}
-                    <Pressable
-                        onPress={() => setShowEditModal(true)}
-                        className="absolute right-[68px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
-                        style={{ top: Math.max(insets.top, 20) + 12 }}
-                    >
-                        <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
-                    </Pressable>
+                            {/* Edit button */}
+                            <Pressable
+                                onPress={() => setShowEditModal(true)}
+                                className="absolute right-[68px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                                style={{ top: Math.max(insets.top, 20) + 12 }}
+                            >
+                                <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
+                            </Pressable>
 
-                    {/* Delete button */}
-                    <Pressable
-                        onPress={handleDelete}
-                        className="absolute right-4 w-10 h-10 rounded-full bg-black/50 items-center justify-center"
-                        style={{ top: Math.max(insets.top, 20) + 12 }}
-                    >
-                        <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
-                    </Pressable>
+                            {/* Delete button */}
+                            <Pressable
+                                onPress={handleDelete}
+                                className="absolute right-4 w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                                style={{ top: Math.max(insets.top, 20) + 12 }}
+                            >
+                                <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+                            </Pressable>
+                        </>
+                    )}
                 </View>
 
                 {/* Content — Solid Plate (high contrast) */}
@@ -364,7 +407,7 @@ export default function RecipeDetailScreen() {
                                 const groups: { section: string | null; items: typeof ingredients }[] = [];
                                 let currentSection: string | null | undefined = undefined;
                                 for (const ing of ingredients) {
-                                    if (ing.section !== currentSection) {
+                                    if (groups.length === 0 || ing.section !== currentSection) {
                                         currentSection = ing.section;
                                         groups.push({ section: ing.section, items: [ing] });
                                     } else {
@@ -430,18 +473,23 @@ export default function RecipeDetailScreen() {
             </ScrollView>
 
             {/* Start Cooking Button */}
-            <View className="absolute bottom-0 left-0 right-0 p-5 pb-8">
-                <GlassContainer style={{ borderRadius: 20, overflow: "hidden" }}>
-                    <Pressable
-                        onPress={handleStartCooking}
-                        className="flex-row items-center justify-center py-4"
-                    >
-                        <Ionicons name="restaurant" size={20} color="#FF6B35" />
-                        <Text className="text-accent font-sans-bold text-base ml-2">
-                            Start Cooking
-                        </Text>
-                    </Pressable>
-                </GlassContainer>
+            <View className="absolute bottom-0 left-0 right-0">
+                <LinearGradient
+                    colors={["transparent", "rgba(10,10,15,0.8)", "rgba(10,10,15,1)"]}
+                    className="pt-12 pb-8 px-5"
+                >
+                    <GlassContainer style={{ borderRadius: 20, overflow: "hidden" }}>
+                        <Pressable
+                            onPress={handleStartCooking}
+                            className="flex-row items-center justify-center py-4"
+                        >
+                            <Ionicons name="restaurant" size={20} color="#FF6B35" />
+                            <Text className="text-accent font-sans-bold text-base ml-2">
+                                Start Cooking
+                            </Text>
+                        </Pressable>
+                    </GlassContainer>
+                </LinearGradient>
             </View>
 
             {/* Custom Delete Modal */}

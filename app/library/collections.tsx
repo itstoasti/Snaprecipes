@@ -168,7 +168,7 @@ export default function CollectionsScreen() {
                 renderItem={({ item, index }) => (
                     <Animated.View entering={FadeInDown.delay(index * 60)}>
                         <Pressable
-                            onPress={() => router.push({ pathname: "/(tabs)/", params: { filter: `col_${item.id}` } })}
+                            onPress={() => router.push(`/library/collection/${item.id}`)}
                             onLongPress={() => handleDelete(item.id, item.name)}
                             className="flex-row items-center py-4 border-b border-surface-800"
                         >
