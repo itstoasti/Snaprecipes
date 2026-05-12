@@ -26,6 +26,12 @@ Organize your kitchen into premium digital cookbooks.
 - **Dedicated Detail Screens**: Navigate into focused collection views with custom headers and back buttons—no more clunky filters.
 - **Easy Management**: Add or remove recipes from collections with a single tap.
 
+### 🌍 Community Recipe Discovery
+Explore thousands of recipes shared by the SnapRecipes community.
+- **Global Search**: Search the community feed for inspiration or specific dishes.
+- **One-Tap Save**: Find something you like? Save any community recipe directly to your personal library or specific cookbook instantly.
+- **Ad-Free Browsing**: A clean, lightning-fast experience across both the mobile app and [snaprecipes.xyz](https://www.snaprecipes.xyz/recipes).
+
 ### 👨‍🍳 Interactive Cook Mode
 A dedicated, distraction-free interface for the kitchen.
 - **Step-by-Step Guidance**: Check off steps as you go so you never lose your place.
