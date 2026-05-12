@@ -2,7 +2,8 @@
 
 SnapRecipes is a premium mobile and web experience designed to help you save any recipe from across the web, social media, or physical cookbooks using state-of-the-art AI extraction. No life stories, no ads—just recipes.
 
-![SnapRecipes Header](https://www.snaprecipes.xyz/og-image.png)
+<img width="1794" height="877" alt="ChatGPT Image May 11, 2026, 10_44_54 PM" src="https://github.com/user-attachments/assets/2af7a036-7897-4b80-addc-edb199e0138c" />
+
 
 ## ✨ Core Features
 
