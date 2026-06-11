@@ -42,7 +42,7 @@ export default function CalorieCounterScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const { logs, loading, dailyTotals, mealGroups, goals, removeFoodLog, updateMealType, refresh } =
+    const { logs, loading, dailyTotals, mealGroups, goals, removeFoodLog, updateMealType, updateFoodLog, refresh } =
         useFoodLog(selectedDate);
 
     // Re-fetch food logs every time this screen comes into focus
@@ -89,14 +89,14 @@ export default function CalorieCounterScreen() {
     );
 
     // ── Move-meal modal state ──
-    const [moveTarget, setMoveTarget] = useState<{ logId: number; foodName: string; mealType: string } | null>(null);
+    const [moveTarget, setMoveTarget] = useState<typeof logs[0] | null>(null);
 
     const [showGoalInfo, setShowGoalInfo] = useState(false);
 
     const handleMoveMeal = useCallback(
-        (logId: number, foodName: string, currentMealType: string) => {
+        (item: typeof logs[0]) => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setMoveTarget({ logId, foodName, mealType: currentMealType });
+            setMoveTarget(item);
         },
         []
     );
@@ -156,7 +156,7 @@ export default function CalorieCounterScreen() {
                     items.map((item, idx) => (
                         <Animated.View key={item.id} entering={SlideInRight.delay(idx * 50)}>
                             <Pressable
-                                onLongPress={() => handleMoveMeal(item.id, item.food_name, mealType)}
+                                onLongPress={() => handleMoveMeal(item)}
                                 delayLongPress={400}
                             >
                                 <GlassContainer
@@ -432,11 +432,21 @@ export default function CalorieCounterScreen() {
             {/* Move Meal Modal */}
             <MoveMealModal
                 visible={moveTarget !== null}
-                foodName={moveTarget?.foodName || ""}
-                currentMealType={moveTarget?.mealType || "snack"}
-                onSelect={(newMealType) => {
+                foodName={moveTarget?.food_name || ""}
+                brand={moveTarget?.brand}
+                servingSize={moveTarget?.serving_size}
+                initialServingQty={moveTarget?.serving_qty || 1}
+                calories={moveTarget?.calories || 0}
+                protein={moveTarget?.protein || 0}
+                carbs={moveTarget?.carbs || 0}
+                fat={moveTarget?.fat || 0}
+                currentMealType={moveTarget?.meal_type || "snack"}
+                onSave={async (newQty, newMealType) => {
                     if (moveTarget) {
-                        updateMealType(moveTarget.logId, newMealType);
+                        await updateFoodLog(moveTarget.id, {
+                            serving_qty: newQty,
+                            meal_type: newMealType,
+                        });
                     }
                     setMoveTarget(null);
                 }}

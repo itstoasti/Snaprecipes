@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from "react";
-import { View, Text, Pressable, FlatList, TextInput, ScrollView, Alert, Modal, Image } from "react-native";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { View, Text, Pressable, FlatList, TextInput, ScrollView, Alert, Modal, Image, ActivityIndicator } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,17 +20,53 @@ export default function ShoppingListScreen() {
         toggleItem, 
         deleteItem, 
         clearChecked, 
+        clearAll,
         generateFromMealPlan, 
         addItemsFromRecipe 
     } = useShoppingList();
-    const { recipes } = useRecipes();
+    const { recipes, searchCommunityRecipes, saveCommunityRecipe } = useRecipes();
 
     const [newItemName, setNewItemName] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
+    const [isTrashModalVisible, setIsTrashModalVisible] = useState(false);
     const [isManualEntryStarted, setIsManualEntryStarted] = useState(false);
     const [isRecipePickerVisible, setIsRecipePickerVisible] = useState(false);
     const [recipeSearch, setRecipeSearch] = useState("");
+    const [recipeTab, setRecipeTab] = useState<"mine" | "community">("mine");
+    const [communityRecipes, setCommunityRecipes] = useState<any[]>([]);
+    const [loadingCommunity, setLoadingCommunity] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+
+    // Fetch community recipes when in community tab and text changes
+    useEffect(() => {
+        if (recipeTab === "community" && isRecipePickerVisible) {
+            let active = true;
+            const fetchCommunity = async () => {
+                setLoadingCommunity(true);
+                try {
+                    const results = await searchCommunityRecipes(recipeSearch);
+                    if (active) {
+                        setCommunityRecipes(results);
+                    }
+                } catch (error) {
+                    console.error("Error searching community recipes:", error);
+                } finally {
+                    if (active) {
+                        setLoadingCommunity(false);
+                    }
+                }
+            };
+
+            const delay = recipeSearch.trim() ? 500 : 0;
+            const timeoutId = setTimeout(fetchCommunity, delay);
+
+            return () => {
+                active = false;
+                clearTimeout(timeoutId);
+            };
+        }
+    }, [recipeSearch, recipeTab, isRecipePickerVisible, searchCommunityRecipes]);
 
     const filteredRecipes = useMemo(() => {
         if (!recipeSearch.trim()) return recipes;
@@ -75,10 +111,33 @@ export default function ShoppingListScreen() {
         setIsGenerating(false);
     };
 
-    const handleSelectRecipe = async (recipeId: number) => {
-        setIsRecipePickerVisible(false);
-        setIsManualEntryStarted(true); // Ensure items are shown if they were empty
-        await addItemsFromRecipe(recipeId);
+    const handleSelectRecipe = async (recipe: any) => {
+        if (recipeTab === "mine") {
+            setIsRecipePickerVisible(false);
+            setIsManualEntryStarted(true); // Ensure items are shown if they were empty
+            await addItemsFromRecipe(recipe.id);
+        } else {
+            setIsImporting(true);
+            try {
+                const localId = await saveCommunityRecipe(recipe.id);
+                if (localId) {
+                    setIsRecipePickerVisible(false);
+                    setIsManualEntryStarted(true);
+                    await addItemsFromRecipe(localId);
+                } else {
+                    Alert.alert("Error", "Could not import community recipe.");
+                }
+            } catch (error) {
+                console.error("Failed to import community recipe:", error);
+                Alert.alert("Error", "An error occurred while importing the recipe.");
+            } finally {
+                setIsImporting(false);
+            }
+        }
+    };
+
+    const handleTrashPress = () => {
+        setIsTrashModalVisible(true);
     };
 
     return (
@@ -98,7 +157,7 @@ export default function ShoppingListScreen() {
                         <Text className="text-surface-500 font-sans text-xs uppercase tracking-widest mt-0.5">Your Grocery List</Text>
                     </View>
                 </View>
-
+ 
                 {items.length > 0 && (
                     <View className="flex-row">
                         <Pressable 
@@ -109,7 +168,7 @@ export default function ShoppingListScreen() {
                             <Ionicons name="sparkles" size={18} color="#34D399" />
                         </Pressable>
                         <Pressable 
-                            onPress={clearChecked}
+                            onPress={handleTrashPress}
                             className="w-10 h-10 rounded-full bg-surface-900 border border-surface-800 items-center justify-center"
                         >
                             <Ionicons name="trash-outline" size={18} color="#FF6B35" />
@@ -143,7 +202,11 @@ export default function ShoppingListScreen() {
                         </GlassContainer>
 
                         <Pressable 
-                            onPress={() => setIsRecipePickerVisible(true)}
+                            onPress={() => {
+                                setRecipeSearch("");
+                                setRecipeTab("mine");
+                                setIsRecipePickerVisible(true);
+                            }}
                             className="mt-3"
                         >
                             <GlassContainer className="flex-row items-center justify-center py-3 rounded-2xl border border-surface-800/20 bg-surface-800/10">
@@ -307,7 +370,7 @@ export default function ShoppingListScreen() {
                                     This will add all ingredients from your next 7 days of planned meals to this list.
                                 </Text>
                             </View>
-
+ 
                             <View className="flex-row gap-3">
                                 <Pressable 
                                     onPress={() => setIsConfirmModalVisible(false)}
@@ -320,6 +383,58 @@ export default function ShoppingListScreen() {
                                     className="flex-[2] bg-emerald-500 py-4 rounded-2xl items-center px-8"
                                 >
                                     <Text className="text-white font-sans-bold">Generate</Text>
+                                </Pressable>
+                            </View>
+                        </GlassContainer>
+                    </Animated.View>
+                </View>
+            )}
+
+            {/* Custom Styled Trash Confirm Modal */}
+            {isTrashModalVisible && (
+                <View 
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1000 }}
+                >
+                    <Animated.View entering={FadeIn.duration(200)} className="w-[85%]">
+                        <GlassContainer className="p-6 rounded-[32px] border-accent/30">
+                            <View className="items-center mb-6">
+                                <View className="w-16 h-16 bg-accent/20 rounded-full items-center justify-center mb-4">
+                                    <Ionicons name="trash-outline" size={32} color="#FF6B35" />
+                                </View>
+                                <Text className="text-white font-sans-bold text-2xl text-center">Clear Shopping List</Text>
+                                <Text className="text-surface-400 font-sans text-center mt-3 leading-5">
+                                    {checkedItems.length > 0 
+                                        ? "Would you like to clear only your completed items or empty the entire list?"
+                                        : "Are you sure you want to empty your entire shopping list?"}
+                                </Text>
+                            </View>
+ 
+                            <View className="flex-col gap-3">
+                                {checkedItems.length > 0 && (
+                                    <Pressable 
+                                        onPress={async () => {
+                                            setIsTrashModalVisible(false);
+                                            await clearChecked();
+                                        }}
+                                        className="w-full bg-surface-800 py-4 rounded-2xl items-center"
+                                    >
+                                        <Text className="text-white font-sans-bold">Clear Completed ({checkedItems.length})</Text>
+                                    </Pressable>
+                                )}
+                                <Pressable 
+                                    onPress={async () => {
+                                        setIsTrashModalVisible(false);
+                                        await clearAll();
+                                    }}
+                                    className="w-full bg-accent py-4 rounded-2xl items-center"
+                                >
+                                    <Text className="text-white font-sans-bold">Clear Entire List</Text>
+                                </Pressable>
+                                <Pressable 
+                                    onPress={() => setIsTrashModalVisible(false)}
+                                    className="w-full bg-surface-900 border border-surface-800 py-4 rounded-2xl items-center"
+                                >
+                                    <Text className="text-surface-400 font-sans-semibold">Cancel</Text>
                                 </Pressable>
                             </View>
                         </GlassContainer>
@@ -345,65 +460,103 @@ export default function ShoppingListScreen() {
                     >
                         <View className="w-12 h-1 bg-surface-800 rounded-full self-center mt-4 mb-4" />
                         
-                        <View className="px-6 pb-6">
-                            <Text className="text-white font-sans-bold text-2xl mb-2">Import from Recipe</Text>
-                            <Text className="text-surface-500 font-sans text-sm mb-6">Which recipe's ingredients do you need?</Text>
-                            
-                            <View className="flex-row items-center bg-surface-900 border border-surface-800 rounded-2xl px-4 py-3 mb-6">
-                                <Ionicons name="search" size={20} color="#6E6E85" mr-3 />
-                                <TextInput
-                                    className="flex-1 text-white font-sans text-base ml-3"
-                                    placeholder="Search recipes..."
-                                    placeholderTextColor="#6E6E85"
-                                    value={recipeSearch}
-                                    onChangeText={setRecipeSearch}
+                        {isImporting ? (
+                            <View className="flex-1 items-center justify-center pb-20">
+                                <ActivityIndicator size="large" color="#FF6B35" />
+                                <Text className="text-white font-sans-bold text-lg mt-4">Importing Recipe...</Text>
+                                <Text className="text-surface-500 font-sans text-sm mt-1 text-center px-10">
+                                    Saving to your recipes and adding ingredients to shopping list
+                                </Text>
+                            </View>
+                        ) : (
+                            <View className="px-6 pb-6 flex-1">
+                                <Text className="text-white font-sans-bold text-2xl mb-2">Import from Recipe</Text>
+                                <Text className="text-surface-500 font-sans text-sm mb-6">Which recipe's ingredients do you need?</Text>
+                                
+                                {/* Inner Tabs for Recipe Source */}
+                                <View className="flex-row bg-surface-900/50 p-1 rounded-2xl mb-4 border border-surface-800/50">
+                                    <Pressable
+                                        onPress={() => setRecipeTab("mine")}
+                                        className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl ${recipeTab === "mine" ? "bg-surface-800 shadow-sm" : ""}`}
+                                    >
+                                        <Ionicons name="book" size={14} color={recipeTab === "mine" ? "#FFFFFF" : "#6E6E85"} />
+                                        <Text className={`font-sans-bold text-xs ml-2 ${recipeTab === "mine" ? "text-white" : "text-surface-400"}`}>My Recipes</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => setRecipeTab("community")}
+                                        className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl ${recipeTab === "community" ? "bg-surface-800 shadow-sm" : ""}`}
+                                    >
+                                        <Ionicons name="globe" size={14} color={recipeTab === "community" ? "#FFFFFF" : "#6E6E85"} />
+                                        <Text className={`font-sans-bold text-xs ml-2 ${recipeTab === "community" ? "text-white" : "text-surface-400"}`}>Community</Text>
+                                    </Pressable>
+                                </View>
+
+                                <View className="flex-row items-center bg-surface-900 border border-surface-800 rounded-2xl px-4 py-3 mb-6">
+                                    <Ionicons name="search" size={20} color="#6E6E85" />
+                                    <TextInput
+                                        className="flex-1 text-white font-sans text-base ml-3"
+                                        placeholder={recipeTab === "mine" ? "Search recipes..." : "Search community recipes..."}
+                                        placeholderTextColor="#6E6E85"
+                                        value={recipeSearch}
+                                        onChangeText={setRecipeSearch}
+                                    />
+                                    {loadingCommunity && <ActivityIndicator size="small" color="#FF6B35" className="ml-2" />}
+                                </View>
+
+                                <FlatList
+                                    data={recipeTab === "mine" ? filteredRecipes : communityRecipes}
+                                    keyExtractor={(item) => item.id.toString()}
+                                    showsVerticalScrollIndicator={false}
+                                    contentContainerStyle={{ paddingBottom: 100 }}
+                                    renderItem={({ item, index }) => (
+                                        <Animated.View entering={FadeInDown.delay(index * 30)}>
+                                            <Pressable 
+                                                onPress={() => handleSelectRecipe(item)}
+                                                className="mb-3"
+                                            >
+                                                <GlassContainer className="flex-row items-center p-3 rounded-2xl border border-surface-800/30 bg-surface-900/20">
+                                                    {item.image_url ? (
+                                                        <Image 
+                                                            source={{ uri: item.image_url }} 
+                                                            className="w-14 h-14 rounded-xl mr-4"
+                                                        />
+                                                    ) : (
+                                                        <View className="w-14 h-14 rounded-xl bg-surface-800 items-center justify-center mr-4">
+                                                            <Ionicons name="restaurant-outline" size={24} color="#6E6E85" />
+                                                        </View>
+                                                    )}
+                                                    <View className="flex-1">
+                                                        <Text className="text-white font-sans-bold text-base" numberOfLines={1}>
+                                                            {item.title}
+                                                        </Text>
+                                                        <Text className="text-surface-500 font-sans text-xs mt-1">
+                                                            {item.servings} servings
+                                                        </Text>
+                                                    </View>
+                                                    <View className="w-10 h-10 rounded-full bg-accent/10 items-center justify-center">
+                                                        <Ionicons name="chevron-forward" size={18} color="#FF6B35" />
+                                                    </View>
+                                                </GlassContainer>
+                                            </Pressable>
+                                        </Animated.View>
+                                    )}
+                                    ListEmptyComponent={() => (
+                                        <View className="items-center py-10 opacity-40">
+                                            <Ionicons 
+                                                name={recipeTab === "mine" ? "book-outline" : "globe-outline"} 
+                                                size={48} 
+                                                color="#FFFFFF" 
+                                            />
+                                            <Text className="text-white font-sans text-center mt-4 px-10">
+                                                {recipeTab === "mine" 
+                                                    ? `No recipes found matching "${recipeSearch}"` 
+                                                    : `No community recipes found matching "${recipeSearch}"`}
+                                            </Text>
+                                        </View>
+                                    )}
                                 />
                             </View>
-
-                            <FlatList
-                                data={filteredRecipes}
-                                keyExtractor={(item) => item.id.toString()}
-                                showsVerticalScrollIndicator={false}
-                                contentContainerStyle={{ paddingBottom: 100 }}
-                                renderItem={({ item, index }) => (
-                                    <Animated.View entering={FadeInDown.delay(index * 30)}>
-                                        <Pressable 
-                                            onPress={() => handleSelectRecipe(item.id)}
-                                            className="mb-3"
-                                        >
-                                            <GlassContainer className="flex-row items-center p-3 rounded-2xl border border-surface-800/30 bg-surface-900/20">
-                                                {item.image_url ? (
-                                                    <Image 
-                                                        source={{ uri: item.image_url }} 
-                                                        className="w-14 h-14 rounded-xl mr-4"
-                                                    />
-                                                ) : (
-                                                    <View className="w-14 h-14 rounded-xl bg-surface-800 items-center justify-center mr-4">
-                                                        <Ionicons name="restaurant-outline" size={24} color="#6E6E85" />
-                                                    </View>
-                                                )}
-                                                <View className="flex-1">
-                                                    <Text className="text-white font-sans-bold text-base" numberOfLines={1}>
-                                                        {item.title}
-                                                    </Text>
-                                                    <Text className="text-surface-500 font-sans text-xs mt-1">
-                                                        {item.servings} servings
-                                                    </Text>
-                                                </View>
-                                                <View className="w-10 h-10 rounded-full bg-accent/10 items-center justify-center">
-                                                    <Ionicons name="chevron-forward" size={18} color="#FF6B35" />
-                                                </View>
-                                            </GlassContainer>
-                                        </Pressable>
-                                    </Animated.View>
-                                )}
-                                ListEmptyComponent={() => (
-                                    <View className="items-center py-10">
-                                        <Text className="text-surface-600 font-sans">No recipes found matching "{recipeSearch}"</Text>
-                                    </View>
-                                )}
-                            />
-                        </View>
+                        )}
                     </Animated.View>
                 </View>
             </Modal>

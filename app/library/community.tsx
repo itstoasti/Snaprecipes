@@ -37,7 +37,7 @@ export default function CommunityScreen() {
             let supabaseQuery = supabase
                 .from("public_recipes")
                 .select("*")
-                .order("quality_score", { ascending: false })
+                .order("created_at", { ascending: false })
                 .limit(50);
 
             if (query) {

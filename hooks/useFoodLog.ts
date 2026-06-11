@@ -169,17 +169,41 @@ export function useFoodLog(selectedDate?: Date) {
         [loadLogs]
     );
 
+    const updateFoodLog = useCallback(
+        async (
+            logId: number,
+            updates: {
+                serving_qty?: number;
+                meal_type?: "breakfast" | "lunch" | "dinner" | "snack";
+            }
+        ) => {
+            try {
+                const db = await getDatabase();
+                const keys = Object.keys(updates);
+                if (keys.length === 0) return;
+                const setClause = keys.map((k) => `${k} = ?`).join(", ");
+                const values = keys.map((k) => (updates as any)[k]);
+                await db.runAsync(`UPDATE food_logs SET ${setClause} WHERE id = ?`, [...values, logId]);
+                await loadLogs();
+            } catch (e) {
+                console.warn("updateFoodLog error:", e);
+            }
+        },
+        [loadLogs]
+    );
+
+
     // ── Custom Foods (Saved / Frequent) ──
     const searchCustomFoods = useCallback(async (query: string): Promise<CustomFood[]> => {
         try {
             const db = await getDatabase();
             if (!query.trim()) {
                 return db.getAllAsync<CustomFood>(
-                    "SELECT * FROM custom_foods ORDER BY use_count DESC LIMIT 6"
+                    "SELECT id, remote_id, food_name, brand, serving_size, barcode, calories, protein, fat, carbs, sugar, fiber, sodium, image_url, SUM(use_count) as use_count, created_at FROM custom_foods GROUP BY food_name, brand ORDER BY use_count DESC LIMIT 6"
                 );
             }
             return db.getAllAsync<CustomFood>(
-                "SELECT * FROM custom_foods WHERE food_name LIKE ? OR brand LIKE ? ORDER BY use_count DESC LIMIT 30",
+                "SELECT id, remote_id, food_name, brand, serving_size, barcode, calories, protein, fat, carbs, sugar, fiber, sodium, image_url, SUM(use_count) as use_count, created_at FROM custom_foods WHERE food_name LIKE ? OR brand LIKE ? GROUP BY food_name, brand ORDER BY use_count DESC LIMIT 30",
                 [`%${query}%`, `%${query}%`]
             );
         } catch (e) {
@@ -190,27 +214,55 @@ export function useFoodLog(selectedDate?: Date) {
 
     const saveCustomFood = useCallback(
         async (food: Omit<CustomFood, "id" | "remote_id" | "use_count" | "created_at">) => {
-            const db = await getDatabase();
-            await db.runAsync(
-                `INSERT OR REPLACE INTO custom_foods (food_name, brand, serving_size, barcode, calories, protein, fat, carbs, sugar, fiber, sodium, image_url, use_count)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT use_count FROM custom_foods WHERE food_name = ? AND brand IS ?), 0) + 1)`,
-                [
-                    food.food_name,
-                    food.brand || null,
-                    food.serving_size || null,
-                    food.barcode || null,
-                    food.calories,
-                    food.protein,
-                    food.fat,
-                    food.carbs,
-                    food.sugar || null,
-                    food.fiber || null,
-                    food.sodium || null,
-                    food.image_url || null,
-                    food.food_name,
-                    food.brand || null,
-                ]
-            );
+            try {
+                const db = await getDatabase();
+                // Check if the food already exists in the local database
+                const existing = await db.getFirstAsync<{ id: number; use_count: number }>(
+                    "SELECT id, use_count FROM custom_foods WHERE food_name = ? AND (brand = ? OR (brand IS NULL AND ? IS NULL)) LIMIT 1",
+                    [food.food_name, food.brand || null, food.brand || null]
+                );
+
+                if (existing) {
+                    await db.runAsync(
+                        `UPDATE custom_foods 
+                         SET calories = ?, protein = ?, fat = ?, carbs = ?, sugar = ?, fiber = ?, sodium = ?, serving_size = ?, barcode = ?, use_count = use_count + 1
+                         WHERE id = ?`,
+                        [
+                            food.calories,
+                            food.protein,
+                            food.fat,
+                            food.carbs,
+                            food.sugar || null,
+                            food.fiber || null,
+                            food.sodium || null,
+                            food.serving_size || null,
+                            food.barcode || null,
+                            existing.id
+                        ]
+                    );
+                } else {
+                    await db.runAsync(
+                        `INSERT INTO custom_foods (food_name, brand, serving_size, barcode, calories, protein, fat, carbs, sugar, fiber, sodium, image_url, use_count)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+                        [
+                            food.food_name,
+                            food.brand || null,
+                            food.serving_size || null,
+                            food.barcode || null,
+                            food.calories,
+                            food.protein,
+                            food.fat,
+                            food.carbs,
+                            food.sugar || null,
+                            food.fiber || null,
+                            food.sodium || null,
+                            food.image_url || null,
+                        ]
+                    );
+                }
+            } catch (e) {
+                console.warn("saveCustomFood error:", e);
+            }
         },
         []
     );
@@ -225,6 +277,7 @@ export function useFoodLog(selectedDate?: Date) {
         removeFoodLog,
         updateServingQty,
         updateMealType,
+        updateFoodLog,
         searchCustomFoods,
         saveCustomFood,
         refresh: loadLogs,

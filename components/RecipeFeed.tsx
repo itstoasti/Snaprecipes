@@ -9,9 +9,10 @@ interface RecipeFeedProps {
     onRefresh: () => void;
     emptyTitle?: string;
     emptyMessage?: string;
+    contentContainerStyle?: any;
 }
 
-export default function RecipeFeed({ recipes, loading, onRefresh, emptyTitle, emptyMessage }: RecipeFeedProps) {
+export default function RecipeFeed({ recipes, loading, onRefresh, emptyTitle, emptyMessage, contentContainerStyle }: RecipeFeedProps) {
     if (!loading && recipes.length === 0) {
         return (
             <View className="flex-1 items-center justify-center px-8">
@@ -31,7 +32,7 @@ export default function RecipeFeed({ recipes, loading, onRefresh, emptyTitle, em
             data={recipes}
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
-            contentContainerStyle={{ padding: 6, paddingBottom: 120 }}
+            contentContainerStyle={contentContainerStyle || { padding: 6, paddingBottom: 120 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
                 <RefreshControl

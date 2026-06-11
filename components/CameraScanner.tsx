@@ -14,8 +14,9 @@ export default function CameraScanner() {
     const [loading, setLoading] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const router = useRouter();
-    const { insertRecipe } = useRecipes();
+    const { insertRecipe, shareRecipeToCommunity } = useRecipes();
     const { isPro } = useRevenueCat();
+    const [shareToCommunity, setShareToCommunity] = useState(true);
 
     const handleCapture = async () => {
         if (!cameraRef.current) return;
@@ -48,6 +49,10 @@ export default function CameraScanner() {
 
             const recipe = await extractFromImage(photo.base64);
             const recipeId = await insertRecipe(recipe, undefined, "camera");
+            
+            if (!isPro || shareToCommunity) {
+                await shareRecipeToCommunity(recipe);
+            }
 
             await incrementUsage();
 
@@ -154,8 +159,19 @@ export default function CameraScanner() {
                     </View>
                 </View>
 
-                {/* Capture button */}
+                {/* Capture button and Share Toggle */}
                 <View className="items-center pb-12">
+                    <Pressable
+                        onPress={() => isPro && setShareToCommunity(!shareToCommunity)}
+                        className={`flex-row items-center px-4 py-2 rounded-full mb-6 shadow-lg ${shareToCommunity || !isPro ? 'bg-accent' : 'bg-surface-800'}`}
+                    >
+                        <Ionicons name={(shareToCommunity || !isPro) ? "checkmark-circle" : "ellipse-outline"} size={20} color="#FFF" className="mr-2" style={{ marginRight: 6 }} />
+                        <Text className="text-white font-sans-semibold text-sm mr-2">
+                            Share to Community
+                        </Text>
+                        {!isPro && <Ionicons name="lock-closed" size={14} color="#FFF" />}
+                    </Pressable>
+
                     {loading ? (
                         <View className="w-20 h-20 rounded-full bg-accent/80 items-center justify-center">
                             <ActivityIndicator size="large" color="#FFFFFF" />

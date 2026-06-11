@@ -27,6 +27,8 @@ import EditRecipeModal from "@/components/EditRecipeModal";
 import { useCookMode } from "@/hooks/useCookMode";
 import { useRecipes } from "@/hooks/useRecipes";
 import type { Recipe, Ingredient, Step } from "@/db/schema";
+import { getDatabase } from "@/db/client";
+import StatusModal from "@/components/StatusModal";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { useAppReview } from "@/hooks/useAppReview";
 import ReviewPromptModal from "@/components/ReviewPromptModal";
@@ -63,6 +65,13 @@ export default function RecipeDetailScreen() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showCollectionModal, setShowCollectionModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [inCollection, setInCollection] = useState(false);
+    const [statusModalConfig, setStatusModalConfig] = useState<{
+        visible: boolean;
+        type: "success" | "error";
+        title: string;
+        message: string;
+    }>({ visible: false, type: "success", title: "", message: "" });
     const insets = useSafeAreaInsets();
     const { showPrePrompt, recordSuccessfulSave, handlePrePromptResponse } = useAppReview();
 
@@ -78,6 +87,14 @@ export default function RecipeDetailScreen() {
             data = await getCommunityRecipeById(id);
         } else {
             data = await getRecipeById(parseInt(id));
+            
+            // Check if it is in a collection
+            const db = await getDatabase();
+            const collectionCount = await db.getFirstAsync<{count: number}>(
+                `SELECT COUNT(*) as count FROM recipe_collections WHERE recipe_id = ?`,
+                [parseInt(id)]
+            );
+            setInCollection((collectionCount?.count || 0) > 0);
         }
 
         if (data) {
@@ -157,15 +174,21 @@ export default function RecipeDetailScreen() {
         try {
             const newId = await saveCommunityRecipe(id);
             if (newId) {
-                Alert.alert(
-                    "Success", 
-                    "Recipe saved to your library!",
-                    [{ text: "View Library", onPress: () => router.push("/(tabs)/") }]
-                );
+                setStatusModalConfig({
+                    visible: true,
+                    type: "success",
+                    title: "Success",
+                    message: "Recipe saved to your library!"
+                });
             }
         } catch (error) {
             console.error("Failed to save community recipe:", error);
-            Alert.alert("Error", "Failed to save recipe. Please try again.");
+            setStatusModalConfig({
+                visible: true,
+                type: "error",
+                title: "Error",
+                message: "Failed to save recipe. Please try again."
+            });
         } finally {
             setLoading(false);
         }
@@ -184,6 +207,7 @@ export default function RecipeDetailScreen() {
         return (
             <CookMode
                 recipeName={recipe.title}
+                imageUrl={recipe.image_url}
                 ingredients={ingredients}
                 steps={steps}
                 multiplier={multiplier}
@@ -272,7 +296,7 @@ export default function RecipeDetailScreen() {
                                 className="absolute right-[120px] w-10 h-10 rounded-full bg-black/50 items-center justify-center"
                                 style={{ top: Math.max(insets.top, 20) + 12 }}
                             >
-                                <Ionicons name="folder-outline" size={20} color="#FFFFFF" />
+                                <Ionicons name={inCollection ? "folder" : "folder-outline"} size={20} color={inCollection ? "#FF6B35" : "#FFFFFF"} />
                             </Pressable>
 
                             {/* Edit button */}
@@ -521,6 +545,20 @@ export default function RecipeDetailScreen() {
             <ReviewPromptModal
                 visible={showPrePrompt}
                 onRespond={handlePrePromptResponse}
+            />
+
+            <StatusModal
+                visible={statusModalConfig.visible}
+                type={statusModalConfig.type}
+                title={statusModalConfig.title}
+                message={statusModalConfig.message}
+                buttonText="View Library"
+                onClose={() => {
+                    setStatusModalConfig(prev => ({ ...prev, visible: false }));
+                    if (statusModalConfig.type === "success") {
+                        router.push("/(tabs)/");
+                    }
+                }}
             />
         </View>
     );

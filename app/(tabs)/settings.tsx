@@ -288,6 +288,26 @@ export default function SettingsScreen() {
                                 >
                                     <Text className="text-white font-sans-bold text-base">Unlock Cloud Sync</Text>
                                 </Pressable>
+                                {session && session.user ? (
+                                    <View className="w-full items-center mt-4 pt-4 border-t border-surface-800">
+                                        <Text className="text-surface-400 font-sans text-xs mb-3 text-center">
+                                            Signed in as <Text className="text-surface-200 font-sans-semibold">{session.user.email}</Text>
+                                        </Text>
+                                        <Pressable
+                                            onPress={signOut}
+                                            className="w-full py-3 rounded-xl items-center border border-surface-700 bg-surface-900"
+                                        >
+                                            <Text className="text-surface-400 font-sans-semibold text-sm">Sign Out</Text>
+                                        </Pressable>
+                                    </View>
+                                ) : (
+                                    <Pressable
+                                        onPress={() => router.push("/auth")}
+                                        className="w-full py-3 items-center mt-3"
+                                    >
+                                        <Text className="text-accent font-sans-semibold text-sm">Already have an account? Log In</Text>
+                                    </Pressable>
+                                )}
                             </View>
                         ) : session && session.user ? (
                             <View>

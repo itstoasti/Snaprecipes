@@ -32,7 +32,7 @@ export default function ShareScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { insertRecipe } = useRecipes();
-    const { isPro } = useRevenueCat();
+    const { isPro, isReady } = useRevenueCat();
 
     const [status, setStatus] = useState<"loading" | "error" | "paywall">("loading");
     const [errorMessage, setErrorMessage] = useState("");
@@ -84,7 +84,7 @@ export default function ShareScreen() {
 
     // Auto-extract on mount
     useEffect(() => {
-        if (!url || hasStarted.current) return;
+        if (!url || !isReady || hasStarted.current) return;
         hasStarted.current = true;
 
         (async () => {
@@ -96,12 +96,16 @@ export default function ShareScreen() {
             }
 
             try {
-                const recipe = await extractFromUrl(url);
-                const recipeId = await insertRecipe(recipe, url, "url");
+                const recipes = await extractFromUrl(url);
+                let firstRecipeId: number | undefined;
+                for (const recipe of recipes) {
+                    const recipeId = await insertRecipe(recipe, url, "url");
+                    if (!firstRecipeId && recipeId) firstRecipeId = recipeId;
+                }
                 await incrementUsage();
 
-                if (recipeId) {
-                    router.replace(`/recipe/${recipeId}`);
+                if (firstRecipeId) {
+                    router.replace(`/recipe/${firstRecipeId}`);
                 } else {
                     router.replace("/");
                 }
@@ -110,7 +114,7 @@ export default function ShareScreen() {
                 setStatus("error");
             }
         })();
-    }, [url]);
+    }, [url, isReady]);
 
     const handleRetry = async () => {
         if (!url) return;

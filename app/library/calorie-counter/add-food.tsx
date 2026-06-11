@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import {
     View, Text, Pressable, TextInput, FlatList, Alert,
     KeyboardAvoidingView, Platform, Image, ActivityIndicator, ScrollView,
+    Modal,
 } from "react-native";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,10 +11,12 @@ import { useFoodLog } from "@/hooks/useFoodLog";
 import { useRecipes } from "@/hooks/useRecipes";
 import { supabase } from "@/lib/supabase";
 import GlassContainer from "@/components/GlassContainer";
-import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
+import { BlurView } from "expo-blur";
 import { AI_PROVIDER_STORE } from "@/lib/constants";
+import { searchRawFoods } from "@/lib/rawFoods";
 
 type Tab = "search" | "scan" | "quick" | "recipe";
 
@@ -39,11 +42,19 @@ interface QuickAddState {
     carbs: string;
     fat: string;
     serving_size: string;
+    serving_qty: string;
 }
 
 const EMPTY_QUICK: QuickAddState = {
-    food_name: "", calories: "", protein: "", carbs: "", fat: "", serving_size: "",
+    food_name: "", calories: "", protein: "", carbs: "", fat: "", serving_size: "", serving_qty: "1",
 };
+
+const MEAL_TYPES = [
+    { key: "breakfast", label: "Breakfast", icon: "sunny" },
+    { key: "lunch", label: "Lunch", icon: "restaurant" },
+    { key: "dinner", label: "Dinner", icon: "moon" },
+    { key: "snack", label: "Snack", icon: "nutrition" },
+] as const;
 
 export default function AddFoodScreen() {
     const router = useRouter();
@@ -51,6 +62,7 @@ export default function AddFoodScreen() {
     const params = useLocalSearchParams<{ date: string; mealType: string }>();
     const logDate = params.date || new Date().toISOString().split("T")[0];
     const mealType = (params.mealType || "snack") as "breakfast" | "lunch" | "dinner" | "snack";
+    const [selectedMealType, setSelectedMealType] = useState<"breakfast" | "lunch" | "dinner" | "snack">(mealType);
 
     const { addFoodLog, searchCustomFoods, saveCustomFood } = useFoodLog();
     const { recipes, searchCommunityRecipes } = useRecipes();
@@ -65,9 +77,23 @@ export default function AddFoodScreen() {
     const [aiLookedUp, setAiLookedUp] = useState(false);
     const [quick, setQuick] = useState<QuickAddState>(EMPTY_QUICK);
     const [recipeSearch, setRecipeSearch] = useState("");
+    const [logTarget, setLogTarget] = useState<null | { type: "food"; food: FoodResult } | { type: "recipe"; recipe: any }>(null);
+    const [servingQtyStr, setServingQtyStr] = useState("1");
 
     // Debounce timer ref
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const hasExactMatch = useMemo(() => {
+        const queryLower = searchQuery.toLowerCase().trim();
+        if (!queryLower) return true;
+        return searchResults.some(r => {
+            const cleanName = r.food_name.toLowerCase()
+                .replace(/,\s*(raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground).*$/i, "")
+                .replace(/\s*\((raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground)\)/i, "")
+                .trim();
+            return cleanName === queryLower || r.food_name.toLowerCase().trim() === queryLower;
+        });
+    }, [searchResults, searchQuery]);
 
     // ── Smart Search: local DB first, then AI ──
     // ── Database Search: local + community ──
@@ -101,6 +127,32 @@ export default function AddFoodScreen() {
                 console.warn("Local food search failed:", e);
             }
 
+            // Step 1.5: Search curated raw foods
+            try {
+                const rawMatches = searchRawFoods(q);
+                if (rawMatches.length > 0) {
+                    const existingNames = new Set(combinedResults.map(r => r.food_name.toLowerCase()));
+                    const uniqueRaw = rawMatches
+                        .filter(f => !existingNames.has(f.food_name.toLowerCase()))
+                        .map(f => ({
+                            food_name: f.food_name,
+                            brand: "Curated Basic",
+                            serving_size: f.serving_size,
+                            calories: f.calories,
+                            protein: f.protein,
+                            fat: f.fat,
+                            carbs: f.carbs,
+                            sugar: f.sugar,
+                            fiber: f.fiber,
+                            sodium: f.sodium,
+                            source: "local" as const,
+                        }));
+                    combinedResults = [...combinedResults, ...uniqueRaw];
+                }
+            } catch (e) {
+                console.warn("Raw foods search failed:", e);
+            }
+
             // Step 2: Search community global_foods in Supabase
             try {
                 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -109,7 +161,7 @@ export default function AddFoodScreen() {
                 if (supabaseUrl && supabaseKey) {
                     const queryParam = encodeURIComponent(q.toLowerCase());
                     const response = await fetch(
-                        `${supabaseUrl}/rest/v1/global_foods?or=(food_name_lower.ilike.*${queryParam}*,brand_lower.ilike.*${queryParam}*)&order=lookup_count.desc&limit=10`,
+                        `${supabaseUrl}/rest/v1/global_foods?food_name_lower=ilike.*${queryParam}*&order=lookup_count.desc&limit=10`,
                         {
                             headers: {
                                 "apikey": supabaseKey,
@@ -190,28 +242,42 @@ export default function AddFoodScreen() {
             
             // Final Step: Smart Ranking & Filtering
             const queryLower = q.toLowerCase().trim();
-            const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
             
             combinedResults = combinedResults.sort((a, b) => {
                 const nameA = a.food_name.toLowerCase();
                 const nameB = b.food_name.toLowerCase();
                 
-                // 1. Exact match is king
-                if (nameA === queryLower) return -1;
-                if (nameB === queryLower) return 1;
+                // 1. Determine Match Tier
+                const getTier = (name: string) => {
+                    const cleanName = name
+                        .replace(/,\s*(raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground).*$/i, "")
+                        .replace(/\s*\((raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground)\)/i, "")
+                        .trim();
+                    if (cleanName === queryLower || name === queryLower) return 0; // Exact match
+                    if (cleanName.startsWith(queryLower) || name.startsWith(queryLower)) return 1; // Starts with
+                    if (cleanName.includes(queryLower) || name.includes(queryLower)) return 2; // Contains
+                    return 3; // Other
+                };
                 
-                // 2. "Starts with" is queen
-                if (nameA.startsWith(queryLower) && !nameB.startsWith(queryLower)) return -1;
-                if (nameB.startsWith(queryLower) && !nameA.startsWith(queryLower)) return 1;
+                const tierA = getTier(nameA);
+                const tierB = getTier(nameB);
+                if (tierA !== tierB) return tierA - tierB;
                 
-                // 3. Keyword density (how many words from query appear in name)
-                const countA = queryWords.filter(w => nameA.includes(w)).length;
-                const countB = queryWords.filter(w => nameB.includes(w)).length;
-                if (countA !== countB) return countB - countA;
-                
-                // 4. Source priority: local > community > global
+                // 2. Determine Source Priority (local > community > global > ai)
                 const sourceOrder = { local: 0, community: 1, global: 2, ai: 3 };
-                return sourceOrder[a.source] - sourceOrder[b.source];
+                const srcA = sourceOrder[a.source] ?? 99;
+                const srcB = sourceOrder[b.source] ?? 99;
+                if (srcA !== srcB) return srcA - srcB;
+                
+                // 3. Determine Popularity / Usage (higher is better)
+                const popA = (a as any).use_count || (a as any).lookup_count || 0;
+                const popB = (b as any).use_count || (b as any).lookup_count || 0;
+                if (popB !== popA) return popB - popA;
+                
+                // 4. Shorter length is better
+                if (nameA.length !== nameB.length) return nameA.length - nameB.length;
+                
+                return nameA.localeCompare(nameB);
             });
 
             // 5. Semantic De-noising (e.g. if searching for bread, deprioritize tortillas/wraps)
@@ -322,57 +388,15 @@ export default function AddFoodScreen() {
     }, []);
 
     // ── Log a food result ──
-    const handleLogFood = useCallback(async (food: FoodResult) => {
+    const handleLogFood = useCallback(async (food: FoodResult, qty: number = 1) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        // If this came from AI or Global database, save to local custom_foods so it's cached for next time
-        if (food.source === "ai" || food.source === "global") {
-            await saveCustomFood({
-                food_name: food.food_name,
-                brand: food.brand || null,
-                serving_size: food.serving_size || "1 serving",
-                barcode: null,
-                calories: food.calories,
-                protein: food.protein,
-                fat: food.fat,
-                carbs: food.carbs,
-                sugar: food.sugar || null,
-                fiber: food.fiber || null,
-                sodium: food.sodium || null,
-                image_url: null,
-            });
-
-            // If it's a global item, also "contribute" it to our community database via analyze-food pipeline
-            // This builds our community database without using expensive Gemini tokens
-            if (food.source === "global") {
-                const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-                const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-                if (supabaseUrl && supabaseKey) {
-                    fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
-                        method: 'POST',
-                        headers: {
-                            "Content-Type": "application/json",
-                            "apikey": supabaseKey,
-                            "Authorization": `Bearer ${supabaseKey}`,
-                        },
-                        body: JSON.stringify({ 
-                            textDescription: food.food_name,
-                            _silent_contribution: true,
-                            _contributed_item: {
-                                ...food,
-                                source: "community"
-                            }
-                        })
-                    }).catch(() => {});
-                }
-            }
-        }
-
-        await addFoodLog({
+        // Save/update in local custom_foods so it's cached/incremented for next time
+        await saveCustomFood({
             food_name: food.food_name,
             brand: food.brand || null,
-            serving_size: food.serving_size || null,
-            serving_qty: 1,
+            serving_size: food.serving_size || "1 serving",
+            barcode: null,
             calories: food.calories,
             protein: food.protein,
             fat: food.fat,
@@ -380,7 +404,47 @@ export default function AddFoodScreen() {
             sugar: food.sugar || null,
             fiber: food.fiber || null,
             sodium: food.sodium || null,
-            meal_type: mealType,
+            image_url: null,
+        });
+
+        // If it's a global item, also "contribute" it to our community database via analyze-food pipeline
+        // This builds our community database without using expensive Gemini tokens
+        if (food.source === "global") {
+            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+            const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+            if (supabaseUrl && supabaseKey) {
+                fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
+                    method: 'POST',
+                    headers: {
+                        "Content-Type": "application/json",
+                        "apikey": supabaseKey,
+                        "Authorization": `Bearer ${supabaseKey}`,
+                    },
+                    body: JSON.stringify({ 
+                        textDescription: food.food_name,
+                        _silent_contribution: true,
+                        _contributed_item: {
+                            ...food,
+                            source: "community"
+                        }
+                    })
+                }).catch(() => {});
+            }
+        }
+
+        await addFoodLog({
+            food_name: food.food_name,
+            brand: food.brand || null,
+            serving_size: food.serving_size || null,
+            serving_qty: qty,
+            calories: food.calories,
+            protein: food.protein,
+            fat: food.fat,
+            carbs: food.carbs,
+            sugar: food.sugar || null,
+            fiber: food.fiber || null,
+            sodium: food.sodium || null,
+            meal_type: selectedMealType,
             log_date: logDate,
             source_type: food.source === "ai" ? "search" : "search",
             source_recipe_id: null,
@@ -401,6 +465,7 @@ export default function AddFoodScreen() {
         const pro = parseFloat(quick.protein) || 0;
         const carb = parseFloat(quick.carbs) || 0;
         const fatVal = parseFloat(quick.fat) || 0;
+        const qtyVal = parseFloat(quick.serving_qty) || 1;
 
         await saveCustomFood({
             food_name: quick.food_name.trim(),
@@ -414,10 +479,10 @@ export default function AddFoodScreen() {
             food_name: quick.food_name.trim(),
             brand: null,
             serving_size: quick.serving_size.trim() || "1 serving",
-            serving_qty: 1,
+            serving_qty: qtyVal,
             calories: cal, protein: pro, fat: fatVal, carbs: carb,
             sugar: null, fiber: null, sodium: null,
-            meal_type: mealType, log_date: logDate,
+            meal_type: selectedMealType, log_date: logDate,
             source_type: "manual", source_recipe_id: null,
             image_url: null, barcode: null,
         });
@@ -425,16 +490,16 @@ export default function AddFoodScreen() {
     }, [quick, addFoodLog, saveCustomFood, mealType, logDate, router]);
 
     // ── Log from Recipe ──
-    const handleLogRecipe = useCallback(async (recipe: any) => {
+    const handleLogRecipe = useCallback(async (recipe: any, qty: number = 1) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         await addFoodLog({
             food_name: recipe.title, brand: "SnapRecipe",
             serving_size: recipe.servings ? `1/${recipe.servings} recipe` : "1 serving", 
-            serving_qty: 1,
+            serving_qty: qty,
             calories: recipe.calories || 0, protein: recipe.protein || 0,
             fat: recipe.fat || 0, carbs: recipe.carbs || 0,
             sugar: recipe.sugar || null, fiber: recipe.fiber || null,
-            sodium: recipe.sodium || null, meal_type: mealType, log_date: logDate,
+            sodium: recipe.sodium || null, meal_type: selectedMealType, log_date: logDate,
             source_type: "recipe", source_recipe_id: recipe.id > 0 ? recipe.id : null,
             image_url: recipe.image_url || null, barcode: null,
         });
@@ -464,17 +529,54 @@ export default function AddFoodScreen() {
 
     // ── Navigate to scanner ──
     const handleOpenScanner = useCallback((mode: "photo" | "barcode") => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        router.push({
-            pathname: "/library/calorie-counter/scan",
-            params: { date: logDate, mealType, mode },
-        });
-    }, [router, logDate, mealType]);
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            router.push({
+                pathname: "/library/calorie-counter/scan",
+                params: { date: logDate, mealType: selectedMealType, mode },
+            });
+        } catch (e) {
+            console.warn("Failed to open scanner:", e);
+            Alert.alert("Error", "Could not open the scanner. Please try again.");
+        }
+    }, [router, logDate, selectedMealType]);
 
     const filteredRecipes = useMemo(() => {
         if (!recipeSearch.trim()) return recipes.filter(r => r.calories);
         return recipes.filter(r => r.calories && r.title.toLowerCase().includes(recipeSearch.toLowerCase()));
     }, [recipes, recipeSearch]);
+
+    const searchListHeader = useMemo(() => {
+        const showAiCard = !searching && searchQuery.trim().length > 0 && !aiLookedUp && !hasExactMatch;
+        return (
+            <View>
+                {!searchQuery.trim() && searchResults.length > 0 && (
+                    <Text className="text-surface-500 font-sans text-xs mb-2 px-1">FREQUENT</Text>
+                )}
+                {showAiCard && (
+                    <Animated.View entering={FadeInDown} className="mb-3">
+                        <Pressable 
+                            onPress={triggerAiSearch}
+                            className="bg-amber-400/10 border border-amber-400/20 p-4 rounded-2xl flex-row items-center justify-between"
+                        >
+                            <View className="flex-row items-center flex-1 mr-3">
+                                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "rgba(251,191,36,0.15)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="sparkles" size={18} color="#FBBF24" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-amber-400 font-sans-bold text-sm">Ask AI to Estimate</Text>
+                                    <Text className="text-surface-400 font-sans text-xs mt-0.5">
+                                        Get nutrition facts for raw/fresh "{searchQuery}"
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#FBBF24" />
+                        </Pressable>
+                    </Animated.View>
+                )}
+            </View>
+        );
+    }, [searching, searchQuery, aiLookedUp, hasExactMatch, searchResults, triggerAiSearch]);
 
     const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
         { key: "search", label: "Search", icon: "search" },
@@ -499,7 +601,7 @@ export default function AddFoodScreen() {
                     </Pressable>
                     <View>
                         <Text className="text-white font-sans-bold text-xl">Add Food</Text>
-                        <Text className="text-surface-400 font-sans text-xs capitalize">{mealType} • {logDate}</Text>
+                        <Text className="text-surface-400 font-sans text-xs capitalize">{selectedMealType} • {logDate}</Text>
                     </View>
                 </View>
             </View>
@@ -593,11 +695,7 @@ export default function AddFoodScreen() {
                         keyExtractor={(item, idx) => `${item.food_name}-${idx}`}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 40 }}
-                        ListHeaderComponent={
-                            !searchQuery.trim() && searchResults.length > 0 ? (
-                                <Text className="text-surface-500 font-sans text-xs mb-2 px-1">FREQUENT</Text>
-                            ) : null
-                        }
+                        ListHeaderComponent={searchListHeader}
                         ListEmptyComponent={
                             !searching && searchQuery.trim() ? (
                                 <View className="items-center justify-center py-12 px-10">
@@ -641,13 +739,23 @@ export default function AddFoodScreen() {
                         }
                         renderItem={({ item, index }) => (
                             <Animated.View entering={FadeInDown.delay(index * 30)}>
-                                <Pressable onPress={() => handleLogFood(item)}>
+                                <Pressable onPress={() => {
+                                    setLogTarget({ type: "food", food: item });
+                                    setServingQtyStr("1");
+                                    setSelectedMealType(mealType);
+                                }}>
                                     <GlassContainer className="flex-row items-center p-3.5 mb-2 rounded-2xl overflow-hidden"
                                         style={
+                                            item.source === "local" ? { borderColor: "rgba(239,68,68,0.25)" } :
                                             item.source === "ai" ? { borderColor: "rgba(251,191,36,0.2)" } :
                                             item.source === "community" ? { borderColor: "rgba(52,211,153,0.2)" } : undefined
                                         }
                                     >
+                                        {item.source === "local" && (
+                                            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(239,68,68,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                                <Ionicons name="heart" size={16} color="#EF4444" />
+                                            </View>
+                                        )}
                                         {item.source === "ai" && (
                                             <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(251,191,36,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
                                                 <Ionicons name="sparkles" size={16} color="#FBBF24" />
@@ -808,7 +916,11 @@ export default function AddFoodScreen() {
                         )}
                         renderItem={({ item, index }) => (
                             <Animated.View entering={FadeInDown.delay(index * 40)}>
-                                <Pressable onPress={() => handleLogRecipe(item)}>
+                                <Pressable onPress={() => {
+                                    setLogTarget({ type: "recipe", recipe: item });
+                                    setServingQtyStr("1");
+                                    setSelectedMealType(mealType);
+                                }}>
                                     <GlassContainer className="flex-row items-center p-3 mb-2 rounded-2xl overflow-hidden">
                                         <View className="w-12 h-12 rounded-xl bg-surface-800 overflow-hidden mr-3">
                                             {item.image_url ? <Image source={{ uri: item.image_url }} style={{ flex: 1 }} /> : (
@@ -848,6 +960,7 @@ export default function AddFoodScreen() {
                             {([
                                 { key: "food_name", label: "Food Name", placeholder: "e.g. Grilled Chicken Breast", kb: "default" },
                                 { key: "serving_size", label: "Serving Size", placeholder: "e.g. 1 cup, 100g", kb: "default" },
+                                { key: "serving_qty", label: "Serving Quantity", placeholder: "1", kb: "numeric" },
                                 { key: "calories", label: "Calories", placeholder: "0", kb: "numeric" },
                                 { key: "protein", label: "Protein (g)", placeholder: "0", kb: "numeric" },
                                 { key: "carbs", label: "Carbs (g)", placeholder: "0", kb: "numeric" },
@@ -865,6 +978,31 @@ export default function AddFoodScreen() {
                                     />
                                 </View>
                             ))}
+                            {/* Meal Type Selection */}
+                            <View className="mb-4 mt-2">
+                                <Text className="text-surface-400 font-sans text-xs mb-2">Meal Category</Text>
+                                <View className="flex-row bg-surface-900 rounded-2xl p-1 border border-white/5">
+                                    {MEAL_TYPES.map((t) => {
+                                        const isSelected = selectedMealType === t.key;
+                                        return (
+                                            <Pressable
+                                                key={t.key}
+                                                onPress={() => {
+                                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                    setSelectedMealType(t.key);
+                                                }}
+                                                className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
+                                                style={isSelected ? { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" } : undefined}
+                                            >
+                                                <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : "#6E6E85"} />
+                                                <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : "#6E6E85" }}>
+                                                    {t.label}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </View>
                             <Pressable onPress={handleQuickAdd} style={{ backgroundColor: "#EF4444", borderRadius: 16, paddingVertical: 14, alignItems: "center", marginTop: 8 }}>
                                 <Text className="text-white font-sans-bold text-sm">Add to Log</Text>
                             </Pressable>
@@ -872,6 +1010,174 @@ export default function AddFoodScreen() {
                     </Animated.View>
                 </ScrollView>
             )}
+            {/* Serving Adjustment Modal */}
+            {logTarget && (() => {
+                const isFood = logTarget.type === "food";
+                const item = isFood ? logTarget.food! : logTarget.recipe!;
+                const title = isFood ? item.food_name : item.title;
+                const brand = isFood ? item.brand : "SnapRecipe";
+                const servingSize = isFood ? (item.serving_size || "1 serving") : (item.servings ? `1/${item.servings} recipe` : "1 serving");
+                const baseCal = isFood ? item.calories : (item.calories || 0);
+                const basePro = isFood ? item.protein : (item.protein || 0);
+                const baseCarb = isFood ? item.carbs : (item.carbs || 0);
+                const baseFat = isFood ? item.fat : (item.fat || 0);
+
+                const qty = parseFloat(servingQtyStr) || 0;
+
+                const displayCal = Math.round(baseCal * qty);
+                const displayPro = Math.round(basePro * qty * 10) / 10;
+                const displayCarb = Math.round(baseCarb * qty * 10) / 10;
+                const displayFat = Math.round(baseFat * qty * 10) / 10;
+
+                const handleIncrement = () => {
+                    const nextVal = (qty + 0.5);
+                    setServingQtyStr(nextVal.toString());
+                };
+
+                const handleDecrement = () => {
+                    const nextVal = Math.max(0.1, qty - 0.5);
+                    setServingQtyStr(nextVal.toString());
+                };
+
+                return (
+                    <Modal transparent visible={logTarget !== null} animationType="none" statusBarTranslucent>
+                        <View className="flex-1">
+                            <Animated.View entering={FadeIn} exiting={FadeOut} className="absolute inset-0">
+                                <BlurView intensity={20} tint="dark" className="flex-1 bg-black/70" />
+                            </Animated.View>
+                            <Pressable className="flex-1 justify-end" onPress={() => setLogTarget(null)}>
+                                <Pressable onPress={(e) => e.stopPropagation()}>
+                                    <Animated.View entering={SlideInDown.duration(300)} exiting={SlideOutDown} className="pb-10 pt-4 px-5">
+                                        <GlassContainer style={{ borderRadius: 24, overflow: "hidden" }}>
+                                            <View className="p-6">
+                                                {/* Header */}
+                                                <View className="items-center mb-6">
+                                                    {brand ? (
+                                                        <Text className="text-surface-500 font-sans text-[10px] uppercase tracking-tighter mb-1">
+                                                            {brand}
+                                                        </Text>
+                                                    ) : null}
+                                                    <Text className="text-white font-sans-bold text-lg text-center" numberOfLines={2}>
+                                                        {title}
+                                                    </Text>
+                                                    <Text className="text-surface-400 font-sans text-xs mt-1 text-center">
+                                                        Base serving: {servingSize}
+                                                    </Text>
+                                                </View>
+
+                                                {/* Macros Grid */}
+                                                <View className="flex-row justify-around mb-6 bg-white/5 rounded-2xl py-4 border border-white/5">
+                                                    <View className="items-center">
+                                                        <Text style={{ color: "#EF4444", fontFamily: "Inter_700Bold", fontSize: 18 }}>{displayCal}</Text>
+                                                        <Text className="text-surface-500 font-sans text-[10px] mt-1">Calories</Text>
+                                                    </View>
+                                                    <View className="items-center">
+                                                        <Text style={{ color: "#60A5FA", fontFamily: "Inter_700Bold", fontSize: 18 }}>{displayPro}g</Text>
+                                                        <Text className="text-surface-500 font-sans text-[10px] mt-1">Protein</Text>
+                                                    </View>
+                                                    <View className="items-center">
+                                                        <Text style={{ color: "#FBBF24", fontFamily: "Inter_700Bold", fontSize: 18 }}>{displayCarb}g</Text>
+                                                        <Text className="text-surface-500 font-sans text-[10px] mt-1">Carbs</Text>
+                                                    </View>
+                                                    <View className="items-center">
+                                                        <Text style={{ color: "#F472B6", fontFamily: "Inter_700Bold", fontSize: 18 }}>{displayFat}g</Text>
+                                                        <Text className="text-surface-500 font-sans text-[10px] mt-1">Fat</Text>
+                                                    </View>
+                                                </View>
+
+                                                {/* Stepper + Input */}
+                                                <View className="flex-row items-center justify-between bg-white/5 rounded-2xl px-5 py-4 mb-6 border border-white/5">
+                                                    <View>
+                                                        <Text className="text-white font-sans-bold text-sm">Number of Servings</Text>
+                                                        <Text className="text-surface-500 font-sans text-[10px] mt-0.5">Adjust quantity to scale macros</Text>
+                                                    </View>
+                                                    <View className="flex-row items-center" style={{ gap: 12 }}>
+                                                        <Pressable 
+                                                            onPress={handleDecrement} 
+                                                            className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
+                                                        >
+                                                            <Ionicons name="remove" size={20} color="white" />
+                                                        </Pressable>
+                                                        <TextInput
+                                                            value={servingQtyStr}
+                                                            onChangeText={(v) => {
+                                                                // Allow decimals and numbers
+                                                                const sanitized = v.replace(/[^0-9.]/g, "");
+                                                                setServingQtyStr(sanitized);
+                                                            }}
+                                                            keyboardType="decimal-pad"
+                                                            className="text-white font-sans-bold text-lg text-center bg-surface-900 px-3 py-1.5 rounded-lg min-w-[50px] max-w-[80px]"
+                                                        />
+                                                        <Pressable 
+                                                            onPress={handleIncrement} 
+                                                            className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
+                                                        >
+                                                            <Ionicons name="add" size={20} color="white" />
+                                                        </Pressable>
+                                                    </View>
+                                                </View>
+
+                                                {/* Meal Type Selection */}
+                                                <View className="mb-6">
+                                                    <Text className="text-white font-sans-bold text-sm mb-2 px-1">Meal Category</Text>
+                                                    <View className="flex-row bg-white/5 rounded-2xl p-1 border border-white/5">
+                                                        {MEAL_TYPES.map((t) => {
+                                                            const isSelected = selectedMealType === t.key;
+                                                            return (
+                                                                <Pressable
+                                                                    key={t.key}
+                                                                    onPress={() => {
+                                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                                        setSelectedMealType(t.key);
+                                                                    }}
+                                                                    className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
+                                                                    style={isSelected ? { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" } : undefined}
+                                                                >
+                                                                    <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : "#6E6E85"} />
+                                                                    <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : "#6E6E85" }}>
+                                                                        {t.label}
+                                                                    </Text>
+                                                                </Pressable>
+                                                            );
+                                                        })}
+                                                    </View>
+                                                </View>
+
+                                                {/* Actions */}
+                                                <View className="flex-row" style={{ gap: 12 }}>
+                                                    <Pressable
+                                                        onPress={() => setLogTarget(null)}
+                                                        style={{ flex: 1, paddingVertical: 14, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 14, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" }}
+                                                    >
+                                                        <Text className="text-white font-sans-semibold text-base">Cancel</Text>
+                                                    </Pressable>
+                                                    <Pressable
+                                                        onPress={async () => {
+                                                            if (qty <= 0) {
+                                                                Alert.alert("Invalid Quantity", "Please enter a quantity greater than 0.");
+                                                                return;
+                                                                }
+                                                            setLogTarget(null);
+                                                            if (isFood) {
+                                                                await handleLogFood(item, qty);
+                                                            } else {
+                                                                await handleLogRecipe(item, qty);
+                                                            }
+                                                        }}
+                                                        style={{ flex: 1, paddingVertical: 14, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}
+                                                    >
+                                                        <Text className="text-white font-sans-semibold text-base">Log Food</Text>
+                                                    </Pressable>
+                                                </View>
+                                            </View>
+                                        </GlassContainer>
+                                    </Animated.View>
+                                </Pressable>
+                            </Pressable>
+                        </View>
+                    </Modal>
+                );
+            })()}
         </KeyboardAvoidingView>
     );
 }

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getDatabase } from "@/db/client";
 import RecipeFeed from "@/components/RecipeFeed";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import AddRecipesModal from "@/components/AddRecipesModal";
 
 export default function CollectionDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -14,6 +15,7 @@ export default function CollectionDetailScreen() {
     const [recipes, setRecipes] = useState<any[]>([]);
     const [collectionName, setCollectionName] = useState("");
     const [loading, setLoading] = useState(true);
+    const [showAddModal, setShowAddModal] = useState(false);
 
     const loadData = useCallback(async () => {
         if (!id) return;
@@ -61,6 +63,12 @@ export default function CollectionDetailScreen() {
                             {collectionName || "Loading..."}
                         </Text>
                     </View>
+                    <Pressable
+                        onPress={() => setShowAddModal(true)}
+                        className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center ml-4"
+                    >
+                        <Ionicons name="add-outline" size={24} color="#FF6B35" />
+                    </Pressable>
                 </View>
             </View>
 
@@ -86,6 +94,13 @@ export default function CollectionDetailScreen() {
                     contentContainerStyle={{ paddingBottom: 100 }}
                 />
             )}
+
+            <AddRecipesModal
+                visible={showAddModal}
+                collectionId={parseInt(id || "0")}
+                onClose={() => setShowAddModal(false)}
+                onAddSuccess={loadData}
+            />
         </View>
     );
 }

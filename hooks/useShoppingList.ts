@@ -74,6 +74,21 @@ export function useShoppingList() {
         await loadItems();
     }, [loadItems]);
 
+    const clearAll = useCallback(async () => {
+        const db = await getDatabase();
+        const allItems = await db.getAllAsync<{ remote_id: string | null }>("SELECT remote_id FROM shopping_items");
+        
+        await db.runAsync("DELETE FROM shopping_items");
+        
+        for (const item of allItems) {
+            if (item.remote_id) {
+                unsyncShoppingItem(item.remote_id);
+            }
+        }
+        
+        await loadItems();
+    }, [loadItems]);
+
     const generateFromMealPlan = useCallback(async (startDate: string, endDate: string) => {
         const db = await getDatabase();
         
@@ -155,6 +170,7 @@ export function useShoppingList() {
         toggleItem,
         deleteItem,
         clearChecked,
+        clearAll,
         generateFromMealPlan,
         addItemsFromRecipe,
     };

@@ -132,7 +132,14 @@ export function useRecipes() {
                 [id]
             );
 
-            // Delete locally
+            // Delete locally (with manual cascades to prevent foreign key errors on older SQLite setups)
+            await db.runAsync("DELETE FROM ingredients WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM steps WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM recipe_collections WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM recipe_tags WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM meal_plans WHERE recipe_id = ?", [id]);
+            await db.runAsync("UPDATE shopping_items SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
+            await db.runAsync("UPDATE food_logs SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
             await db.runAsync("DELETE FROM recipes WHERE id = ?", [id]);
 
             // Also delete from Supabase if it was synced (fire-and-forget)
@@ -327,6 +334,7 @@ export function useRecipes() {
         // Map public_recipes schema to internal Recipe/Ingredient/Step schema
         const recipe: Recipe = {
             id: 0, // Placeholder
+            remote_id: null,
             title: data.title,
             description: data.description,
             image_url: data.image_url,
@@ -349,20 +357,24 @@ export function useRecipes() {
 
         const ingredients: Ingredient[] = (data.ingredients || []).map((ing: any, idx: number) => ({
             id: idx,
+            remote_id: null,
             recipe_id: 0,
             text: ing.text,
             quantity: ing.quantity,
             unit: ing.unit,
             name: ing.name,
             section: ing.section,
-            order_index: idx
+            order_index: idx,
+            checked: false
         }));
 
         const steps: Step[] = (data.steps || []).map((step: any, idx: number) => ({
             id: idx,
+            remote_id: null,
             recipe_id: 0,
             text: step.text,
-            step_number: step.step_number || (idx + 1)
+            step_number: step.step_number || (idx + 1),
+            checked: false
         }));
 
         return { recipe, ingredients, steps };
@@ -379,10 +391,10 @@ export function useRecipes() {
             servings: data.recipe.servings,
             prepTime: data.recipe.prep_time || "",
             cookTime: data.recipe.cook_time || "",
-            calories: data.recipe.calories,
-            protein: data.recipe.protein,
-            fat: data.recipe.fat,
-            carbs: data.recipe.carbs,
+            calories: data.recipe.calories ?? undefined,
+            protein: data.recipe.protein ?? undefined,
+            fat: data.recipe.fat ?? undefined,
+            carbs: data.recipe.carbs ?? undefined,
             ingredients: data.ingredients.map(i => ({
                 text: i.text,
                 name: i.name,
@@ -423,6 +435,23 @@ export function useRecipes() {
         return data || [];
     }, []);
 
+    const shareRecipeToCommunity = useCallback(async (recipeData: ExtractedRecipe) => {
+        try {
+            const { error } = await supabase.rpc('share_to_community_rpc', {
+                recipe_data: recipeData
+            });
+
+            if (error) {
+                console.warn("Failed to share recipe to community:", error);
+                return false;
+            }
+            return true;
+        } catch (e) {
+            console.error("Error sharing to community:", e);
+            return false;
+        }
+    }, []);
+
     return {
         recipes,
         loading,
@@ -431,6 +460,7 @@ export function useRecipes() {
         getCommunityRecipeById,
         searchCommunityRecipes,
         saveCommunityRecipe,
+        shareRecipeToCommunity,
         insertRecipe,
         deleteRecipe,
         updateRecipe,
@@ -474,7 +504,8 @@ export function useRecipes() {
                             console.log(`[Repair] No source URL for recipe ${recipe.id}, skipping.`);
                             continue;
                         }
-                        const extracted = await extractFromUrl(recipe.source_url, true);
+                        const extractedArr = await extractFromUrl(recipe.source_url, true);
+                        const extracted = extractedArr[0];
                         if (extracted.imageUrl && extracted.imageUrl !== recipe.image_url) {
                         console.log(`[Repair] Updating image for recipe ${recipe.id}: ${extracted.imageUrl}`);
                         await db.runAsync(

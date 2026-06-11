@@ -22,6 +22,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { useAppReview } from "@/hooks/useAppReview";
 import ReviewPromptModal from "@/components/ReviewPromptModal";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
 
 function FormInput({
     label,
@@ -60,12 +61,14 @@ function FormInput({
 
 export default function NewRecipeScreen() {
     const router = useRouter();
-    const { insertRecipe } = useRecipes();
+    const { insertRecipe, shareRecipeToCommunity } = useRecipes();
     const [loading, setLoading] = useState(false);
     const { showPrePrompt, recordSuccessfulSave, handlePrePromptResponse } = useAppReview();
+    const { isPro } = useRevenueCat();
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
+    const [shareToCommunity, setShareToCommunity] = useState(true);
     const [prepTime, setPrepTime] = useState("");
     const [cookTime, setCookTime] = useState("");
     const [servings, setServings] = useState("4");
@@ -129,6 +132,10 @@ export default function NewRecipeScreen() {
             };
 
             const recipeId = await insertRecipe(recipeData, undefined, "manual");
+
+            if (!isPro || shareToCommunity) {
+                await shareRecipeToCommunity(recipeData);
+            }
 
             await recordSuccessfulSave();
 
@@ -278,6 +285,24 @@ export default function NewRecipeScreen() {
                             style={{ textAlignVertical: "top" }}
                         />
                     </View>
+
+                    <Pressable
+                        onPress={() => isPro && setShareToCommunity(!shareToCommunity)}
+                        className={`flex-row items-center p-4 rounded-2xl mb-8 ${shareToCommunity || !isPro ? 'bg-surface-800' : 'bg-surface-900'}`}
+                    >
+                        <View className={`w-6 h-6 rounded-md items-center justify-center mr-3 ${shareToCommunity || !isPro ? 'bg-accent' : 'border border-surface-600'}`}>
+                            {(shareToCommunity || !isPro) && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-white font-sans-semibold text-sm mb-0.5">Share to Community Library</Text>
+                            <Text className="text-surface-400 font-sans text-xs">
+                                {!isPro ? "Free users automatically share imported and manual recipes to the community." : "Allow others to discover and use this recipe."}
+                            </Text>
+                        </View>
+                        {!isPro && (
+                            <Ionicons name="lock-closed" size={16} color="#6E6E85" />
+                        )}
+                    </Pressable>
                 </Animated.View>
             </ScrollView>
 

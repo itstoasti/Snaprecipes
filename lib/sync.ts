@@ -3,6 +3,67 @@ import { supabase } from "@/lib/supabase";
 import * as Crypto from "expo-crypto";
 import type { SQLiteDatabase } from "expo-sqlite";
 import type { Recipe, Ingredient, Step, Collection, MealPlan, ShoppingItem } from "@/db/schema";
+import * as FileSystem from "expo-file-system";
+import { decode } from "base64-arraybuffer";
+
+// Helper: upload local file:/// or content:// image to Supabase Storage and return the public URL.
+// If it's already a web URL, return it as-is.
+async function uploadRecipeImageIfNeeded(
+    db: SQLiteDatabase,
+    userId: string,
+    recipeId: number,
+    remoteRecipeId: string,
+    imageUri: string | null
+): Promise<string | null> {
+    if (!imageUri) return null;
+
+    const isLocal = imageUri.startsWith("file://") || imageUri.startsWith("content://") || !imageUri.includes("://");
+    if (!isLocal) return imageUri;
+
+    try {
+        console.log(`[Upload] Uploading local image to Supabase Storage: ${imageUri}`);
+        
+        let cleanUri = imageUri;
+        // Ensure format file:// for local file paths
+        if (!cleanUri.startsWith("file://") && !cleanUri.startsWith("content://")) {
+            cleanUri = "file://" + cleanUri;
+        }
+
+        const base64 = await FileSystem.readAsStringAsync(cleanUri, {
+            encoding: FileSystem.EncodingType.Base64,
+        });
+
+        const arrayBuffer = decode(base64);
+        // Save images as userId/remoteRecipeId.jpg to align with RLS check (foldername(name))[1] = auth.uid()::text
+        const filePath = `${userId}/${remoteRecipeId}.jpg`;
+
+        const { error: uploadErr } = await supabase.storage
+            .from("recipe-images")
+            .upload(filePath, arrayBuffer, {
+                contentType: "image/jpeg",
+                upsert: true,
+            });
+
+        if (uploadErr) {
+            console.error(`[Upload] Supabase storage upload failed:`, uploadErr.message);
+            return null;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from("recipe-images")
+            .getPublicUrl(filePath);
+
+        console.log(`[Upload] Upload successful! Public URL: ${publicUrl}`);
+
+        // Update local database to persist the cloud URL
+        await db.runAsync("UPDATE recipes SET image_url = ? WHERE id = ?", [publicUrl, recipeId]);
+
+        return publicUrl;
+    } catch (e) {
+        console.error(`[Upload] Failed to read or upload image:`, e);
+        return null;
+    }
+}
 
 // Shared helper: push one recipe (ingredients + steps) to Supabase and stamp remote_ids locally
 async function pushSingleRecipe(
@@ -15,12 +76,14 @@ async function pushSingleRecipe(
     const ingredients = await db.getAllAsync<Ingredient>("SELECT * FROM ingredients WHERE recipe_id = ?", [recipe.id]);
     const steps = await db.getAllAsync<Step>("SELECT * FROM steps WHERE recipe_id = ?", [recipe.id]);
 
+    const uploadedImageUrl = await uploadRecipeImageIfNeeded(db, userId, recipe.id, recipeRemoteId, recipe.image_url);
+
     const recipePayload = {
         id: recipeRemoteId,
         owner_id: userId,
         title: recipe.title,
         description: recipe.description,
-        image_url: recipe.image_url,
+        image_url: uploadedImageUrl,
         source_url: recipe.source_url,
         source_type: recipe.source_type,
         servings: recipe.servings,
@@ -271,10 +334,11 @@ export async function syncUpdateRecipe(recipeId: number): Promise<void> {
     if (!recipe) return;
 
     try {
+        const uploadedImageUrl = await uploadRecipeImageIfNeeded(db, user.id, recipe.id, recipe.remote_id!, recipe.image_url);
         const { error } = await supabase.from('recipes').update({
             title: recipe.title,
             description: recipe.description,
-            image_url: recipe.image_url,
+            image_url: uploadedImageUrl,
             source_url: recipe.source_url,
             source_type: recipe.source_type,
             servings: recipe.servings,
@@ -501,6 +565,33 @@ export async function pullRemoteChanges(): Promise<void> {
 
     const db = await getDatabase();
     
+    // Debug wrapper for executing queries with parameters
+    const runLogged = async (sql: string, params: any[] = []): Promise<any> => {
+        try {
+            return await db.runAsync(sql, params);
+        } catch (error) {
+            console.error(`[DB ERROR] Failed running: "${sql}" with params:`, params);
+            console.error("[DB ERROR DETAILS]", error);
+            try {
+                const schema = await db.getAllAsync<{ name: string; sql: string }>("SELECT name, sql FROM sqlite_master WHERE type='table'");
+                console.error("[SQL SCHEMA DUMP]", JSON.stringify(schema, null, 2));
+            } catch (schemaErr) {
+                console.error("Failed to dump schema:", schemaErr);
+            }
+            throw error;
+        }
+    };
+
+    const getFirstLogged = async <T>(sql: string, params: any[] = []): Promise<T | null> => {
+        try {
+            return await db.getFirstAsync<T>(sql, params);
+        } catch (error) {
+            console.error(`[DB ERROR] Failed getFirst: "${sql}" with params:`, params);
+            console.error("[DB ERROR DETAILS]", error);
+            throw error;
+        }
+    };
+    
     try {
         if (__DEV__) console.log(`Pulling remote changes from Supabase...`);
         
@@ -520,7 +611,7 @@ export async function pullRemoteChanges(): Promise<void> {
         // 2. Insert or Update Local DB based on remote_id
         for (const rRecipe of remoteRecipes) {
             // Check if recipe exists locally by remote_id
-            const existing = await db.getFirstAsync<Recipe>("SELECT * FROM recipes WHERE remote_id = ?", [rRecipe.id]);
+            const existing = await getFirstLogged<Recipe>("SELECT * FROM recipes WHERE remote_id = ?", [rRecipe.id]);
             
             let localRecipeId;
             
@@ -536,7 +627,7 @@ export async function pullRemoteChanges(): Promise<void> {
                 if (remoteUpdated > localUpdated + 2000) {
                     console.log(`[Sync] Updating recipe ${existing.id} (remote is newer: ${rRecipe.updated_at} vs ${existing.updated_at})`);
                     localRecipeId = existing.id;
-                    await db.runAsync(
+                    await runLogged(
                         `UPDATE recipes SET title=?, description=?, image_url=?, source_url=?, source_type=?, servings=?, prep_time=?, cook_time=?, calories=?, protein=?, fat=?, carbs=?, sugar=?, fiber=?, sodium=?, sync_status='synced', updated_at=? WHERE id=?`,
                         [rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time, rRecipe.calories, rRecipe.protein, rRecipe.fat, rRecipe.carbs, rRecipe.sugar, rRecipe.fiber, rRecipe.sodium, rRecipe.updated_at, existing.id]
                     );
@@ -546,7 +637,7 @@ export async function pullRemoteChanges(): Promise<void> {
                 }
             } else {
                 // Insert OR IGNORE to prevent UNIQUE constraint crashes
-                const res = await db.runAsync(
+                const res = await runLogged(
                     `INSERT OR IGNORE INTO recipes (remote_id, title, description, image_url, source_url, source_type, servings, prep_time, cook_time, calories, protein, fat, carbs, sugar, fiber, sodium, sync_status) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
                     [rRecipe.id, rRecipe.title, rRecipe.description, rRecipe.image_url, rRecipe.source_url, rRecipe.source_type, rRecipe.servings, rRecipe.prep_time, rRecipe.cook_time, rRecipe.calories, rRecipe.protein, rRecipe.fat, rRecipe.carbs, rRecipe.sugar, rRecipe.fiber, rRecipe.sodium]
@@ -554,7 +645,7 @@ export async function pullRemoteChanges(): Promise<void> {
                 
                 if (res.lastInsertRowId === 0) {
                     // It was ignored, so it must exist now. Re-fetch the id.
-                    const existingNow = await db.getFirstAsync<{id: number}>("SELECT id FROM recipes WHERE remote_id = ?", [rRecipe.id]);
+                    const existingNow = await getFirstLogged<{id: number}>("SELECT id FROM recipes WHERE remote_id = ?", [rRecipe.id]);
                     localRecipeId = existingNow?.id;
                 } else {
                     localRecipeId = res.lastInsertRowId;
@@ -565,12 +656,12 @@ export async function pullRemoteChanges(): Promise<void> {
             if (remoteIngredients) {
                 const recipeMates = remoteIngredients.filter((ing: any) => ing.recipe_id === rRecipe.id);
                 for (const rIng of recipeMates) {
-                    const eIng = await db.getFirstAsync<{id: number}>("SELECT id FROM ingredients WHERE remote_id = ?", [rIng.id]);
+                    const eIng = await getFirstLogged<{id: number}>("SELECT id FROM ingredients WHERE remote_id = ?", [rIng.id]);
                     if (eIng) {
-                        await db.runAsync(`UPDATE ingredients SET text=?, quantity=?, unit=?, name=?, order_index=? WHERE id=?`, 
+                        await runLogged(`UPDATE ingredients SET text=?, quantity=?, unit=?, name=?, order_index=? WHERE id=?`, 
                             [rIng.text, rIng.quantity, rIng.unit, rIng.name, rIng.order_index, eIng.id]);
                     } else {
-                        await db.runAsync(`INSERT OR REPLACE INTO ingredients (remote_id, recipe_id, text, quantity, unit, name, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+                        await runLogged(`INSERT OR REPLACE INTO ingredients (remote_id, recipe_id, text, quantity, unit, name, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
                             [rIng.id, localRecipeId, rIng.text, rIng.quantity, rIng.unit, rIng.name, rIng.order_index]);
                     }
                 }
@@ -580,11 +671,11 @@ export async function pullRemoteChanges(): Promise<void> {
             if (remoteSteps) {
                 const stepMates = remoteSteps.filter((step: any) => step.recipe_id === rRecipe.id);
                 for (const rStep of stepMates) {
-                    const eStep = await db.getFirstAsync<{id: number}>("SELECT id FROM steps WHERE remote_id = ?", [rStep.id]);
+                    const eStep = await getFirstLogged<{id: number}>("SELECT id FROM steps WHERE remote_id = ?", [rStep.id]);
                     if (eStep) {
-                        await db.runAsync(`UPDATE steps SET text=?, step_number=? WHERE id=?`, [rStep.text, rStep.step_number, eStep.id]);
+                        await runLogged(`UPDATE steps SET text=?, step_number=? WHERE id=?`, [rStep.text, rStep.step_number, eStep.id]);
                     } else {
-                        await db.runAsync(`INSERT OR REPLACE INTO steps (remote_id, recipe_id, text, step_number) VALUES (?, ?, ?, ?)`, 
+                        await runLogged(`INSERT OR REPLACE INTO steps (remote_id, recipe_id, text, step_number) VALUES (?, ?, ?, ?)`, 
                             [rStep.id, localRecipeId, rStep.text, rStep.step_number]);
                     }
                 }
@@ -597,17 +688,17 @@ export async function pullRemoteChanges(): Promise<void> {
 
         if (remoteCollections && remoteCollections.length > 0) {
             for (const rCol of remoteCollections) {
-                const existing = await db.getFirstAsync<{ id: number }>(
+                const existing = await getFirstLogged<{ id: number }>(
                     "SELECT id FROM collections WHERE remote_id = ?", [rCol.id]
                 );
 
                 if (existing) {
-                    await db.runAsync(
+                    await runLogged(
                         `UPDATE collections SET name=?, color=?, icon_name=? WHERE id=?`,
                         [rCol.name, rCol.color, rCol.icon_name, existing.id]
                     );
                 } else {
-                    await db.runAsync(
+                    await runLogged(
                         `INSERT INTO collections (remote_id, name, color, icon_name) VALUES (?, ?, ?, ?)`,
                         [rCol.id, rCol.name, rCol.color, rCol.icon_name]
                     );
@@ -621,10 +712,10 @@ export async function pullRemoteChanges(): Promise<void> {
 
         if (remoteRC && remoteRC.length > 0) {
             for (const rAssoc of remoteRC) {
-                const localRecipe = await db.getFirstAsync<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rAssoc.recipe_id]);
-                const localCol = await db.getFirstAsync<{ id: number }>("SELECT id FROM collections WHERE remote_id = ?", [rAssoc.collection_id]);
+                const localRecipe = await getFirstLogged<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rAssoc.recipe_id]);
+                const localCol = await getFirstLogged<{ id: number }>("SELECT id FROM collections WHERE remote_id = ?", [rAssoc.collection_id]);
                 if (localRecipe && localCol) {
-                    await db.runAsync(
+                    await runLogged(
                         `INSERT OR IGNORE INTO recipe_collections (recipe_id, collection_id) VALUES (?, ?)`,
                         [localRecipe.id, localCol.id]
                     );
@@ -638,17 +729,17 @@ export async function pullRemoteChanges(): Promise<void> {
 
         if (remotePlans && remotePlans.length > 0) {
             for (const rPlan of remotePlans) {
-                const localRecipe = await db.getFirstAsync<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rPlan.recipe_id]);
+                const localRecipe = await getFirstLogged<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rPlan.recipe_id]);
                 if (!localRecipe) continue;
 
-                const existing = await db.getFirstAsync<{ id: number }>("SELECT id FROM meal_plans WHERE remote_id = ?", [rPlan.id]);
+                const existing = await getFirstLogged<{ id: number }>("SELECT id FROM meal_plans WHERE remote_id = ?", [rPlan.id]);
                 if (existing) {
-                    await db.runAsync(
+                    await runLogged(
                         `UPDATE meal_plans SET recipe_id=?, planned_date=?, meal_type=?, servings=? WHERE id=?`,
                         [localRecipe.id, rPlan.planned_date, rPlan.meal_type, rPlan.servings, existing.id]
                     );
                 } else {
-                    await db.runAsync(
+                    await runLogged(
                         `INSERT INTO meal_plans (remote_id, recipe_id, planned_date, meal_type, servings) VALUES (?, ?, ?, ?, ?)`,
                         [rPlan.id, localRecipe.id, rPlan.planned_date, rPlan.meal_type, rPlan.servings]
                     );
@@ -664,18 +755,18 @@ export async function pullRemoteChanges(): Promise<void> {
             for (const rItem of remoteItems) {
                 let localRecipeId = null;
                 if (rItem.source_recipe_id) {
-                    const localRecipe = await db.getFirstAsync<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rItem.source_recipe_id]);
+                    const localRecipe = await getFirstLogged<{ id: number }>("SELECT id FROM recipes WHERE remote_id = ?", [rItem.source_recipe_id]);
                     localRecipeId = localRecipe?.id || null;
                 }
 
-                const existing = await db.getFirstAsync<{ id: number }>("SELECT id FROM shopping_items WHERE remote_id = ?", [rItem.id]);
+                const existing = await getFirstLogged<{ id: number }>("SELECT id FROM shopping_items WHERE remote_id = ?", [rItem.id]);
                 if (existing) {
-                    await db.runAsync(
+                    await runLogged(
                         `UPDATE shopping_items SET name=?, quantity=?, unit=?, is_checked=?, category=?, source_recipe_id=? WHERE id=?`,
                         [rItem.name, rItem.quantity, rItem.unit, rItem.is_checked ? 1 : 0, rItem.category, localRecipeId, existing.id]
                     );
                 } else {
-                    await db.runAsync(
+                    await runLogged(
                         `INSERT INTO shopping_items (remote_id, name, quantity, unit, is_checked, category, source_recipe_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                         [rItem.id, rItem.name, rItem.quantity, rItem.unit, rItem.is_checked ? 1 : 0, rItem.category, localRecipeId]
                     );
@@ -685,7 +776,7 @@ export async function pullRemoteChanges(): Promise<void> {
         
         // Final sanity check: Deduplicate any local recipes that share the exact same title
         // This resolves issues where free-user syncs might duplicate existing remote items.
-        await deduplicateRecipes(db);
+        await deduplicateRecipes(db, runLogged);
 
         if (__DEV__) console.log("Pull sync completed successfully.");
     } catch (e) {
@@ -693,7 +784,7 @@ export async function pullRemoteChanges(): Promise<void> {
     }
 }
 
-async function deduplicateRecipes(db: SQLiteDatabase) {
+async function deduplicateRecipes(db: SQLiteDatabase, runLogged: (sql: string, params?: any[]) => Promise<any>) {
     try {
         const recipes = await db.getAllAsync<Recipe>("SELECT * FROM recipes ORDER BY created_at ASC");
         const seenTitles = new Map<string, Recipe>();
@@ -714,7 +805,14 @@ async function deduplicateRecipes(db: SQLiteDatabase) {
         }
 
         for (const id of dupesToDelete) {
-            await db.runAsync("DELETE FROM recipes WHERE id = ?", [id]);
+            await runLogged("DELETE FROM ingredients WHERE recipe_id = ?", [id]);
+            await runLogged("DELETE FROM steps WHERE recipe_id = ?", [id]);
+            await runLogged("DELETE FROM recipe_collections WHERE recipe_id = ?", [id]);
+            await runLogged("DELETE FROM recipe_tags WHERE recipe_id = ?", [id]);
+            await runLogged("DELETE FROM meal_plans WHERE recipe_id = ?", [id]);
+            await runLogged("UPDATE shopping_items SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
+            await runLogged("UPDATE food_logs SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
+            await runLogged("DELETE FROM recipes WHERE id = ?", [id]);
         }
 
         if (dupesToDelete.length > 0 && __DEV__) {

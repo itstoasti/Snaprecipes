@@ -183,14 +183,17 @@ function extractRecipeSection(content: string, maxChars: number = 40000): string
 /**
  * Extract a recipe from a URL using Gemini or OpenAI
  */
-export async function extractFromUrl(url: string, reCacheOnly = false): Promise<ExtractedRecipe> {
+export async function extractFromUrl(url: string, reCacheOnly = false): Promise<ExtractedRecipe[]> {
     let markdownContent = "";
     let ogImage = "";
     let socialCaption = "";
     let scrapeFailed = true; // Track if actual page content was scraped
+    let slideshowImages: string[] = []; // TikTok/IG slideshow image URLs
+    let tiktokVideoUrl: string | undefined = undefined;
 
     // Step 1: Handle TikTok URLs specifically since they aggressively block Jina and OpenGraph scrapers
     const isTikTok = url.includes("tiktok.com");
+    const isInstagram = url.includes("instagram.com");
     if (isTikTok) {
         try {
             const tikwmResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
@@ -203,6 +206,15 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
                 }
                 if (tikwmData.data.cover) {
                     ogImage = tikwmData.data.cover;
+                }
+                // Detect TikTok slideshow (photo carousel) — TikWM returns images[] array
+                if (tikwmData.data.images && Array.isArray(tikwmData.data.images) && tikwmData.data.images.length > 0) {
+                    slideshowImages = tikwmData.data.images;
+                    if (__DEV__) console.log(`[Slideshow] TikTok slideshow detected with ${slideshowImages.length} slides`);
+                    // Use the first slide as the recipe thumbnail
+                    ogImage = tikwmData.data.images[0];
+                } else if (tikwmData.data.play) {
+                    tiktokVideoUrl = tikwmData.data.play;
                 }
             }
         } catch (e) {
@@ -337,7 +349,10 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
             provider, 
             geminiModel: 'gemini-2.5-flash',
             reCacheOnly,
-            ogImageUrl: ogImage
+            ogImageUrl: ogImage,
+            slideshowImageUrls: slideshowImages.length > 0 ? slideshowImages : undefined,
+            isInstagram: isInstagram || undefined,
+            videoUrl: tiktokVideoUrl
         })
     });
 
@@ -352,12 +367,24 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
     if (__DEV__) {
         console.log("=== RAW AI RESPONSE ===");
         console.log("Provider:", provider);
-        console.log("Has imageUrl:", !!data.imageUrl);
-        console.log("Has steps:", !!data.steps, "Length:", data.steps?.length || 0);
-        console.log("Has ingredients:", !!data.ingredients, "Length:", data.ingredients?.length || 0);
+        console.log("Is slideshow:", !!data.slideshow);
+        if (data.slideshow) {
+            console.log("Recipes found:", data.recipes?.length || 0);
+        } else {
+            console.log("Has imageUrl:", !!data.imageUrl);
+            console.log("Has steps:", !!data.steps, "Length:", data.steps?.length || 0);
+            console.log("Has ingredients:", !!data.ingredients, "Length:", data.ingredients?.length || 0);
+        }
         console.log("=== END DEBUG ===");
     }
 
+    // Handle slideshow multi-recipe response
+    if (data.slideshow && data.recipes && Array.isArray(data.recipes)) {
+        if (__DEV__) console.log(`[Slideshow] Received ${data.recipes.length} recipes from slideshow extraction`);
+        return data.recipes.map((r: any) => validateRecipe(r));
+    }
+
+    // Single recipe flow (normal extraction)
     const recipe = validateRecipe(data);
 
     // Instagram/Facebook CDN URLs often fail to load in apps due to expiring signatures in query params
@@ -398,7 +425,7 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
          recipe.imageUrl = ogImage;
     }
 
-    return recipe;
+    return [recipe];
 }
 
 /**

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
     View, Text, Pressable, Alert, ActivityIndicator, Platform, ScrollView,
 } from "react-native";
@@ -28,6 +28,13 @@ interface ScannedFood {
     sodium?: number | null;
 }
 
+const MEAL_TYPES = [
+    { key: "breakfast", label: "Breakfast", icon: "sunny" },
+    { key: "lunch", label: "Lunch", icon: "restaurant" },
+    { key: "dinner", label: "Dinner", icon: "moon" },
+    { key: "snack", label: "Snack", icon: "nutrition" },
+] as const;
+
 export default function ScanScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -36,7 +43,8 @@ export default function ScanScreen() {
     const params = useLocalSearchParams<{ date: string; mealType: string; mode: string }>();
     const logDate = params.date || new Date().toISOString().split("T")[0];
     const mealType = (params.mealType || "snack") as "breakfast" | "lunch" | "dinner" | "snack";
-    const initialMode = (params.mode || "photo") as "photo" | "barcode";
+    const initialMode = (params.mode || "barcode") as "photo" | "barcode";
+    const [selectedMealType, setSelectedMealType] = useState<"breakfast" | "lunch" | "dinner" | "snack">(mealType);
 
     const { addFoodLog, saveCustomFood } = useFoodLog();
 
@@ -46,7 +54,31 @@ export default function ScanScreen() {
     const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
     const [confidence, setConfidence] = useState<string>("");
     const [barcodeProcessing, setBarcodeProcessing] = useState(false);
-    const [qty, setQty] = useState(1);
+    const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
+    const [quantities, setQuantities] = useState<Record<number, number>>({});
+    const [cameraReady, setCameraReady] = useState(false);
+    const [loggedIndexes, setLoggedIndexes] = useState<number[]>([]);
+
+    // Automatically select all items and default quantities to 1 when results load
+    useEffect(() => {
+        if (results) {
+            setSelectedIndexes(results.map((_, idx) => idx));
+            const initialQuantities: Record<number, number> = {};
+            results.forEach((_, idx) => {
+                initialQuantities[idx] = 1;
+            });
+            setQuantities(initialQuantities);
+        } else {
+            setSelectedIndexes([]);
+            setQuantities({});
+        }
+    }, [results]);
+
+    // Delay camera mount to avoid crash during screen transition animation
+    useEffect(() => {
+        const timer = setTimeout(() => setCameraReady(true), 350);
+        return () => clearTimeout(timer);
+    }, []);
 
     // ── Photo Capture → AI Analysis ──
     const analyzeBase64 = useCallback(async (base64: string) => {
@@ -104,7 +136,7 @@ export default function ScanScreen() {
 
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: ['images'],
                 base64: true,
                 quality: 0.7,
             });
@@ -213,51 +245,70 @@ export default function ScanScreen() {
         }
     }, [barcodeProcessing, scannedBarcode]);
 
-    const handleLogScannedFood = useCallback(async (food: ScannedFood) => {
+    const handleLogSelectedFoods = useCallback(async () => {
+        if (!results || selectedIndexes.length === 0) return;
+        setLoading(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await saveCustomFood({
-            food_name: food.food_name,
-            brand: food.brand,
-            serving_size: food.serving_size,
-            barcode: scannedBarcode || null,
-            calories: food.calories,
-            protein: food.protein,
-            fat: food.fat,
-            carbs: food.carbs,
-            sugar: food.sugar || null,
-            fiber: food.fiber || null,
-            sodium: food.sodium || null,
-            image_url: null,
-        });
 
-        await addFoodLog({
-            food_name: food.food_name,
-            brand: food.brand,
-            serving_size: food.serving_size,
-            serving_qty: qty,
-            calories: food.calories,
-            protein: food.protein,
-            fat: food.fat,
-            carbs: food.carbs,
-            sugar: food.sugar || null,
-            fiber: food.fiber || null,
-            sodium: food.sodium || null,
-            meal_type: mealType,
-            log_date: logDate,
-            source_type: mode === "barcode" ? "barcode" : "photo",
-            source_recipe_id: null,
-            image_url: null,
-            barcode: scannedBarcode || null,
-        });
-        router.back();
-        setTimeout(() => router.back(), 100);
-    }, [addFoodLog, saveCustomFood, mealType, logDate, mode, scannedBarcode, router, qty]);
+        try {
+            for (const idx of selectedIndexes) {
+                const food = results[idx];
+                const itemQty = quantities[idx] || 1;
+
+                await saveCustomFood({
+                    food_name: food.food_name,
+                    brand: food.brand,
+                    serving_size: food.serving_size,
+                    barcode: scannedBarcode || null,
+                    calories: food.calories,
+                    protein: food.protein,
+                    fat: food.fat,
+                    carbs: food.carbs,
+                    sugar: food.sugar || null,
+                    fiber: food.fiber || null,
+                    sodium: food.sodium || null,
+                    image_url: null,
+                });
+
+                await addFoodLog({
+                    food_name: food.food_name,
+                    brand: food.brand,
+                    serving_size: food.serving_size,
+                    serving_qty: itemQty,
+                    calories: food.calories,
+                    protein: food.protein,
+                    fat: food.fat,
+                    carbs: food.carbs,
+                    sugar: food.sugar || null,
+                    fiber: food.fiber || null,
+                    sodium: food.sodium || null,
+                    meal_type: selectedMealType,
+                    log_date: logDate,
+                    source_type: mode === "barcode" ? "barcode" : "photo",
+                    source_recipe_id: null,
+                    image_url: null,
+                    barcode: scannedBarcode || null,
+                });
+            }
+
+            // Move selected indexes to logged indexes
+            setLoggedIndexes(prev => [...prev, ...selectedIndexes]);
+            // Clear selections
+            setSelectedIndexes([]);
+        } catch (error: any) {
+            Alert.alert("Log Failed", error.message || "Could not log foods");
+        } finally {
+            setLoading(false);
+        }
+    }, [results, selectedIndexes, quantities, scannedBarcode, saveCustomFood, addFoodLog, selectedMealType, logDate, mode]);
 
     const handleRetake = useCallback(() => {
         setResults(null);
         setScannedBarcode(null);
         setConfidence("");
-        setQty(1);
+        setLoggedIndexes([]);
+        setSelectedIndexes([]);
+        setQuantities({});
     }, []);
 
     if (!permission) return <View className="flex-1 bg-surface-950 items-center justify-center"><ActivityIndicator size="large" color="#EF4444" /></View>;
@@ -278,64 +329,172 @@ export default function ScanScreen() {
         return (
             <View className="flex-1 bg-surface-950" style={{ paddingTop: Math.max(insets.top, 20) + 10 }}>
                 <Stack.Screen options={{ headerShown: false }} />
+                {/* Header */}
                 <View className="px-5 flex-row items-center justify-between mb-4">
-                    <Pressable onPress={handleRetake} className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center">
-                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                    <Pressable onPress={() => router.back()} className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center">
+                        <Ionicons name="close" size={20} color="#FFFFFF" />
                     </Pressable>
                     <Text className="text-white font-sans-bold text-xl">Results</Text>
-                    <View className="w-10" />
+                    <Pressable onPress={handleRetake} className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center">
+                        <Ionicons name="camera-outline" size={20} color="#FFFFFF" />
+                    </Pressable>
                 </View>
                 <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }}>
-                    {results.map((item, idx) => (
-                        <Animated.View key={idx} entering={FadeInDown.delay(idx * 80)}>
-                            <GlassContainer style={{ borderRadius: 20, marginBottom: 12 }} className="p-4">
-                                <Text className="text-white font-sans-bold text-base mb-1">{item.food_name}</Text>
-                                <Text className="text-surface-400 font-sans text-xs mb-3">{item.serving_size}</Text>
-                                <View className="flex-row flex-wrap mb-3">
-                                    {[
-                                        { label: "Calories", value: `${Math.round(item.calories)}`, color: "#EF4444" },
-                                        { label: "Protein", value: `${Math.round(item.protein)}g`, color: "#60A5FA" },
-                                        { label: "Carbs", value: `${Math.round(item.carbs)}g`, color: "#FBBF24" },
-                                        { label: "Fat", value: `${Math.round(item.fat)}g`, color: "#F472B6" },
-                                    ].map((m) => (
-                                        <View key={m.label} style={{ width: "25%", alignItems: "center", paddingVertical: 6 }}>
-                                            <Text style={{ color: m.color, fontFamily: "Inter_700Bold", fontSize: 16 }}>{m.value}</Text>
-                                            <Text className="text-surface-500 font-sans text-[10px] mt-1">{m.label}</Text>
+                    {/* Global Meal Category Selection */}
+                    <Animated.View entering={FadeInDown.delay(50)}>
+                        <GlassContainer style={{ borderRadius: 20, marginBottom: 16 }} className="p-4">
+                            <Text className="text-white font-sans-bold text-sm mb-3">Meal Category for this plate</Text>
+                            <View className="flex-row bg-white/5 rounded-2xl p-1 border border-white/5">
+                                {MEAL_TYPES.map((t) => {
+                                    const isSelected = selectedMealType === t.key;
+                                    return (
+                                        <Pressable
+                                            key={t.key}
+                                            onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                setSelectedMealType(t.key);
+                                            }}
+                                            className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
+                                            style={isSelected ? { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" } : undefined}
+                                        >
+                                            <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : "#6E6E85"} />
+                                            <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : "#6E6E85" }}>
+                                                {t.label}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </GlassContainer>
+                    </Animated.View>
+
+                    {/* Items List */}
+                    {results.map((item, idx) => {
+                        const isLogged = loggedIndexes.includes(idx);
+                        const isSelected = selectedIndexes.includes(idx);
+                        const itemQty = quantities[idx] || 1;
+
+                        return (
+                            <Animated.View key={idx} entering={FadeInDown.delay(idx * 80 + 100)}>
+                                <GlassContainer style={{ borderRadius: 20, marginBottom: 12 }} className="p-4">
+                                    <Pressable
+                                        onPress={() => {
+                                            if (isLogged) return;
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            setSelectedIndexes(prev =>
+                                                prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+                                            );
+                                        }}
+                                        className="flex-row items-center mb-1"
+                                    >
+                                        {/* Checkbox */}
+                                        {!isLogged && (
+                                            <View className="mr-3">
+                                                {isSelected ? (
+                                                    <View className="w-6 h-6 rounded-full bg-red-500 items-center justify-center">
+                                                        <Ionicons name="checkmark" size={16} color="white" />
+                                                    </View>
+                                                ) : (
+                                                    <View className="w-6 h-6 rounded-full border-2 border-white/20 items-center justify-center bg-white/5" />
+                                                )}
+                                            </View>
+                                        )}
+                                        
+                                        <View className="flex-1">
+                                            <Text className="text-white font-sans-bold text-base">{item.food_name}</Text>
+                                            <Text className="text-surface-400 font-sans text-xs">{item.serving_size}</Text>
                                         </View>
-                                    ))}
-                                </View>
+                                        
+                                        {isLogged && (
+                                            <View style={{ backgroundColor: "rgba(16,185,129,0.15)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(16,185,129,0.3)" }}>
+                                                <Text style={{ color: "#10B981", fontSize: 11 }} className="font-sans-bold">Logged ✓</Text>
+                                            </View>
+                                        )}
+                                    </Pressable>
 
-                                {/* Quantity Selector */}
-                                <View className="flex-row items-center justify-between bg-white/5 rounded-2xl px-5 py-4 mb-4 border border-white/10">
-                                    <View>
-                                        <Text className="text-white font-sans-bold text-sm">Number of Servings</Text>
-                                        <Text className="text-surface-500 font-sans text-[10px] mt-0.5">Total: {Math.round(item.calories * qty)} kcal</Text>
+                                    {/* Macro Breakdown (scaled in real-time) */}
+                                    <View className="flex-row flex-wrap mb-2 mt-3">
+                                        {[
+                                            { label: "Calories", value: `${Math.round(item.calories * itemQty)}`, color: "#EF4444" },
+                                            { label: "Protein", value: `${Math.round(item.protein * itemQty)}g`, color: "#60A5FA" },
+                                            { label: "Carbs", value: `${Math.round(item.carbs * itemQty)}g`, color: "#FBBF24" },
+                                            { label: "Fat", value: `${Math.round(item.fat * itemQty)}g`, color: "#F472B6" },
+                                        ].map((m) => (
+                                            <View key={m.label} style={{ width: "25%", alignItems: "center", paddingVertical: 4 }}>
+                                                <Text style={{ color: m.color, fontFamily: "Inter_700Bold", fontSize: 16 }}>{m.value}</Text>
+                                                <Text className="text-surface-500 font-sans text-[10px] mt-0.5">{m.label}</Text>
+                                            </View>
+                                        ))}
                                     </View>
-                                    <View className="flex-row items-center" style={{ gap: 16 }}>
-                                        <Pressable 
-                                            onPress={() => setQty(Math.max(0.5, qty - 0.5))} 
-                                            className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
-                                        >
-                                            <Ionicons name="remove" size={20} color="white" />
-                                        </Pressable>
-                                        <Text className="text-white font-sans-bold text-lg min-w-[24px] text-center">{qty}</Text>
-                                        <Pressable 
-                                            onPress={() => setQty(qty + 0.5)} 
-                                            className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
-                                        >
-                                            <Ionicons name="add" size={20} color="white" />
-                                        </Pressable>
-                                    </View>
-                                </View>
 
-                                <Pressable onPress={() => handleLogScannedFood(item)} style={{ backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 12, alignItems: "center" }}>
-                                    <Text className="text-white font-sans-bold text-sm">Add {qty} {qty === 1 ? "Serving" : "Servings"} to Log</Text>
-                                </Pressable>
-                            </GlassContainer>
-                        </Animated.View>
-                    ))}
-                    <Pressable onPress={handleRetake} className="items-center mt-2">
-                        <Text className="text-surface-400 font-sans text-sm">Scan Again</Text>
+                                    {/* Quantity Stepper (specific to this item, visible only if selected & not logged) */}
+                                    {!isLogged && isSelected && (
+                                        <View className="flex-row items-center justify-between bg-white/5 rounded-xl px-4 py-3 border border-white/5 mt-3">
+                                            <View>
+                                                <Text className="text-white font-sans-bold text-xs">Number of Servings</Text>
+                                                <Text className="text-surface-500 font-sans text-[9px] mt-0.5">Total: {Math.round(item.calories * itemQty)} kcal</Text>
+                                            </View>
+                                            <View className="flex-row items-center" style={{ gap: 12 }}>
+                                                <Pressable 
+                                                    onPress={() => {
+                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                        setQuantities(prev => ({
+                                                            ...prev,
+                                                            [idx]: Math.max(0.5, (prev[idx] || 1) - 0.5)
+                                                        }));
+                                                    }}
+                                                    className="w-8 h-8 rounded-full bg-surface-800 items-center justify-center border border-white/5"
+                                                >
+                                                    <Ionicons name="remove" size={16} color="white" />
+                                                </Pressable>
+                                                <Text className="text-white font-sans-bold text-sm min-w-[20px] text-center">
+                                                    {itemQty}
+                                                </Text>
+                                                <Pressable 
+                                                    onPress={() => {
+                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                        setQuantities(prev => ({
+                                                            ...prev,
+                                                            [idx]: (prev[idx] || 1) + 0.5
+                                                        }));
+                                                    }}
+                                                    className="w-8 h-8 rounded-full bg-surface-800 items-center justify-center border border-white/5"
+                                                >
+                                                    <Ionicons name="add" size={16} color="white" />
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    )}
+                                </GlassContainer>
+                            </Animated.View>
+                        );
+                    })}
+
+                    {/* Batch Log Button */}
+                    {selectedIndexes.length > 0 && (
+                        <Pressable 
+                            onPress={handleLogSelectedFoods} 
+                            style={{ backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 8 }}
+                        >
+                            <Text className="text-white font-sans-bold text-base">
+                                Log {selectedIndexes.length} Selected {selectedIndexes.length === 1 ? "Item" : "Items"}
+                            </Text>
+                        </Pressable>
+                    )}
+
+                    {/* Done Logging / Finish Button */}
+                    {loggedIndexes.length > 0 && (
+                        <Pressable 
+                            onPress={() => router.replace("/library/calorie-counter")} 
+                            style={{ backgroundColor: "#10B981", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 8, marginBottom: 16 }}
+                        >
+                            <Text className="text-white font-sans-bold text-base">Done Logging</Text>
+                        </Pressable>
+                    )}
+
+                    {/* Scan Another Photo */}
+                    <Pressable onPress={handleRetake} className="items-center mt-4 mb-8">
+                        <Text className="text-surface-400 font-sans text-sm">Scan Another Photo</Text>
                     </Pressable>
                 </ScrollView>
             </View>
@@ -345,13 +504,17 @@ export default function ScanScreen() {
     return (
         <View className="flex-1 bg-black">
             <Stack.Screen options={{ headerShown: false }} />
-            <CameraView
-                ref={cameraRef}
-                style={{ flex: 1 }}
-                facing="back"
-                barcodeScannerSettings={mode === "barcode" ? { barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "qr"] } : undefined}
-                onBarcodeScanned={mode === "barcode" ? handleBarcodeScanned : undefined}
-            />
+            {cameraReady ? (
+                <CameraView
+                    ref={cameraRef}
+                    style={{ flex: 1 }}
+                    facing="back"
+                    barcodeScannerSettings={mode === "barcode" ? { barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "qr"] } : undefined}
+                    onBarcodeScanned={mode === "barcode" ? handleBarcodeScanned : undefined}
+                />
+            ) : (
+                <View style={{ flex: 1, backgroundColor: '#000' }} />
+            )}
             <View className="absolute inset-0 pointer-events-box-none">
                 <View className="flex-row items-center justify-between px-6" style={{ paddingTop: Math.max(insets.top, 20) + 10 }}>
                     <Pressable onPress={() => router.back()} className="w-12 h-12 rounded-full bg-black/40 items-center justify-center" hitSlop={20}>
@@ -372,7 +535,7 @@ export default function ScanScreen() {
                 </View>
                 <View className="flex-1 items-center justify-center px-10">
                     {mode === "photo" ? <View className="w-full aspect-square rounded-3xl border-2 border-white/30" /> : (
-                        <View style={{ width: "90%", height: 200, borderRadius: 20, borderWidth: 2, borderColor: "rgba(251,191,36,0.5)", alignItems: "center", justifyContext: "center" }}>
+                        <View style={{ width: "90%", height: 200, borderRadius: 20, borderWidth: 2, borderColor: "rgba(251,191,36,0.5)", alignItems: "center", justifyContent: "center" }}>
                             <Ionicons name="barcode-outline" size={64} color="rgba(251,191,36,0.5)" />
                             <Text className="text-white/60 font-sans text-sm text-center mt-2">{barcodeProcessing ? "Looking up..." : "Align barcode in this area"}</Text>
                         </View>

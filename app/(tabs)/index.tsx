@@ -10,6 +10,8 @@ import { useCollections } from "@/hooks/useCollections";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "@/lib/supabase";
 import ImportModal from "@/components/ImportModal";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { canExtractRecipe } from "@/lib/usage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -19,10 +21,20 @@ export default function GroupedDashboard() {
     const { recipes, loadRecipes } = useRecipes();
     const { dailyTotals, refresh: refreshLogs } = useFoodLog();
     const { collections } = useCollections();
+    const { isPro } = useRevenueCat();
     
     const [trending, setTrending] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showImport, setShowImport] = useState(false);
+
+    const checkUsageAndOpenModal = async () => {
+        const allowed = await canExtractRecipe(isPro);
+        if (allowed) {
+            setShowImport(true);
+        } else {
+            router.push("/paywall");
+        }
+    };
 
     useFocusEffect(
         useCallback(() => {
@@ -94,7 +106,7 @@ export default function GroupedDashboard() {
                 {/* ── RECIPE MANAGEMENT (Main Purpose) ── */}
                 <View className="mb-10">
                     <Pressable 
-                        onPress={() => setShowImport(true)}
+                        onPress={checkUsageAndOpenModal}
                         className="w-full bg-accent rounded-[40px] p-8 justify-between shadow-lg shadow-accent/20"
                         style={{ height: 180 }}
                     >
@@ -179,7 +191,13 @@ export default function GroupedDashboard() {
                                 className="bg-surface-900 rounded-[28px] overflow-hidden border border-white/5"
                             >
                                 <View className="h-28">
-                                    <Image source={{ uri: recipe.image_url }} className="w-full h-full" />
+                                    {recipe.image_url ? (
+                                        <Image source={{ uri: recipe.image_url }} className="w-full h-full" />
+                                    ) : (
+                                        <View className="w-full h-full bg-surface-800 items-center justify-center">
+                                            <Text className="text-xl">🍽️</Text>
+                                        </View>
+                                    )}
                                 </View>
                                 <View className="p-3">
                                     <Text className="text-white font-sans-bold text-[11px]" numberOfLines={1}>{recipe.title}</Text>
