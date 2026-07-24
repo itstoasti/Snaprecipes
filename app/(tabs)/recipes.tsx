@@ -6,11 +6,12 @@ import { useRecipes } from "@/hooks/useRecipes";
 import RecipeFeed from "@/components/RecipeFeed";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import ImportModal from "@/components/ImportModal";
+import SavesExplanationModal from "@/components/SavesExplanationModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
-import { canExtractRecipe } from "@/lib/usage";
+import { canExtractRecipe, getCurrentUsage } from "@/lib/usage";
 
 export default function RecipesScreen() {
     const { recipes, loading, loadRecipes } = useRecipes();
@@ -20,12 +21,17 @@ export default function RecipesScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isPro } = useRevenueCat();
+    const [usageCount, setUsageCount] = useState(0);
+    const [showSavesExplanation, setShowSavesExplanation] = useState(false);
 
-    // Refresh recipes data on every focus
+    // Refresh recipes data and free usage count on every focus
     useFocusEffect(
         useCallback(() => {
             loadRecipes();
-        }, [loadRecipes])
+            if (!isPro) {
+                getCurrentUsage().then(setUsageCount).catch(console.error);
+            }
+        }, [loadRecipes, isPro])
     );
 
     // Apply search
@@ -67,13 +73,27 @@ export default function RecipesScreen() {
             style={{ paddingTop: Math.max(insets.top, 20) + 10 }}
         >
             {/* Header */}
-            <View className="px-5 mb-4">
-                <Text className="text-surface-400 font-sans text-xs uppercase tracking-widest">
-                    Your Kitchen
-                </Text>
-                <Text className="text-white font-sans-bold text-3xl mt-0.5">
-                    Recipes
-                </Text>
+            <View className="px-5 mb-4 flex-row justify-between items-end">
+                <View>
+                    <Text className="text-surface-400 font-sans text-xs uppercase tracking-widest">
+                        Your Kitchen
+                    </Text>
+                    <Text className="text-white font-sans-bold text-3xl mt-0.5">
+                        Recipes
+                    </Text>
+                </View>
+                {!isPro && (
+                    <Pressable
+                        onPress={() => setShowSavesExplanation(true)}
+                        className="bg-surface-900 border border-white/5 rounded-full px-3 py-1.5 flex-row items-center mb-1"
+                        style={{ gap: 6 }}
+                    >
+                        <View className="w-2 h-2 rounded-full" style={{ backgroundColor: usageCount >= 5 ? "#EF4444" : "#FF6B35" }} />
+                        <Text className="text-surface-300 font-sans-bold text-[10px] uppercase tracking-wider">
+                            Saves: {usageCount}/5 Free
+                        </Text>
+                    </Pressable>
+                )}
             </View>
 
             {/* Search Bar */}
@@ -113,6 +133,12 @@ export default function RecipesScreen() {
                     setShowImport(false);
                     loadRecipes();
                 }}
+            />
+
+            <SavesExplanationModal
+                visible={showSavesExplanation}
+                usageCount={usageCount}
+                onClose={() => setShowSavesExplanation(false)}
             />
         </View>
     );

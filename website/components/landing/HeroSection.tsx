@@ -1,122 +1,200 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import RevealOnScroll from "@/components/RevealOnScroll";
+
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.deanfieldz.yummy";
 
 export default function HeroSection() {
+    const router = useRouter();
+    const [url, setUrl] = useState("");
+    const [error, setError] = useState("");
+
+    const handleExtractSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+
+        const trimmedUrl = url.trim();
+        if (!trimmedUrl) {
+            setError("Please enter a recipe URL");
+            return;
+        }
+
+        // Basic URL validation
+        try {
+            new URL(trimmedUrl);
+        } catch (_) {
+            setError("Please enter a valid URL (including http/https)");
+            return;
+        }
+
+        // Navigate to preview page with the URL parameter
+        router.push(`/recipes/preview?url=${encodeURIComponent(trimmedUrl)}`);
+    };
+
     return (
-        <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
-            {/* Background blurs */}
-            <div className="absolute inset-0">
-                <div className="absolute top-20 left-10 w-72 h-72 bg-accent/20 rounded-full blur-[120px]" />
-                <div className="absolute bottom-20 right-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-[150px]" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[200px]" />
+        <section className="relative min-h-screen flex items-center overflow-hidden pt-28 pb-16 bg-surface-950">
+            {/* Background floating ingredients & blobs */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                {/* Floating Illustrations - Hidden on mobile/tablet, spread out in margins on desktop */}
+                <img
+                    src="/images/parsley.jpg"
+                    alt=""
+                    className="absolute top-[8%] left-[2%] w-24 h-24 md:w-36 md:h-36 object-contain animate-float opacity-35 select-none mix-blend-multiply rounded-full hidden lg:block"
+                />
+                <img
+                    src="/images/olive_oil.jpg"
+                    alt=""
+                    className="absolute top-[48%] left-[38%] w-24 h-24 md:w-36 md:h-36 object-contain animate-float opacity-35 select-none delay-500 mix-blend-multiply rounded-full hidden lg:block"
+                />
+                <img
+                    src="/images/onion.jpg"
+                    alt=""
+                    className="absolute top-[6%] right-[2%] w-24 h-24 md:w-36 md:h-36 object-contain animate-float opacity-35 select-none delay-1000 mix-blend-multiply rounded-full hidden lg:block"
+                />
+                <img
+                    src="/images/cheese.jpg"
+                    alt=""
+                    className="absolute top-[5%] right-[30%] w-24 h-24 md:w-36 md:h-36 object-contain animate-float opacity-35 select-none delay-700 mix-blend-multiply rounded-full hidden lg:block"
+                />
+
+                {/* Soft glow blobs */}
+                <div className="absolute top-1/4 left-0 w-80 h-80 bg-accent/5 rounded-full blur-[100px]" />
+                <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-accent/5 rounded-full blur-[120px]" />
             </div>
 
-            <div className="relative max-w-7xl mx-auto px-6 py-20 w-full">
-                <div className="grid lg:grid-cols-2 gap-16 items-center">
-                    {/* Text */}
+            <div className="relative max-w-7xl mx-auto px-6 w-full z-10">
+                <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
+                    {/* Left text column */}
                     <div className="text-center lg:text-left">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-900/80 border border-surface-700 text-sm text-surface-400 mb-8" style={{ animation: "fadeIn 0.6s ease-out 0.2s forwards", opacity: 0 }}>
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            Now available on Android
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-900 border border-surface-700/80 text-xs font-bold text-accent mb-8 animate-[fadeIn_0.6s_ease-out_0.2s_forwards] opacity-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                            WEB VERSION NOW AVAILABLE
                         </div>
 
-                        <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] mb-6" style={{ animation: "slideUp 0.6s ease-out 0.3s forwards", opacity: 0 }}>
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl font-black leading-[1.1] text-surface-300 mb-6 tracking-tight animate-[slideUp_0.6s_ease-out_0.3s_forwards] opacity-0">
                             Save Any Recipe
-                            <span className="gradient-text block">Instantly</span>
+                            <span className="text-accent block mt-1">Instantly</span>
                         </h1>
 
-                        <p className="text-xl text-surface-400 mb-10 max-w-lg mx-auto lg:mx-0" style={{ animation: "slideUp 0.6s ease-out 0.4s forwards", opacity: 0 }}>
+                        <p className="text-base sm:text-lg text-surface-500 mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed animate-[slideUp_0.6s_ease-out_0.4s_forwards] opacity-0">
                             Snap a photo, paste a link, or share from any app. We extract the recipe and ditch the 10-page life stories. Just clean, beautiful recipes.
                         </p>
 
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start" style={{ animation: "slideUp 0.6s ease-out 0.5s forwards", opacity: 0 }}>
-                            <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center justify-center gap-3 px-8 py-4 bg-accent hover:bg-accent-light rounded-2xl font-semibold text-lg transition-all hover:shadow-xl hover:shadow-accent/25 hover:-translate-y-1">
-                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.206 12l2.492-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z" />
-                                </svg>
-                                Download for Android
-                            </a>
+                        {/* Frictionless Web Extraction Bar */}
+                        <div className="mb-8 max-w-xl mx-auto lg:mx-0 animate-[slideUp_0.6s_ease-out_0.5s_forwards] opacity-0">
+                            <form onSubmit={handleExtractSubmit} className="relative flex flex-col sm:flex-row gap-2 p-1.5 bg-surface-900 border border-surface-700/60 rounded-3xl shadow-md">
+                                <input
+                                    type="text"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    placeholder="Paste a recipe URL to extract..."
+                                    className="flex-1 px-5 py-3.5 bg-transparent text-surface-300 font-sans text-sm outline-none placeholder:text-surface-500 rounded-2xl"
+                                />
+                                <button
+                                    type="submit"
+                                    className="px-6 py-3.5 bg-accent hover:bg-accent-light text-white font-bold text-sm rounded-2xl transition-all hover:shadow-lg hover:shadow-accent/25 active:scale-[0.98] cursor-pointer"
+                                >
+                                    Extract Free
+                                </button>
+                            </form>
+                            {error && (
+                                <p className="text-red-500 text-xs text-left mt-2 ml-4 font-semibold">{error}</p>
+                            )}
                         </div>
 
-                        {/* Social proof */}
-                        <div className="flex items-center gap-6 mt-10 justify-center lg:justify-start" style={{ animation: "fadeIn 0.6s ease-out 0.7s forwards", opacity: 0 }}>
-                            <div className="flex -space-x-3">
-                                {["photo-1494790108377-be9c29b29330", "photo-1507003211169-0a1dd7228f2d", "photo-1438761681033-6461ffad8d80", "photo-1472099645785-5658abf4ff4e"].map((id) => (
-                                    <img key={id} src={`https://images.unsplash.com/${id}?w=100&h=100&fit=crop`} className="w-10 h-10 rounded-full border-2 border-surface-950 object-cover" alt="" />
-                                ))}
+                        {/* Store links badges */}
+                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 mt-12 animate-[fadeIn_0.6s_ease-out_0.45s_forwards] opacity-0">
+                            <a
+                                href={PLAY_STORE_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="transition-transform active:scale-95 cursor-pointer"
+                            >
+                                <img
+                                    src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+                                    alt="Get it on Google Play"
+                                    className="h-14 md:h-16 object-contain"
+                                />
+                            </a>
+                            <button
+                                onClick={() => router.push("/auth")}
+                                className="px-7 py-3.5 bg-surface-900 hover:bg-[#F3EFE4] text-surface-300 font-extrabold rounded-2xl border border-surface-700/80 hover:border-surface-600 transition-all shadow-sm text-xs uppercase tracking-wider cursor-pointer"
+                            >
+                                Sign In to Web App
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Right Mockup column */}
+                    <div className="relative flex justify-center lg:justify-end animate-[scaleIn_0.8s_ease-out_0.4s_forwards] opacity-0 lg:pr-12">
+                        {/* Scattered Recipe Cards (left of the phone) */}
+                        <div className="absolute left-[-100px] top-[10%] w-44 hidden xl:block z-10 space-y-5 pointer-events-none">
+                            {/* Card 1 */}
+                            <div className="bg-surface-900 border border-surface-700/60 p-3 rounded-2xl shadow-xl -rotate-6 transform hover:rotate-0 transition-transform duration-300">
+                                <div className="h-20 rounded-lg bg-surface-950 overflow-hidden mb-1.5">
+                                    <img src="https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&q=80&w=200" alt="French Toast" className="w-full h-full object-cover" />
+                                </div>
+                                <h4 className="font-bold text-[10px] text-surface-300 truncate">French Toast</h4>
+                                <p className="text-[8px] text-surface-500">15 min • Easy</p>
                             </div>
-                            <div className="text-left">
-                                <div className="flex items-center gap-0.5 text-amber-400">
+
+                            {/* Card 2 */}
+                            <div className="bg-surface-900 border border-surface-700/60 p-3 rounded-2xl shadow-xl rotate-3 transform hover:rotate-0 transition-transform duration-300 translate-x-6">
+                                <div className="h-20 rounded-lg bg-surface-950 overflow-hidden mb-1.5">
+                                    <img src="https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&q=80&w=200" alt="Pesto Pasta" className="w-full h-full object-cover" />
+                                </div>
+                                <h4 className="font-bold text-[10px] text-surface-300 truncate">Pesto Pasta</h4>
+                                <p className="text-[8px] text-accent font-bold">20 min • Popular</p>
+                            </div>
+
+                            {/* Card 3 */}
+                            <div className="bg-surface-900 border border-surface-700/60 p-3 rounded-2xl shadow-xl -rotate-3 transform hover:rotate-0 transition-transform duration-300 -translate-x-2">
+                                <div className="h-20 rounded-lg bg-surface-950 overflow-hidden mb-1.5">
+                                    <img src="https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&q=80&w=200" alt="Salmon Bowl" className="w-full h-full object-cover" />
+                                </div>
+                                <h4 className="font-bold text-[10px] text-surface-300 truncate">Salmon Bowl</h4>
+                                <p className="text-[8px] text-surface-500">25 min • Healthy</p>
+                            </div>
+                        </div>
+
+                        {/* Floating Testimonial/Review Card (right of the phone) */}
+                        <div className="absolute right-[-80px] bottom-[15%] w-48 hidden xl:block z-10 pointer-events-none">
+                            <div className="bg-surface-900 border border-surface-700/60 p-3.5 rounded-2xl shadow-xl rotate-6 transform hover:rotate-0 transition-transform duration-300">
+                                <div className="flex items-center gap-0.5 mb-1.5 text-amber-400">
                                     {[...Array(5)].map((_, i) => (
-                                        <svg key={i} className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <svg key={i} className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                         </svg>
                                     ))}
                                 </div>
-                                <p className="text-surface-400 text-sm">Loved by 10,000+ home cooks</p>
+                                <p className="text-[9px] text-surface-450 leading-relaxed italic mb-1.5">
+                                    "No ads, no blogs, just clean cooking. Absolute game changer!"
+                                </p>
+                                <p className="text-[8px] font-bold text-surface-300 text-right">— Sarah J.</p>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Phone mockup */}
-                    <div className="relative flex justify-center lg:justify-end" style={{ animation: "scaleIn 0.8s ease-out 0.4s forwards", opacity: 0 }}>
-                        <div className="phone-mockup w-72 h-[600px] p-3 animate-float">
-                            <div className="w-full h-full rounded-[2.25rem] bg-surface-950 overflow-hidden relative">
-                                <div className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center z-20">
-                                    <div className="w-28 h-7 bg-black rounded-b-2xl" />
-                                </div>
-                                <div className="pt-10 px-4 h-full overflow-hidden">
-                                    <div className="flex items-center justify-between mb-5">
-                                        <div>
-                                            <p className="text-surface-500 text-xs">Good evening</p>
-                                            <h3 className="text-lg font-bold">My Recipes</h3>
-                                        </div>
-                                        <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                            </svg>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {[
-                                            { img: "photo-1499636136210-6f4ee915583e", title: "Chocolate Chip Cookies", time: "15 min", serves: "24 cookies" },
-                                            { img: "photo-1546069901-ba9599a7e63c", title: "Fresh Garden Salad", time: "10 min", serves: "4 servings" },
-                                            { img: "photo-1563379926898-05f4575a45d8", title: "Creamy Garlic Pasta", time: "25 min", serves: "6 servings" },
-                                        ].map((card) => (
-                                            <div key={card.title} className="recipe-card rounded-2xl overflow-hidden">
-                                                <div className="h-24 relative">
-                                                    <img src={`https://images.unsplash.com/${card.img}?w=400&h=200&fit=crop`} className="w-full h-full object-cover" alt={card.title} />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-surface-900/90 to-transparent" />
-                                                    <div className="absolute bottom-2 left-3 right-3">
-                                                        <h4 className="font-bold text-sm">{card.title}</h4>
-                                                    </div>
-                                                </div>
-                                                <div className="p-3 pt-2">
-                                                    <div className="flex items-center gap-3 text-[10px] text-surface-400">
-                                                        <span className="flex items-center gap-1">
-                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                            {card.time}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                            {card.serves}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                        {/* Phone container */}
+                        <div className="relative w-full max-w-[290px] rounded-[3rem] bg-[#0d0d0d] p-3 shadow-2xl border border-neutral-800 z-20">
+                            {/* Speaker & camera notch area */}
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-5 bg-[#0d0d0d] rounded-full z-20 flex items-center justify-center pointer-events-none">
+                                <div className="w-12 h-0.5 bg-neutral-800/60 rounded-full" />
+                            </div>
+                            <div className="rounded-[2.2rem] overflow-hidden relative bg-black border border-black/10" style={{ aspectRatio: "9 / 19.5" }}>
+                                <video
+                                    src="/videos/recipe_header_video.mp4"
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                    className="w-full h-full object-contain bg-black"
+                                />
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Scroll indicator */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-                <svg className="w-6 h-6 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
             </div>
         </section>
     );

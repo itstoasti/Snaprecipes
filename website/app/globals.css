@@ -1,17 +1,28 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-surface-950: #0a0a0f;
-  --color-surface-900: #12121a;
-  --color-surface-800: #1a1a24;
-  --color-surface-700: #252530;
-  --color-surface-600: #32323f;
-  --color-surface-500: #5c5c6d;
-  --color-surface-400: #8b8b9a;
+  --color-surface-950: #FDFBF7; /* Page Background (warm cream) */
+  --color-surface-900: #F7F4EB; /* Card Background (lighter cream) */
+  --color-surface-850: #F3EFE4; /* Intermediate card/tag surface */
+  --color-surface-800: #EFEBE0; /* Tag / Muted surfaces */
+  --color-surface-750: #E8E4D8; /* Intermediate border/surface */
+  --color-surface-700: #E2DDD0; /* Borders */
+  --color-surface-600: #B2AFA1; /* Secondary elements / borders */
+  --color-surface-550: #A09C8D; /* Muted text for crossed out/unavailable features */
+  --color-surface-500: #8E8A79; /* Secondary / Muted Text */
+  --color-surface-450: #747063; /* Intermediate body text */
+  --color-surface-400: #5C584E; /* Regular body text */
+  --color-surface-300: #1C1914; /* Headings and primary text */
   --color-accent: #FF6B35;
   --color-accent-light: #FF8C5A;
   --color-accent-dark: #E55A28;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-outfit), system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 @keyframes float {
@@ -78,7 +89,7 @@
 }
 
 .glass {
-  background: rgba(18, 18, 26, 0.8);
+  background: rgba(253, 251, 247, 0.8);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -102,8 +113,9 @@
 }
 
 .recipe-card {
-  background: linear-gradient(145deg, #12121a 0%, #0a0a0f 100%);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: var(--color-surface-900);
+  border: 1px solid var(--color-surface-700);
+  box-shadow: 0 10px 25px -5px rgba(28, 25, 20, 0.05), 0 8px 10px -6px rgba(28, 25, 20, 0.05);
 }
 
 .phone-mockup {
@@ -145,4 +157,8 @@
 
 .animate-glow {
   animation: glow 2s ease-in-out infinite alternate;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

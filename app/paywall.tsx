@@ -1,4 +1,5 @@
 import React from "react";
+import { trackEvent } from "@/lib/analytics";
 import { View, Text, Pressable, Platform, StatusBar, Image, ScrollView, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -63,6 +64,7 @@ export default function PaywallScreen() {
 
     // Track when paywall is shown for RevenueCat analytics
     React.useEffect(() => {
+        trackEvent("paywall_viewed");
         if (currentOffering && typeof (Purchases as any).logPaywallPresented === 'function') {
             try {
                 (Purchases as any).logPaywallPresented(currentOffering);
@@ -92,6 +94,7 @@ export default function PaywallScreen() {
     const baseMonthlyPrice = monthlyPackage ? monthlyPackage.product.price : 2.99;
 
     const handleSelectPackage = (pkgId: string) => {
+        trackEvent("paywall_package_selected", { package_id: pkgId });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedPkgId(pkgId);
     };
@@ -112,11 +115,15 @@ export default function PaywallScreen() {
                 return;
             }
 
+            trackEvent("purchase_initiated", { package_type: activePackage.packageType, price: activePackage.product.price });
             await Purchases.purchasePackage(activePackage);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            trackEvent("purchase_completed", { package_type: activePackage.packageType });
             router.replace("/auth");
         } catch (e: any) {
-            if (!e.userCancelled) {
+            if (e.userCancelled) {
+                trackEvent("purchase_cancelled");
+            } else {
                 console.error("Purchase error", e);
                 alert("An error occurred during purchase. Please try again.");
             }
@@ -322,7 +329,7 @@ export default function PaywallScreen() {
                             <Ionicons name="checkmark-sharp" size={20} color="#10B981" style={{ marginTop: 2, marginRight: 10 }} />
                             <View style={{ flex: 1 }}>
                                 <Text className="text-white font-sans-bold text-lg leading-6">Recipe Importing & Management</Text>
-                                <Text className="text-surface-200 font-sans text-sm leading-5">Save recipes from any website, Instagram, or TikTok.</Text>
+                                <Text className="text-surface-200 font-sans text-sm leading-5">Save recipes from any website, Instagram, or TikTok. (Pro includes unlimited saves; free tier limited to 5 saves per month).</Text>
                             </View>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>

@@ -66,9 +66,10 @@ export default function RecipeDetailScreen() {
     const [showCollectionModal, setShowCollectionModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [inCollection, setInCollection] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
     const [statusModalConfig, setStatusModalConfig] = useState<{
         visible: boolean;
-        type: "success" | "error";
+        type: "success" | "error" | "info";
         title: string;
         message: string;
     }>({ visible: false, type: "success", title: "", message: "" });
@@ -85,6 +86,22 @@ export default function RecipeDetailScreen() {
         let data;
         if (isCommunity === "true") {
             data = await getCommunityRecipeById(id);
+            if (data?.recipe) {
+                const db = await getDatabase();
+                let savedRecipe: Recipe | null = null;
+                if (data.recipe.source_url) {
+                    savedRecipe = await db.getFirstAsync<Recipe>(
+                        "SELECT id FROM recipes WHERE source_url = ?",
+                        [data.recipe.source_url]
+                    );
+                } else {
+                    savedRecipe = await db.getFirstAsync<Recipe>(
+                        "SELECT id FROM recipes WHERE title = ?",
+                        [data.recipe.title]
+                    );
+                }
+                setIsSaved(!!savedRecipe);
+            }
         } else {
             data = await getRecipeById(parseInt(id));
             
@@ -168,12 +185,22 @@ export default function RecipeDetailScreen() {
 
     const handleSaveToLibrary = async () => {
         if (!id) return;
+        if (isSaved) {
+            setStatusModalConfig({
+                visible: true,
+                type: "info",
+                title: "Already Saved",
+                message: "This recipe is already in your library."
+            });
+            return;
+        }
         setLoading(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         try {
             const newId = await saveCommunityRecipe(id);
             if (newId) {
+                setIsSaved(true);
                 setStatusModalConfig({
                     visible: true,
                     type: "success",
@@ -286,7 +313,11 @@ export default function RecipeDetailScreen() {
                             className="absolute right-4 w-10 h-10 rounded-full bg-black/50 items-center justify-center"
                             style={{ top: Math.max(insets.top, 20) + 12 }}
                         >
-                            <Ionicons name="bookmark" size={20} color="#FF6B35" />
+                            <Ionicons 
+                                name={isSaved ? "bookmark" : "bookmark-outline"} 
+                                size={20} 
+                                color={isSaved ? "#FF6B35" : "#FFFFFF"} 
+                            />
                         </Pressable>
                     ) : (
                         <>
@@ -552,11 +583,11 @@ export default function RecipeDetailScreen() {
                 type={statusModalConfig.type}
                 title={statusModalConfig.title}
                 message={statusModalConfig.message}
-                buttonText="View Library"
+                buttonText={statusModalConfig.type === "success" ? "View Recipes" : "Got it"}
                 onClose={() => {
                     setStatusModalConfig(prev => ({ ...prev, visible: false }));
                     if (statusModalConfig.type === "success") {
-                        router.push("/(tabs)/");
+                        router.push("/(tabs)/recipes");
                     }
                 }}
             />

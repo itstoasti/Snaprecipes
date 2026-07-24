@@ -423,16 +423,106 @@ export function useRecipes() {
             return data || [];
         }
 
+        const cleanQuery = query.trim().replace(/,+/g, "").replace(/\s+/g, " ");
+        let words = cleanQuery.toLowerCase().split(" ").filter(w => w.length > 2);
+
+        // Broad category expansion dictionary to map group names to specific ingredients/tags
+        const CATEGORY_MAP: Record<string, string[]> = {
+            fish: ["salmon", "tuna", "cod", "tilapia", "halibut", "trout", "snapper", "haddock", "bass", "seafood"],
+            seafood: ["shrimp", "prawn", "crab", "lobster", "scallop", "mussel", "clam", "oyster", "squid", "octopus", "fish", "salmon", "tuna", "cod", "tilapia", "halibut", "trout", "snapper", "haddock", "bass"],
+            poultry: ["chicken", "turkey", "duck"],
+            meat: ["beef", "pork", "steak", "lamb", "veal", "venison", "chicken", "turkey"],
+        };
+
+        // Expand search words if any match a broad category key
+        const expandedWords = new Set<string>(words);
+        words.forEach(w => {
+            if (CATEGORY_MAP[w]) {
+                CATEGORY_MAP[w].forEach(term => expandedWords.add(term));
+            }
+        });
+        words = Array.from(expandedWords);
+
+        // Build PostgREST .or filter checking both title and tags
+        let orFilter = `title.ilike.%${cleanQuery}%`;
+
+        words.forEach(word => {
+            orFilter += `,tags.cs.{${word}}`;
+            const withHyphens = word.replace(/\s+/g, "-");
+            if (withHyphens !== word) {
+                orFilter += `,tags.cs.{${withHyphens}}`;
+            }
+        });
+
+        const fullNormalized = cleanQuery.toLowerCase();
+        const fullWithHyphens = fullNormalized.replace(/\s+/g, "-");
+        orFilter += `,tags.cs.{${fullNormalized}},tags.cs.{${fullWithHyphens}}`;
+
         const { data, error } = await supabase
             .from("public_recipes")
             .select("*")
             .not("calories", "is", null)
-            .ilike("title", `%${query}%`)
-            .order("created_at", { ascending: false })
-            .limit(50);
+            .or(orFilter)
+            .limit(100);
 
         if (error) throw error;
-        return data || [];
+        if (!data) return [];
+
+        // Rank the results:
+        // Tier 1: Title matches exact query (case-insensitive)
+        // Tier 2: Title starts with query
+        // Tier 3: Title contains full query
+        // Tier 4: Title contains a higher number of the individual search words
+        // Tier 5: Fallback relevance (quality_score or save_count)
+        const lowerQuery = cleanQuery.toLowerCase();
+        const queryWords = lowerQuery.split(" ");
+
+        return data.sort((a, b) => {
+            const aTitle = a.title.toLowerCase();
+            const bTitle = b.title.toLowerCase();
+
+            // Tier 1: Exact title match
+            const aExact = aTitle === lowerQuery;
+            const bExact = bTitle === lowerQuery;
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+
+            // Tier 2: Starts with title
+            const aStarts = aTitle.startsWith(lowerQuery);
+            const bStarts = bTitle.startsWith(lowerQuery);
+            if (aStarts && !bStarts) return -1;
+            if (!aStarts && bStarts) return 1;
+
+            // Tier 3: Contains full query in title
+            const aContains = aTitle.includes(lowerQuery);
+            const bContains = bTitle.includes(lowerQuery);
+            if (aContains && !bContains) return -1;
+            if (!aContains && bContains) return 1;
+
+            // Tier 4: Count of word matches in the title
+            const getWordMatches = (title: string) => {
+                let matches = 0;
+                queryWords.forEach(w => {
+                    if (w.length > 2 && title.includes(w)) matches++;
+                });
+                return matches;
+            };
+            const aMatches = getWordMatches(aTitle);
+            const bMatches = getWordMatches(bTitle);
+            if (bMatches !== aMatches) return bMatches - aMatches;
+
+            // Tier 5: Fallback: Quality score and save count
+            const aScore = a.quality_score || 0;
+            const bScore = b.quality_score || 0;
+            if (bScore !== aScore) return bScore - aScore;
+
+            const aSaves = a.save_count || 0;
+            const bSaves = b.save_count || 0;
+            if (bSaves !== aSaves) return bSaves - aSaves;
+
+            // Fallback: Created date (newest first)
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
     }, []);
 
     const shareRecipeToCommunity = useCallback(async (recipeData: ExtractedRecipe) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator, AppState, AppStateStatus } from "react-native";
@@ -14,10 +14,11 @@ import {
 } from "@expo-google-fonts/inter";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
+import { pushPendingChanges, pullRemoteChanges, deduplicateLocalRecipes } from "@/lib/sync";
 import { RevenueCatProvider } from "@/hooks/useRevenueCat";
 import { getDatabase } from "@/db/client";
 import { ShareIntentProvider, useShareIntent } from "expo-share-intent";
+import { initAnalytics, trackScreenView } from "@/lib/analytics";
 import "../global.css";
 
 export default function RootLayout() {
@@ -108,8 +109,30 @@ export default function RootLayout() {
 
     // Initialize the database once on mount
     useEffect(() => {
-        getDatabase().catch(e => console.error("Error setting up database:", e));
+        (async () => {
+            try {
+                await getDatabase();
+                await deduplicateLocalRecipes();
+            } catch (e) {
+                console.error("Error setting up database / deduplicating:", e);
+            }
+        })();
     }, []);
+
+    // Initialize Amplitude analytics
+    useEffect(() => {
+        initAnalytics();
+    }, []);
+
+    // Auto-track screen views on navigation changes
+    const prevSegmentsRef = useRef<string>("");
+    useEffect(() => {
+        const currentScreen = segments.join("/") || "(tabs)";
+        if (currentScreen !== prevSegmentsRef.current) {
+            prevSegmentsRef.current = currentScreen;
+            trackScreenView(currentScreen);
+        }
+    }, [segments]);
 
     if (!fontsLoaded || !isReady) {
         return (

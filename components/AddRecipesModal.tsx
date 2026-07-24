@@ -25,7 +25,7 @@ type Tab = "mine" | "community";
 export default function AddRecipesModal({ visible, collectionId, onClose, onAddSuccess }: AddRecipesModalProps) {
     const { height: windowHeight } = useWindowDimensions();
     const { addRecipeToCollection } = useCollections();
-    const { saveCommunityRecipe } = useRecipes();
+    const { saveCommunityRecipe, searchCommunityRecipes } = useRecipes();
 
     const [tab, setTab] = useState<Tab>("mine");
     const [searchQuery, setSearchQuery] = useState("");
@@ -74,25 +74,14 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
     const loadCommunityRecipes = useCallback(async (query: string) => {
         setLoading(true);
         try {
-            let supabaseQuery = supabase
-                .from("public_recipes")
-                .select("*")
-                .order("created_at", { ascending: false })
-                .limit(50);
-
-            if (query.trim()) {
-                supabaseQuery = supabaseQuery.ilike("title", `%${query.trim()}%`);
-            }
-
-            const { data, error } = await supabaseQuery;
-            if (error) throw error;
-            setCommunityRecipes(data || []);
+            const results = await searchCommunityRecipes(query);
+            setCommunityRecipes(results);
         } catch (error) {
             console.error("Failed to load community recipes:", error);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [searchCommunityRecipes]);
 
     // ── Reset & load on open / tab switch ───────────────────────
     useEffect(() => {
@@ -166,18 +155,21 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
     };
 
     const totalSelected = selectedMyIds.size + selectedCommunityIds.size;
-    const currentRecipes = tab === "mine" ? myRecipes : communityRecipes;
 
     // ── Render ──────────────────────────────────────────────────
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <View style={{ flex: 1 }}>
-                <Pressable onPress={onClose} style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.6)" }]} />
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === "ios" ? "padding" : undefined}
-                    style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: windowHeight * 0.88 }}
-                >
-                    <Animated.View style={{ flex: 1 }} entering={SlideInDown.duration(300)}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                className="flex-1"
+            >
+                <View className="flex-1 justify-end">
+                    <Pressable onPress={onClose} style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.6)" }]} />
+                    <Animated.View 
+                        style={{ height: "100%", maxHeight: windowHeight * 0.88 }}
+                        className="w-full"
+                        entering={SlideInDown.duration(300)}
+                    >
                         <GlassContainer style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1 }}>
                             <View style={{ flex: 1, padding: 20, paddingBottom: 48 }}>
                                 {/* Handle */}
@@ -190,83 +182,48 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                         onPress={onClose}
                                         style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#2A2A3A", alignItems: "center", justifyContent: "center" }}
                                     >
-                                        <Ionicons name="close" size={20} color="#FF6B35" />
+                                        <Ionicons name="close" size={20} color="#6E6E85" />
                                     </Pressable>
                                 </View>
 
-                                {/* ── Tab Toggle ── */}
-                                <View
-                                    style={{
-                                        flexDirection: "row",
-                                        backgroundColor: "#1A1A2E",
-                                        borderRadius: 14,
-                                        padding: 3,
-                                        marginBottom: 12,
-                                    }}
-                                >
-                                    <Pressable
-                                        onPress={() => setTab("mine")}
-                                        style={{
-                                            flex: 1,
-                                            paddingVertical: 10,
-                                            borderRadius: 12,
-                                            alignItems: "center",
-                                            backgroundColor: tab === "mine" ? "#FF6B35" : "transparent",
-                                        }}
-                                    >
-                                        <Text style={{
-                                            color: tab === "mine" ? "#FFF" : "#6E6E85",
-                                            fontWeight: "700",
-                                            fontSize: 14,
-                                        }}>
-                                            My Recipes
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => setTab("community")}
-                                        style={{
-                                            flex: 1,
-                                            paddingVertical: 10,
-                                            borderRadius: 12,
-                                            alignItems: "center",
-                                            backgroundColor: tab === "community" ? "#FF6B35" : "transparent",
-                                        }}
-                                    >
-                                        <Text style={{
-                                            color: tab === "community" ? "#FFF" : "#6E6E85",
-                                            fontWeight: "700",
-                                            fontSize: 14,
-                                        }}>
-                                            Community
-                                        </Text>
-                                    </Pressable>
+                                {/* Tabs */}
+                                <View style={{ flexDirection: "row", backgroundColor: "#1C1C28", borderRadius: 16, padding: 4, marginBottom: 16 }}>
+                                    {(["mine", "community"] as Tab[]).map((t) => (
+                                        <Pressable
+                                            key={t}
+                                            onPress={() => setTab(t)}
+                                            style={{
+                                                flex: 1,
+                                                paddingVertical: 10,
+                                                alignItems: "center",
+                                                borderRadius: 12,
+                                                backgroundColor: tab === t ? "rgba(255, 107, 53, 0.12)" : "transparent",
+                                                borderWidth: tab === t ? 1 : 0,
+                                                borderColor: tab === t ? "rgba(255, 107, 53, 0.25)" : "transparent",
+                                            }}
+                                        >
+                                            <Text style={{
+                                                color: tab === t ? "#FF6B35" : "#6E6E85",
+                                                fontWeight: "700",
+                                                fontSize: 14,
+                                                textTransform: "capitalize"
+                                            }}>
+                                                {t === "mine" ? "My Recipes" : "Community"}
+                                            </Text>
+                                        </Pressable>
+                                    ))}
                                 </View>
 
-                                {/* ── Search Bar ── */}
-                                <View
-                                    style={{
-                                        flexDirection: "row",
-                                        alignItems: "center",
-                                        backgroundColor: "#1A1A2E",
-                                        borderRadius: 14,
-                                        paddingHorizontal: 14,
-                                        paddingVertical: Platform.OS === "ios" ? 12 : 4,
-                                        marginBottom: 12,
-                                    }}
-                                >
-                                    <Ionicons name="search" size={18} color="#6E6E85" style={{ marginRight: 8 }} />
+                                {/* Search */}
+                                <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#1A1A26", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" }}>
+                                    <Ionicons name="search" size={20} color="#6E6E85" style={{ marginRight: 12 }} />
                                     <TextInput
                                         value={searchQuery}
                                         onChangeText={handleSearch}
-                                        placeholder={tab === "mine" ? "Search your recipes…" : "Search community recipes…"}
+                                        placeholder={tab === "mine" ? "Search your recipes..." : "Search community recipes..."}
                                         placeholderTextColor="#6E6E85"
-                                        autoCapitalize="none"
+                                        style={{ flex: 1, color: "#FFF", fontSize: 16 }}
                                         autoCorrect={false}
-                                        style={{
-                                            flex: 1,
-                                            color: "#FFF",
-                                            fontSize: 15,
-                                        }}
                                     />
                                     {searchQuery.length > 0 && (
                                         <Pressable onPress={() => handleSearch("")}>
@@ -275,99 +232,139 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                     )}
                                 </View>
 
-                                {/* ── Recipe List ── */}
                                 {loading ? (
                                     <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                                        <ActivityIndicator size="large" color="#FF6B35" />
-                                    </View>
-                                ) : currentRecipes.length === 0 ? (
-                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                                        <Ionicons name={tab === "mine" ? "book-outline" : "globe-outline"} size={48} color="#6E6E85" />
-                                        <Text className="text-surface-400 font-sans text-center mt-4" style={{ paddingHorizontal: 24 }}>
-                                            {searchQuery.trim()
-                                                ? "No recipes found matching your search."
-                                                : tab === "mine"
-                                                    ? "All your recipes are already in this cookbook!"
-                                                    : "No community recipes available yet."}
-                                        </Text>
+                                        <ActivityIndicator size="small" color="#FF6B35" />
                                     </View>
                                 ) : (
                                     <>
-                                        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                                            {currentRecipes.map((recipe) => {
-                                                const id = tab === "mine" ? recipe.id : recipe.id;
-                                                const isSelected = tab === "mine"
-                                                    ? selectedMyIds.has(recipe.id)
-                                                    : selectedCommunityIds.has(recipe.id);
-
-                                                return (
-                                                    <Pressable
-                                                        key={`${tab}-${id}`}
-                                                        onPress={() => tab === "mine" ? toggleMy(recipe.id) : toggleCommunity(recipe.id)}
-                                                        style={{
-                                                            flexDirection: "row",
-                                                            alignItems: "center",
-                                                            padding: 12,
-                                                            borderRadius: 16,
-                                                            marginBottom: 8,
-                                                            backgroundColor: isSelected ? "rgba(255,107,53,0.15)" : "rgba(42,42,58,0.6)",
-                                                            borderWidth: isSelected ? 1 : 0,
-                                                            borderColor: isSelected ? "rgba(255,107,53,0.3)" : "transparent",
-                                                        }}
-                                                    >
-                                                        {/* Thumbnail */}
-                                                        <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: "#2A2A3A", overflow: "hidden", marginRight: 12 }}>
-                                                            {recipe.image_url ? (
-                                                                <Image source={{ uri: recipe.image_url }} style={{ width: "100%", height: "100%" }} />
-                                                            ) : (
-                                                                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                                                                    <Ionicons name="restaurant-outline" size={20} color="#6E6E85" />
+                                        {/* Scrollable list */}
+                                        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false}>
+                                            {tab === "mine" ? (
+                                                myRecipes.length === 0 ? (
+                                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
+                                                        <Text style={{ color: "#6E6E85", fontSize: 14, textAlign: "center" }}>
+                                                            No recipes found.
+                                                        </Text>
+                                                    </View>
+                                                ) : (
+                                                    myRecipes.map((recipe) => {
+                                                        const isSelected = selectedMyIds.has(recipe.id);
+                                                        return (
+                                                            <Pressable
+                                                                key={recipe.id}
+                                                                onPress={() => toggleMy(recipe.id)}
+                                                                style={{
+                                                                    flexDirection: "row",
+                                                                    alignItems: "center",
+                                                                    padding: 12,
+                                                                    borderRadius: 16,
+                                                                    backgroundColor: isSelected ? "rgba(255, 107, 53, 0.08)" : "#1C1C28",
+                                                                    marginBottom: 8,
+                                                                    borderWidth: 1,
+                                                                    borderColor: isSelected ? "rgba(255, 107, 53, 0.2)" : "rgba(255,255,255,0.02)",
+                                                                }}
+                                                            >
+                                                                <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#2A2A3E", overflow: "hidden", marginRight: 12 }}>
+                                                                    {recipe.image_url ? (
+                                                                        <Image source={{ uri: recipe.image_url }} style={{ flex: 1 }} />
+                                                                    ) : (
+                                                                        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                                                                            <Ionicons name="restaurant" size={18} color="#FF6B35" />
+                                                                        </View>
+                                                                    )}
                                                                 </View>
-                                                            )}
-                                                        </View>
-
-                                                        {/* Title + source badge */}
-                                                        <View style={{ flex: 1 }}>
-                                                            <Text style={{ color: "#FFF", fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
-                                                                {recipe.title}
-                                                            </Text>
-                                                            {tab === "community" && recipe.source_domain && (
-                                                                <Text style={{ color: "#6E6E85", fontSize: 12, marginTop: 2 }} numberOfLines={1}>
-                                                                    {recipe.source_domain}
+                                                                <Text style={{ flex: 1, color: "#FFF", fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
+                                                                    {recipe.title}
                                                                 </Text>
-                                                            )}
-                                                        </View>
-
-                                                        {/* Checkbox */}
-                                                        <View style={{
-                                                            width: 24, height: 24, borderRadius: 12,
-                                                            borderWidth: 1,
-                                                            alignItems: "center", justifyContent: "center",
-                                                            backgroundColor: isSelected ? "#FF6B35" : "transparent",
-                                                            borderColor: isSelected ? "#FF6B35" : "#6E6E85",
-                                                            marginLeft: 12,
-                                                        }}>
-                                                            {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
-                                                        </View>
-                                                    </Pressable>
-                                                );
-                                            })}
+                                                                <View style={{
+                                                                    width: 22,
+                                                                    height: 22,
+                                                                    borderRadius: 11,
+                                                                    borderWidth: 1.5,
+                                                                    borderColor: isSelected ? "#FF6B35" : "#6E6E85",
+                                                                    backgroundColor: isSelected ? "#FF6B35" : "transparent",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    marginLeft: 12,
+                                                                }}>
+                                                                    {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                                                                </View>
+                                                            </Pressable>
+                                                        );
+                                                    })
+                                                )
+                                            ) : (
+                                                communityRecipes.length === 0 ? (
+                                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
+                                                        <Text style={{ color: "#6E6E85", fontSize: 14, textAlign: "center" }}>
+                                                            No community recipes found.
+                                                        </Text>
+                                                    </View>
+                                                ) : (
+                                                    communityRecipes.map((recipe) => {
+                                                        const isSelected = selectedCommunityIds.has(recipe.id);
+                                                        return (
+                                                            <Pressable
+                                                                key={recipe.id}
+                                                                onPress={() => toggleCommunity(recipe.id)}
+                                                                style={{
+                                                                    flexDirection: "row",
+                                                                    alignItems: "center",
+                                                                    padding: 12,
+                                                                    borderRadius: 16,
+                                                                    backgroundColor: isSelected ? "rgba(255, 107, 53, 0.08)" : "#1C1C28",
+                                                                    marginBottom: 8,
+                                                                    borderWidth: 1,
+                                                                    borderColor: isSelected ? "rgba(255, 107, 53, 0.2)" : "rgba(255,255,255,0.02)",
+                                                                }}
+                                                            >
+                                                                <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#2A2A3E", overflow: "hidden", marginRight: 12 }}>
+                                                                    {recipe.image_url ? (
+                                                                        <Image source={{ uri: recipe.image_url }} style={{ flex: 1 }} />
+                                                                    ) : (
+                                                                        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                                                                            <Ionicons name="restaurant" size={18} color="#FF6B35" />
+                                                                        </View>
+                                                                    )}
+                                                                </View>
+                                                                <Text style={{ flex: 1, color: "#FFF", fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
+                                                                    {recipe.title}
+                                                                </Text>
+                                                                <View style={{
+                                                                    width: 22,
+                                                                    height: 22,
+                                                                    borderRadius: 11,
+                                                                    borderWidth: 1.5,
+                                                                    borderColor: isSelected ? "#FF6B35" : "#6E6E85",
+                                                                    backgroundColor: isSelected ? "#FF6B35" : "transparent",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    marginLeft: 12,
+                                                                }}>
+                                                                    {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                                                                </View>
+                                                            </Pressable>
+                                                        );
+                                                    })
+                                                )
+                                            )}
                                         </ScrollView>
 
-                                        {/* ── Save Button ── */}
+                                        {/* Action Button */}
                                         <Pressable
                                             onPress={handleSave}
-                                            disabled={saving}
+                                            disabled={saving || (selectedMyIds.size === 0 && selectedCommunityIds.size === 0)}
                                             style={{
-                                                backgroundColor: totalSelected > 0 ? "#FF6B35" : "#2A2A3A",
-                                                padding: 16,
+                                                backgroundColor: (selectedMyIds.size > 0 || selectedCommunityIds.size > 0) ? "#FF6B35" : "#2A2A3E",
+                                                paddingVertical: 16,
                                                 borderRadius: 16,
                                                 alignItems: "center",
-                                                marginTop: 12,
+                                                marginTop: 16,
                                             }}
                                         >
                                             {saving ? (
-                                                <ActivityIndicator color="#FFF" />
+                                                <ActivityIndicator size="small" color="#FFF" />
                                             ) : (
                                                 <Text style={{
                                                     color: totalSelected > 0 ? "#FFF" : "#6E6E85",
@@ -385,8 +382,8 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                             </View>
                         </GlassContainer>
                     </Animated.View>
-                </KeyboardAvoidingView>
-            </View>
+                </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

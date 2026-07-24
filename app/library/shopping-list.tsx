@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { View, Text, Pressable, FlatList, TextInput, ScrollView, Alert, Modal, Image, ActivityIndicator } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -95,6 +96,7 @@ export default function ShoppingListScreen() {
     const handleAddItem = async () => {
         if (!newItemName.trim()) return;
         await addItem(newItemName.trim());
+        trackEvent("shopping_item_added", { source: "manual" });
         setNewItemName("");
     };
 
@@ -108,6 +110,7 @@ export default function ShoppingListScreen() {
         const start = format(startOfToday(), "yyyy-MM-dd");
         const end = format(addDays(new Date(), 7), "yyyy-MM-dd");
         await generateFromMealPlan(start, end);
+        trackEvent("shopping_items_generated", { source: "meal_plan" });
         setIsGenerating(false);
     };
 
@@ -116,6 +119,7 @@ export default function ShoppingListScreen() {
             setIsRecipePickerVisible(false);
             setIsManualEntryStarted(true); // Ensure items are shown if they were empty
             await addItemsFromRecipe(recipe.id);
+            trackEvent("shopping_items_generated", { source: "recipe" });
         } else {
             setIsImporting(true);
             try {
@@ -124,6 +128,7 @@ export default function ShoppingListScreen() {
                     setIsRecipePickerVisible(false);
                     setIsManualEntryStarted(true);
                     await addItemsFromRecipe(localId);
+                    trackEvent("shopping_items_generated", { source: "recipe" });
                 } else {
                     Alert.alert("Error", "Could not import community recipe.");
                 }
@@ -277,7 +282,10 @@ export default function ShoppingListScreen() {
                                 entering={FadeInRight.delay(index * 50)}
                                 className="mb-3"
                             >
-                                <Pressable onPress={() => toggleItem(item.id, !item.is_checked)}>
+                                <Pressable onPress={() => {
+                                    toggleItem(item.id, !item.is_checked);
+                                    trackEvent("shopping_item_toggled", { checked: !item.is_checked });
+                                }}>
                                     <View>
                                         <GlassContainer 
                                             className="flex-row items-center p-4 rounded-[24px] border border-surface-800/30 bg-surface-900/20"
@@ -296,7 +304,10 @@ export default function ShoppingListScreen() {
                                                 ) : null}
                                             </View>
                                             <Pressable 
-                                                onPress={() => deleteItem(item.id)}
+                                                onPress={() => {
+                                                    deleteItem(item.id);
+                                                    trackEvent("shopping_item_deleted");
+                                                }}
                                                 className="w-8 h-8 items-center justify-center rounded-full bg-surface-800/50"
                                                 hitSlop={10}
                                             >
@@ -326,7 +337,10 @@ export default function ShoppingListScreen() {
                                 className="mb-3 opacity-40"
                             >
                                 <View>
-                                    <Pressable onPress={() => toggleItem(item.id, !item.is_checked)}>
+                                    <Pressable onPress={() => {
+                                        toggleItem(item.id, !item.is_checked);
+                                        trackEvent("shopping_item_toggled", { checked: !item.is_checked });
+                                    }}>
                                         <GlassContainer 
                                             className="flex-row items-center p-4 rounded-[24px] border border-surface-800/10 bg-surface-900/10"
                                         >
@@ -339,7 +353,10 @@ export default function ShoppingListScreen() {
                                                 </Text>
                                             </View>
                                             <Pressable 
-                                                onPress={() => deleteItem(item.id)}
+                                                onPress={() => {
+                                                    deleteItem(item.id);
+                                                    trackEvent("shopping_item_deleted");
+                                                }}
                                                 className="w-8 h-8 items-center justify-center rounded-full bg-surface-800/30"
                                                 hitSlop={10}
                                             >
@@ -415,6 +432,7 @@ export default function ShoppingListScreen() {
                                         onPress={async () => {
                                             setIsTrashModalVisible(false);
                                             await clearChecked();
+                                            trackEvent("shopping_list_cleared", { scope: "checked" });
                                         }}
                                         className="w-full bg-surface-800 py-4 rounded-2xl items-center"
                                     >
@@ -425,6 +443,7 @@ export default function ShoppingListScreen() {
                                     onPress={async () => {
                                         setIsTrashModalVisible(false);
                                         await clearAll();
+                                        trackEvent("shopping_list_cleared", { scope: "all" });
                                     }}
                                     className="w-full bg-accent py-4 rounded-2xl items-center"
                                 >

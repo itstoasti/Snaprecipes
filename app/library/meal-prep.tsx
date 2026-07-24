@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMealPlans } from "@/hooks/useMealPlans";
 import { useRecipes } from "@/hooks/useRecipes";
 import { supabase } from "@/lib/supabase";
+import { trackEvent } from "@/lib/analytics";
 import GlassContainer from "@/components/GlassContainer";
 import Animated, { FadeInDown, SlideInRight } from "react-native-reanimated";
 import { format, addDays, isSameDay } from "@/lib/dateUtils";
@@ -68,6 +69,7 @@ export default function MealPrepScreen() {
     // ── Add personal recipe ─────────────────────────────────────
     const handleAddRecipe = async (recipeId: number) => {
         await addRecipeToPlan(recipeId, format(selectedDate, "yyyy-MM-dd"));
+        trackEvent("meal_planned", { source: "mine" });
         setIsSelectorVisible(false);
         setSearchQuery("");
     };
@@ -79,6 +81,7 @@ export default function MealPrepScreen() {
             const newId = await saveCommunityRecipe(publicId);
             if (newId) {
                 await addRecipeToPlan(newId, format(selectedDate, "yyyy-MM-dd"));
+                trackEvent("meal_planned", { source: "community" });
             }
             setIsSelectorVisible(false);
             setSearchQuery("");
@@ -222,7 +225,10 @@ export default function MealPrepScreen() {
                                     </Pressable>
                                     <View className="w-[1px] h-8 bg-surface-800 mx-2 opacity-50" />
                                     <Pressable
-                                        onPress={() => removeFromPlan(item.id)}
+                                        onPress={() => {
+                                            removeFromPlan(item.id);
+                                            trackEvent("meal_unplanned", { recipe_id: item.recipe_id });
+                                        }}
                                         className="w-10 h-10 items-center justify-center"
                                     >
                                         <Ionicons name="trash-outline" size={18} color="#FF6B6B" />

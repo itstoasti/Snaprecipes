@@ -516,3 +516,49 @@ function validateRecipe(data: any): ExtractedRecipe {
         sodium: typeof data.sodium === 'number' ? data.sodium : (parseFloat(data.sodium) || undefined),
     };
 }
+
+export function cleanUrlForDuplicateCheck(urlStr: string): string {
+    try {
+        const parsed = new URL(urlStr);
+        const host = parsed.hostname.toLowerCase();
+        
+        // Handle YouTube video links uniquely
+        if (host.includes("youtube.com") || host === "youtube.com") {
+            const vParam = parsed.searchParams.get("v");
+            if (vParam) {
+                return `youtube::${vParam}`;
+            }
+        }
+        
+        // Handle youtu.be links
+        if (host === "youtu.be") {
+            const vParam = parsed.pathname.substring(1);
+            if (vParam) {
+                return `youtube::${vParam}`;
+            }
+        }
+        
+        // Handle YouTube shorts
+        if (parsed.pathname.startsWith("/shorts/")) {
+            const parts = parsed.pathname.split("/");
+            const vParam = parts[2];
+            if (vParam) {
+                return `youtube::${vParam}`;
+            }
+        }
+
+        // Handle YouTube embed
+        if (parsed.pathname.startsWith("/embed/")) {
+            const parts = parsed.pathname.split("/");
+            const vParam = parts[2];
+            if (vParam) {
+                return `youtube::${vParam}`;
+            }
+        }
+        
+        return `${parsed.origin}${parsed.pathname}`.toLowerCase();
+    } catch {
+        return urlStr.toLowerCase();
+    }
+}
+

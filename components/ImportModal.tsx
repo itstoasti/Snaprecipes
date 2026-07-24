@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { trackEvent } from "@/lib/analytics";
 import {
     View,
     Text,
@@ -28,9 +29,9 @@ import Animated, {
     Easing
 } from "react-native-reanimated";
 import GlassContainer from "./GlassContainer";
-import { extractFromUrl } from "@/lib/extract";
+import { extractFromUrl, cleanUrlForDuplicateCheck } from "@/lib/extract";
 import { useRecipes } from "@/hooks/useRecipes";
-import { canExtractRecipe, incrementUsage } from "@/lib/usage";
+import { canExtractRecipe, incrementUsage, getCurrentUsage } from "@/lib/usage";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 
 interface ImportModalProps {
@@ -139,50 +140,7 @@ function ExtractionLoader() {
     );
 }
 
-function cleanUrlForDuplicateCheck(urlStr: string): string {
-    try {
-        const parsed = new URL(urlStr);
-        const host = parsed.hostname.toLowerCase();
-        
-        // Handle YouTube video links uniquely
-        if (host.includes("youtube.com") || host === "youtube.com") {
-            const vParam = parsed.searchParams.get("v");
-            if (vParam) {
-                return `youtube::${vParam}`;
-            }
-        }
-        
-        // Handle youtu.be links
-        if (host === "youtu.be") {
-            const vParam = parsed.pathname.substring(1);
-            if (vParam) {
-                return `youtube::${vParam}`;
-            }
-        }
-        
-        // Handle YouTube shorts
-        if (parsed.pathname.startsWith("/shorts/")) {
-            const parts = parsed.pathname.split("/");
-            const vParam = parts[2];
-            if (vParam) {
-                return `youtube::${vParam}`;
-            }
-        }
 
-        // Handle YouTube embed
-        if (parsed.pathname.startsWith("/embed/")) {
-            const parts = parsed.pathname.split("/");
-            const vParam = parts[2];
-            if (vParam) {
-                return `youtube::${vParam}`;
-            }
-        }
-        
-        return `${parsed.origin}${parsed.pathname}`.toLowerCase();
-    } catch {
-        return urlStr.toLowerCase();
-    }
-}
 
 export default function ImportModal({ visible, onClose, onImportSuccess }: ImportModalProps) {
     const [url, setUrl] = useState("");
@@ -196,6 +154,16 @@ export default function ImportModal({ visible, onClose, onImportSuccess }: Impor
     const [shareToCommunity, setShareToCommunity] = useState(true);
     const [apiErrorTitle, setApiErrorTitle] = useState("Uh oh!");
     const [apiErrorDesc, setApiErrorDesc] = useState("Looks like we are more popular than we expected right now and hit our extraction limits!");
+    const [usageCount, setUsageCount] = useState(0);
+
+    useEffect(() => {
+        if (visible) {
+            trackEvent("recipe_import_opened");
+        }
+        if (visible && !isPro) {
+            getCurrentUsage().then(setUsageCount).catch(console.error);
+        }
+    }, [visible, isPro]);
 
     useEffect(() => {
         const showSubscription = Keyboard.addListener(
@@ -266,6 +234,7 @@ export default function ImportModal({ visible, onClose, onImportSuccess }: Impor
 
             // Note: the review prompt handles its own visibility via state.
             onClose();
+            trackEvent("recipe_imported", { source: "url" });
             if (onImportSuccess) {
                 onImportSuccess();
             }
@@ -296,6 +265,7 @@ export default function ImportModal({ visible, onClose, onImportSuccess }: Impor
     };
 
     const handleCamera = () => {
+        trackEvent("recipe_import_method_selected", { method: "camera" });
         setMode("choose");
         onClose();
         router.push("/camera");
@@ -417,13 +387,40 @@ export default function ImportModal({ visible, onClose, onImportSuccess }: Impor
                                     <Text className="text-white font-sans-bold text-2xl mb-2">
                                         Import Recipe
                                     </Text>
-                                    <Text className="text-surface-400 font-sans text-base mb-8">
+                                    <Text className="text-surface-400 font-sans text-base mb-5">
                                         Choose how you'd like to add a recipe
                                     </Text>
 
+                                    {!isPro && (
+                                        <Pressable
+                                            onPress={() => {
+                                                handleClose();
+                                                router.push("/paywall");
+                                            }}
+                                            className="mb-6 p-4 bg-white/5 rounded-2xl border border-white/5"
+                                        >
+                                            <View className="flex-row justify-between items-center mb-2">
+                                                <Text className="text-surface-400 font-sans-bold text-[10px] uppercase tracking-widest">Monthly Free Saves</Text>
+                                                <Text className="text-white font-sans-bold text-xs">{usageCount} / 5 used</Text>
+                                            </View>
+                                            <View className="h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
+                                                <View style={{ width: `${(usageCount / 5) * 100}%` }} className="h-full bg-accent rounded-full" />
+                                            </View>
+                                            <View className="flex-row justify-between items-center">
+                                                <Text className="text-surface-500 font-sans text-[10px]">
+                                                    {usageCount >= 5 ? "Limit reached" : `${5 - usageCount} free saves left this month`}
+                                                </Text>
+                                                <Text className="text-accent font-sans-bold text-[10px]">Go Pro for Unlimited →</Text>
+                                            </View>
+                                        </Pressable>
+                                    )}
+
                                     {/* URL Option */}
                                     <Pressable
-                                        onPress={() => setMode("url")}
+                                        onPress={() => {
+                                        trackEvent("recipe_import_method_selected", { method: "url" });
+                                        setMode("url");
+                                    }}
                                         className="flex-row items-center p-4 bg-surface-800/60 rounded-2xl mb-3"
                                     >
                                         <View className="w-12 h-12 rounded-full bg-accent/20 items-center justify-center mr-4">

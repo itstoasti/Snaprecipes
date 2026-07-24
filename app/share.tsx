@@ -12,8 +12,9 @@ import Animated, {
     Easing,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { extractFromUrl } from "@/lib/extract";
+import { extractFromUrl, cleanUrlForDuplicateCheck } from "@/lib/extract";
 import { useRecipes } from "@/hooks/useRecipes";
+import { getDatabase } from "@/db/client";
 import { incrementUsage } from "@/lib/usage";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { canExtractRecipe } from "@/lib/usage";
@@ -88,6 +89,27 @@ export default function ShareScreen() {
         hasStarted.current = true;
 
         (async () => {
+            // Check if recipe is already imported to avoid duplication and save usage
+            try {
+                const db = await getDatabase();
+                const cleanedInputUrl = cleanUrlForDuplicateCheck(url);
+                const localRecipes = await db.getAllAsync<{ id: number; source_url: string | null }>(
+                    "SELECT id, source_url FROM recipes WHERE source_url IS NOT NULL"
+                );
+                const existingRecipe = localRecipes.find(r => {
+                    if (!r.source_url) return false;
+                    return cleanUrlForDuplicateCheck(r.source_url) === cleanedInputUrl;
+                });
+
+                if (existingRecipe) {
+                    console.log(`[Share] Recipe already exists (ID: ${existingRecipe.id}). Redirecting directly.`);
+                    router.replace(`/recipe/${existingRecipe.id}`);
+                    return;
+                }
+            } catch (dbErr) {
+                console.warn("[Share] Database duplicate check failed:", dbErr);
+            }
+
             // Check usage limits first
             const allowed = await canExtractRecipe(isPro);
             if (!allowed) {

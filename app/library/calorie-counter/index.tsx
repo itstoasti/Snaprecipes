@@ -20,6 +20,7 @@ import { format, addDays, isSameDay } from "@/lib/dateUtils";
 import * as Haptics from "expo-haptics";
 import MoveMealModal from "@/components/MoveMealModal";
 import { BlurView } from "expo-blur";
+import { trackEvent } from "@/lib/analytics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -447,6 +448,11 @@ export default function CalorieCounterScreen() {
                             serving_qty: newQty,
                             meal_type: newMealType,
                         });
+                        trackEvent("food_log_updated", {
+                            meal_type: newMealType,
+                            serving_qty: newQty,
+                            food_name: moveTarget.food_name,
+                        });
                     }
                     setMoveTarget(null);
                 }}
@@ -483,6 +489,9 @@ export default function CalorieCounterScreen() {
                                                     onPress={() => {
                                                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                                                         removeFoodLog(deleteTarget.logId);
+                                                        trackEvent("food_log_deleted", {
+                                                            food_name: deleteTarget.foodName,
+                                                        });
                                                         setDeleteTarget(null);
                                                     }}
                                                     style={{ flex: 1, paddingVertical: 14, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}
@@ -516,6 +525,7 @@ export default function CalorieCounterScreen() {
                                 <Pressable 
                                     onPress={() => {
                                         setShowGoalInfo(false);
+                                        trackEvent("goals_info_settings_clicked");
                                         router.push("/settings");
                                     }}
                                     className="bg-accent py-4 rounded-2xl items-center shadow-lg shadow-accent/20"

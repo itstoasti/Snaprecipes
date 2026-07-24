@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import GlassContainer from "@/components/GlassContainer";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { useRevenueCat } from "@/hooks/useRevenueCat";
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -54,7 +54,6 @@ function LibraryTile({ title, icon, color, description, onPress, index }: Librar
 export default function LibraryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { isPro } = useRevenueCat();
 
     const tiles = [
         {
@@ -83,13 +82,7 @@ export default function LibraryScreen() {
             icon: "flame" as const,
             color: "#EF4444", // Red
             description: "Track daily macros",
-            onPress: () => {
-                if (isPro) {
-                    router.push("/library/calorie-counter");
-                } else {
-                    router.push("/paywall");
-                }
-            },
+            onPress: () => router.push("/library/calorie-counter"),
         },
         {
             title: "Community",

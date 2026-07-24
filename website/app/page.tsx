@@ -6,6 +6,8 @@ import ProblemSolution from "@/components/landing/ProblemSolution";
 import Features from "@/components/landing/Features";
 import HowItWorks from "@/components/landing/HowItWorks";
 import Pricing from "@/components/landing/Pricing";
+import Testimonials from "@/components/landing/Testimonials";
+import FAQs from "@/components/landing/FAQs";
 import FinalCTA from "@/components/landing/FinalCTA";
 
 export default function Home() {
@@ -16,8 +18,10 @@ export default function Home() {
       <TrustedSources />
       <ProblemSolution />
       <Features />
+      <Testimonials />
       <HowItWorks />
       <Pricing />
+      <FAQs />
       <FinalCTA />
       <Footer />
     </>

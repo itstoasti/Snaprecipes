@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import RecipeImage from "@/components/RecipeImage";
 import { supabase, PublicRecipe } from "@/lib/supabase";
+import RecipeDetailActions from "@/components/RecipeDetailActions";
 
 export const revalidate = 60;
 
@@ -13,11 +14,12 @@ type Props = {
 };
 
 async function getRecipe(slug: string): Promise<PublicRecipe | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
     const { data, error } = await supabase
         .from("public_recipes")
         .select("*")
-        .eq("slug", slug)
-        .single();
+        .eq(isUuid ? "id" : "slug", slug)
+        .maybeSingle();
 
     if (error || !data) return null;
     return data;
@@ -152,13 +154,13 @@ export default async function RecipePage({ params }: Props) {
             <RecipeJsonLd recipe={recipe} />
             <BreadcrumbJsonLd recipe={recipe} />
             <Navbar />
-            <main className="pt-24 pb-16 min-h-screen">
+            <main className="pt-24 pb-16 min-h-screen text-surface-300">
                 <div className="max-w-4xl mx-auto px-6">
                     {/* Breadcrumb */}
                     <nav className="flex items-center gap-2 text-sm text-surface-500 mb-8">
-                        <Link href="/" className="hover:text-white transition-colors">Home</Link>
+                        <Link href="/" className="hover:text-accent transition-colors">Home</Link>
                         <span>/</span>
-                        <Link href="/recipes" className="hover:text-white transition-colors">Recipes</Link>
+                        <Link href="/recipes" className="hover:text-accent transition-colors">Recipes</Link>
                         <span>/</span>
                         <span className="text-surface-400 truncate max-w-[200px]">{recipe.title}</span>
                     </nav>
@@ -227,18 +229,8 @@ export default async function RecipePage({ params }: Props) {
                                 </div>
                             )}
 
-                            {/* Save in App CTA */}
-                            <a
-                                href={PLAY_STORE_URL}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-3 px-6 py-3 bg-accent hover:bg-accent-light rounded-2xl font-semibold transition-all hover:shadow-lg hover:shadow-accent/25 hover:-translate-y-0.5 w-fit"
-                            >
-                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.206 12l2.492-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z" />
-                                </svg>
-                                Save in App
-                            </a>
+                            {/* Save / Collections Actions */}
+                            <RecipeDetailActions recipe={recipe} />
                         </div>
                     </div>
 
@@ -252,7 +244,7 @@ export default async function RecipePage({ params }: Props) {
                             <p className="text-surface-500 text-xs mb-4">Per serving</p>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 <div className="text-center p-3 bg-surface-800/50 rounded-xl">
-                                    <p className="text-2xl font-bold text-white">{recipe.calories}</p>
+                                    <p className="text-2xl font-bold text-surface-300">{recipe.calories}</p>
                                     <p className="text-xs text-surface-400 mt-1">Calories</p>
                                 </div>
                                 {recipe.protein != null && (
@@ -263,13 +255,13 @@ export default async function RecipePage({ params }: Props) {
                                 )}
                                 {recipe.fat != null && (
                                     <div className="text-center p-3 bg-surface-800/50 rounded-xl">
-                                        <p className="text-2xl font-bold text-yellow-400">{recipe.fat}g</p>
+                                        <p className="text-2xl font-bold text-amber-600">{recipe.fat}g</p>
                                         <p className="text-xs text-surface-400 mt-1">Fat</p>
                                     </div>
                                 )}
                                 {recipe.carbs != null && (
                                     <div className="text-center p-3 bg-surface-800/50 rounded-xl">
-                                        <p className="text-2xl font-bold text-blue-400">{recipe.carbs}g</p>
+                                        <p className="text-2xl font-bold text-blue-600">{recipe.carbs}g</p>
                                         <p className="text-xs text-surface-400 mt-1">Carbs</p>
                                     </div>
                                 )}
@@ -350,20 +342,33 @@ export default async function RecipePage({ params }: Props) {
                     </div>
 
                     {/* Bottom CTA */}
-                    <div className="mt-16 text-center p-8 gradient-border rounded-3xl">
-                        <h3 className="text-2xl font-bold mb-3">Want to save this recipe?</h3>
-                        <p className="text-surface-400 mb-6">Get Snap Recipes to save, organize, and cook with this recipe on your phone.</p>
-                        <a
-                            href={PLAY_STORE_URL}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-3 px-8 py-4 bg-accent hover:bg-accent-light rounded-2xl font-semibold text-lg transition-all hover:shadow-xl hover:shadow-accent/25 hover:-translate-y-1"
-                        >
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.206 12l2.492-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z" />
-                            </svg>
-                            Download Snap Recipes Free
-                        </a>
+                    <div className="mt-16 text-center p-8 gradient-border rounded-3xl bg-surface-900 border border-surface-800">
+                        <h3 className="text-2xl font-bold mb-3 text-surface-300">Want to save this recipe?</h3>
+                        <p className="text-surface-450 mb-6 max-w-lg mx-auto text-sm leading-relaxed">
+                            Save it directly to your digital cookbook library on the web, or download our mobile app to organize and cook on your phone.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                            <Link
+                                href={`/auth?redirect=/recipes/${slug}`}
+                                className="w-full sm:w-auto px-6 py-3 bg-accent hover:bg-accent-light text-white font-semibold rounded-2xl transition-all hover:shadow-lg hover:shadow-accent/25 hover:-translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Save to Web Library
+                            </Link>
+                            <a
+                                href={PLAY_STORE_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full sm:w-auto px-6 py-3 bg-surface-800 hover:bg-surface-750 border border-surface-700/60 text-surface-300 font-semibold rounded-2xl transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.206 12l2.492-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z" />
+                                </svg>
+                                Download Mobile App
+                            </a>
+                        </div>
                     </div>
                 </div>
             </main>

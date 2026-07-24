@@ -106,62 +106,66 @@ export default function CollectionPickerModal({
             animationType="fade"
             onRequestClose={onClose}
         >
-            <View style={{ flex: 1 }}>
-                {/* Backdrop — sits behind the sheet, tapping it closes the modal */}
-                <Pressable
-                    onPress={onClose}
-                    style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.6)" }]}
-                />
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                className="flex-1"
+            >
+                <View className="flex-1 justify-end">
+                    {/* Backdrop — sits behind the sheet, tapping it closes the modal */}
+                    <Pressable
+                        onPress={onClose}
+                        className="absolute inset-0 bg-black/60"
+                    />
 
-                {/* Sheet — not nested inside the backdrop Pressable, so no touch conflict */}
-                {/* explicit height (not maxHeight) so flex:1 children have a real size to work with */}
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === "ios" ? "padding" : undefined}
-                    style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: windowHeight * 0.75 }}
-                >
-                    <Animated.View style={{ flex: 1 }} entering={SlideInDown.duration(300)}>
+                    {/* Sheet — not nested inside the backdrop Pressable, so no touch conflict */}
+                    <Animated.View 
+                        style={{ height: "100%", maxHeight: windowHeight * 0.75 }}
+                        className="w-full"
+                        entering={SlideInDown.duration(300)}
+                    >
                         <GlassContainer
-                            style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1 }}
+                            style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
+                            className="flex-1"
                         >
                             {/* flex column: header takes natural height, list takes the rest */}
-                            <View style={{ flex: 1, padding: 24, paddingBottom: 48 }}>
+                            <View className="flex-1 p-6 pb-12">
 
                                 {/* Fixed header — natural height */}
                                 <View>
-                                    <View style={{ alignSelf: "center", width: 40, height: 4, backgroundColor: "#6E6E85", borderRadius: 2, marginBottom: 20 }} />
+                                    <View className="self-center w-10 h-1 bg-surface-600 rounded-full mb-5" />
 
-                                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4, marginTop: 8 }}>
-                                        <Text className="text-white font-sans-bold text-xl">Add to Cookbook</Text>
+                                    <View className="flex-row items-center justify-between mb-2 mt-2">
+                                        <Text className="text-white font-sans-bold text-2xl">Add to Cookbook</Text>
                                         <Pressable
                                             onPress={() => setShowCreate(!showCreate)}
-                                            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#2A2A3A", alignItems: "center", justifyContent: "center" }}
+                                            className="w-10 h-10 rounded-full bg-surface-900 border border-surface-800 items-center justify-center"
                                         >
                                             <Ionicons name={showCreate ? "close" : "add"} size={20} color="#FF6B35" />
                                         </Pressable>
                                     </View>
-                                    <Text className="text-surface-400 font-sans text-sm mb-5">
+                                    <Text className="text-surface-400 font-sans text-sm mb-6">
                                         Group your recipes into themed cookbooks
                                     </Text>
 
                                     {showCreate && (
                                         <Animated.View
                                             entering={FadeInDown.springify()}
-                                            style={{ marginBottom: 16, backgroundColor: "#2A2A3A", borderRadius: 16, padding: 16, flexDirection: "row", alignItems: "center" }}
+                                            className="mb-6 bg-surface-900/60 border border-surface-800 p-4 rounded-2xl flex-row items-center"
                                         >
                                             <TextInput
                                                 value={newName}
                                                 onChangeText={setNewName}
                                                 placeholder="New cookbook name..."
                                                 placeholderTextColor="#6E6E85"
-                                                style={{ flex: 1, color: "#FFF", fontSize: 16, marginRight: 12 }}
+                                                className="flex-1 text-white font-sans text-base mr-3"
                                                 autoFocus
                                                 onSubmitEditing={handleCreate}
                                             />
                                             <Pressable
                                                 onPress={handleCreate}
-                                                style={{ backgroundColor: "#FF6B35", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 }}
+                                                className="bg-accent px-5 py-2.5 rounded-xl"
                                             >
-                                                <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14 }}>Create</Text>
+                                                <Text className="text-white font-sans-bold text-sm">Create</Text>
                                             </Pressable>
                                         </Animated.View>
                                     )}
@@ -169,57 +173,44 @@ export default function CollectionPickerModal({
 
                                 {/* Scrollable list — flex:1 fills remaining height */}
                                 {loading ? (
-                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                                    <View className="flex-1 items-center justify-center">
                                         <ActivityIndicator size="small" color="#FF6B35" />
                                     </View>
                                 ) : collections.length === 0 ? (
-                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 }}>
+                                    <View className="flex-1 items-center justify-center px-4 py-8">
                                         <Ionicons name="folder-open-outline" size={48} color="#6E6E85" />
-                                        <Text className="text-surface-300 font-sans text-center mt-4 mb-2 opacity-80">
+                                        <Text className="text-white font-sans-bold text-center mt-4 mb-1 opacity-80">
                                             You haven't created any cookbooks yet.
                                         </Text>
-                                        <Text className="text-surface-500 font-sans text-xs text-center">
+                                        <Text className="text-surface-500 font-sans text-sm text-center">
                                             Go to the Library tab to create one.
                                         </Text>
                                     </View>
                                 ) : (
-                                    <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false}>
+                                    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} bounces={false}>
                                         {collections.map((collection) => {
                                             const isSelected = assignedCollectionIds.has(collection.id);
                                             return (
                                                 <Pressable
                                                     key={collection.id}
                                                     onPress={() => toggleCollection(collection.id)}
-                                                    style={({ pressed }) => [
-                                                        {
-                                                            flexDirection: "row",
-                                                            alignItems: "center",
-                                                            padding: 16,
-                                                            borderRadius: 16,
-                                                            marginBottom: 12,
-                                                            backgroundColor: pressed ? "rgba(255,107,53,0.15)" : "rgba(42,42,58,0.6)"
-                                                        }
-                                                    ]}
+                                                    className="flex-row items-center p-4 bg-surface-900/40 border border-surface-800/30 rounded-2xl mb-3 active:bg-accent/10"
                                                 >
                                                     <View
-                                                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: 16, backgroundColor: `${collection.color}20` }}
+                                                        style={{ backgroundColor: `${collection.color}20` }}
+                                                        className="w-10 h-10 rounded-full items-center justify-center mr-4"
                                                     >
                                                         <Ionicons name={collection.icon_name as any} size={20} color={collection.color} />
                                                     </View>
-                                                    <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600", flex: 1 }}>
+                                                    <Text className="text-white font-sans-bold text-base flex-1">
                                                         {collection.name}
                                                     </Text>
                                                     <View
                                                         style={{
-                                                            width: 24,
-                                                            height: 24,
-                                                            borderRadius: 12,
-                                                            borderWidth: 1,
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
                                                             backgroundColor: isSelected ? "#FF6B35" : "transparent",
                                                             borderColor: isSelected ? "#FF6B35" : "#6E6E85"
                                                         }}
+                                                        className="w-6 h-6 rounded-full border items-center justify-center"
                                                     >
                                                         {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
                                                     </View>
@@ -231,8 +222,8 @@ export default function CollectionPickerModal({
                             </View>
                         </GlassContainer>
                     </Animated.View>
-                </KeyboardAvoidingView>
-            </View>
+                </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

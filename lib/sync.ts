@@ -30,7 +30,7 @@ async function uploadRecipeImageIfNeeded(
         }
 
         const base64 = await FileSystem.readAsStringAsync(cleanUri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: "base64",
         });
 
         const arrayBuffer = decode(base64);
@@ -558,41 +558,50 @@ export async function pushPendingChanges(): Promise<void> {
     }
 }
 
+let isPulling = false;
+
 // Pull all remote recipes for this user and upsert locally
 export async function pullRemoteChanges(): Promise<void> {
+    if (isPulling) {
+        if (__DEV__) console.log("[Sync] pullRemoteChanges already in progress, skipping...");
+        return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const db = await getDatabase();
-    
-    // Debug wrapper for executing queries with parameters
-    const runLogged = async (sql: string, params: any[] = []): Promise<any> => {
-        try {
-            return await db.runAsync(sql, params);
-        } catch (error) {
-            console.error(`[DB ERROR] Failed running: "${sql}" with params:`, params);
-            console.error("[DB ERROR DETAILS]", error);
-            try {
-                const schema = await db.getAllAsync<{ name: string; sql: string }>("SELECT name, sql FROM sqlite_master WHERE type='table'");
-                console.error("[SQL SCHEMA DUMP]", JSON.stringify(schema, null, 2));
-            } catch (schemaErr) {
-                console.error("Failed to dump schema:", schemaErr);
-            }
-            throw error;
-        }
-    };
+    isPulling = true;
 
-    const getFirstLogged = async <T>(sql: string, params: any[] = []): Promise<T | null> => {
-        try {
-            return await db.getFirstAsync<T>(sql, params);
-        } catch (error) {
-            console.error(`[DB ERROR] Failed getFirst: "${sql}" with params:`, params);
-            console.error("[DB ERROR DETAILS]", error);
-            throw error;
-        }
-    };
-    
     try {
+        const db = await getDatabase();
+        
+        // Debug wrapper for executing queries with parameters
+        const runLogged = async (sql: string, params: any[] = []): Promise<any> => {
+            try {
+                return await db.runAsync(sql, params);
+            } catch (error) {
+                console.error(`[DB ERROR] Failed running: "${sql}" with params:`, params);
+                console.error("[DB ERROR DETAILS]", error);
+                try {
+                    const schema = await db.getAllAsync<{ name: string; sql: string }>("SELECT name, sql FROM sqlite_master WHERE type='table'");
+                    console.error("[SQL SCHEMA DUMP]", JSON.stringify(schema, null, 2));
+                } catch (schemaErr) {
+                    console.error("Failed to dump schema:", schemaErr);
+                }
+                throw error;
+            }
+        };
+
+        const getFirstLogged = async <T>(sql: string, params: any[] = []): Promise<T | null> => {
+            try {
+                return await db.getFirstAsync<T>(sql, params);
+            } catch (error) {
+                console.error(`[DB ERROR] Failed getFirst: "${sql}" with params:`, params);
+                console.error("[DB ERROR DETAILS]", error);
+                throw error;
+            }
+        };
+        
         if (__DEV__) console.log(`Pulling remote changes from Supabase...`);
         
         // 1. Fetch remote recipes
@@ -699,7 +708,7 @@ export async function pullRemoteChanges(): Promise<void> {
                     );
                 } else {
                     await runLogged(
-                        `INSERT INTO collections (remote_id, name, color, icon_name) VALUES (?, ?, ?, ?)`,
+                        `INSERT OR REPLACE INTO collections (remote_id, name, color, icon_name) VALUES (?, ?, ?, ?)`,
                         [rCol.id, rCol.name, rCol.color, rCol.icon_name]
                     );
                 }
@@ -740,7 +749,7 @@ export async function pullRemoteChanges(): Promise<void> {
                     );
                 } else {
                     await runLogged(
-                        `INSERT INTO meal_plans (remote_id, recipe_id, planned_date, meal_type, servings) VALUES (?, ?, ?, ?, ?)`,
+                        `INSERT OR REPLACE INTO meal_plans (remote_id, recipe_id, planned_date, meal_type, servings) VALUES (?, ?, ?, ?, ?)`,
                         [rPlan.id, localRecipe.id, rPlan.planned_date, rPlan.meal_type, rPlan.servings]
                     );
                 }
@@ -767,7 +776,7 @@ export async function pullRemoteChanges(): Promise<void> {
                     );
                 } else {
                     await runLogged(
-                        `INSERT INTO shopping_items (remote_id, name, quantity, unit, is_checked, category, source_recipe_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        `INSERT OR REPLACE INTO shopping_items (remote_id, name, quantity, unit, is_checked, category, source_recipe_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                         [rItem.id, rItem.name, rItem.quantity, rItem.unit, rItem.is_checked ? 1 : 0, rItem.category, localRecipeId]
                     );
                 }
@@ -776,16 +785,19 @@ export async function pullRemoteChanges(): Promise<void> {
         
         // Final sanity check: Deduplicate any local recipes that share the exact same title
         // This resolves issues where free-user syncs might duplicate existing remote items.
-        await deduplicateRecipes(db, runLogged);
+        await deduplicateLocalRecipes();
 
         if (__DEV__) console.log("Pull sync completed successfully.");
     } catch (e) {
         console.error("Pull Sync Failed:", e);
+    } finally {
+        isPulling = false;
     }
 }
 
-async function deduplicateRecipes(db: SQLiteDatabase, runLogged: (sql: string, params?: any[]) => Promise<any>) {
+export async function deduplicateLocalRecipes(): Promise<void> {
     try {
+        const db = await getDatabase();
         const recipes = await db.getAllAsync<Recipe>("SELECT * FROM recipes ORDER BY created_at ASC");
         const seenTitles = new Map<string, Recipe>();
         const dupesToDelete: number[] = [];
@@ -797,29 +809,44 @@ async function deduplicateRecipes(db: SQLiteDatabase, runLogged: (sql: string, p
                 dupesToDelete.push(recipe.id);
                 // Also explicitly delete from Supabase if it synced as a duplicate
                 if (recipe.remote_id) {
-                    supabase.from('recipes').delete().eq('id', recipe.remote_id).then();
+                    (async () => {
+                        try {
+                            const { error } = await supabase.from('recipes').delete().eq('id', recipe.remote_id);
+                            if (error) {
+                                console.warn("Failed to delete remote duplicate:", error);
+                            }
+                        } catch (err) {
+                            console.warn("Failed to delete remote duplicate:", err);
+                        }
+                    })();
                 }
             } else {
                 seenTitles.set(normalized, recipe);
             }
         }
 
-        for (const id of dupesToDelete) {
-            await runLogged("DELETE FROM ingredients WHERE recipe_id = ?", [id]);
-            await runLogged("DELETE FROM steps WHERE recipe_id = ?", [id]);
-            await runLogged("DELETE FROM recipe_collections WHERE recipe_id = ?", [id]);
-            await runLogged("DELETE FROM recipe_tags WHERE recipe_id = ?", [id]);
-            await runLogged("DELETE FROM meal_plans WHERE recipe_id = ?", [id]);
-            await runLogged("UPDATE shopping_items SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
-            await runLogged("UPDATE food_logs SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
-            await runLogged("DELETE FROM recipes WHERE id = ?", [id]);
+        if (dupesToDelete.length === 0) return;
+
+        if (__DEV__) {
+            console.log(`[Deduplicate] Found ${dupesToDelete.length} duplicate recipes to delete.`);
         }
 
-        if (dupesToDelete.length > 0 && __DEV__) {
-            console.log(`Deleted ${dupesToDelete.length} duplicate recipes.`);
+        for (const id of dupesToDelete) {
+            await db.runAsync("DELETE FROM ingredients WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM steps WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM recipe_collections WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM recipe_tags WHERE recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM meal_plans WHERE recipe_id = ?", [id]);
+            await db.runAsync("UPDATE shopping_items SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
+            await db.runAsync("UPDATE food_logs SET source_recipe_id = NULL WHERE source_recipe_id = ?", [id]);
+            await db.runAsync("DELETE FROM recipes WHERE id = ?", [id]);
+        }
+
+        if (__DEV__) {
+            console.log(`[Deduplicate] Successfully deleted ${dupesToDelete.length} duplicate recipes.`);
         }
     } catch (e) {
-        console.error("Deduplication failed:", e);
+        console.error("[Deduplicate] Deduplication failed:", e);
     }
 }
 

@@ -17,6 +17,7 @@ import * as SecureStore from "expo-secure-store";
 import { BlurView } from "expo-blur";
 import { AI_PROVIDER_STORE } from "@/lib/constants";
 import { searchRawFoods } from "@/lib/rawFoods";
+import { trackEvent } from "@/lib/analytics";
 
 type Tab = "search" | "scan" | "quick" | "recipe";
 
@@ -291,6 +292,7 @@ export default function AddFoodScreen() {
             }
 
             setSearchResults(combinedResults.slice(0, 15));
+            trackEvent("food_search_completed", { query: q, results_count: combinedResults.length });
         } catch (e) {
             console.warn("Search failed:", e);
             setSearchResults([]);
@@ -320,6 +322,7 @@ export default function AddFoodScreen() {
             const { data: { session } } = await supabase.auth.getSession();
             const authToken = session?.access_token || supabaseKey;
             const provider = await SecureStore.getItemAsync(AI_PROVIDER_STORE) || "gemini";
+            trackEvent("ai_food_estimation_triggered", { query: q, provider });
 
             const response = await fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
                 method: "POST",
@@ -451,6 +454,7 @@ export default function AddFoodScreen() {
             image_url: null,
             barcode: null,
         });
+        trackEvent("food_logged", { source: "search", source_type: food.source, calories: food.calories * qty, quantity: qty });
         router.back();
     }, [addFoodLog, saveCustomFood, mealType, logDate, router]);
 
@@ -486,6 +490,7 @@ export default function AddFoodScreen() {
             source_type: "manual", source_recipe_id: null,
             image_url: null, barcode: null,
         });
+        trackEvent("food_logged", { source: "quick_add", calories: cal * qtyVal, quantity: qtyVal });
         router.back();
     }, [quick, addFoodLog, saveCustomFood, mealType, logDate, router]);
 
@@ -503,6 +508,7 @@ export default function AddFoodScreen() {
             source_type: "recipe", source_recipe_id: recipe.id > 0 ? recipe.id : null,
             image_url: recipe.image_url || null, barcode: null,
         });
+        trackEvent("food_logged", { source: "recipe", calories: (recipe.calories || 0) * qty, quantity: qty });
         router.back();
     }, [addFoodLog, mealType, logDate, router]);
 
@@ -530,6 +536,7 @@ export default function AddFoodScreen() {
     // ── Navigate to scanner ──
     const handleOpenScanner = useCallback((mode: "photo" | "barcode") => {
         try {
+            trackEvent("scanner_opened", { mode });
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
             router.push({
                 pathname: "/library/calorie-counter/scan",
@@ -611,7 +618,10 @@ export default function AddFoodScreen() {
                 {TABS.map((t) => (
                     <Pressable
                         key={t.key}
-                        onPress={() => setTab(t.key)}
+                        onPress={() => {
+                            setTab(t.key);
+                            trackEvent("add_food_tab_changed", { tab: t.key });
+                        }}
                         className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
                         style={tab === t.key ? { backgroundColor: "rgba(239,68,68,0.15)" } : undefined}
                     >

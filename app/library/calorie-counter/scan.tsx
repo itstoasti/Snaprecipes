@@ -14,6 +14,8 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 import { AI_PROVIDER_STORE } from "@/lib/constants";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { trackEvent } from "@/lib/analytics";
 
 interface ScannedFood {
     food_name: string;
@@ -39,6 +41,8 @@ export default function ScanScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [permission, requestPermission] = useCameraPermissions();
+    const { isPro, isReady } = useRevenueCat();
+
     const cameraRef = useRef<CameraView>(null);
     const params = useLocalSearchParams<{ date: string; mealType: string; mode: string }>();
     const logDate = params.date || new Date().toISOString().split("T")[0];
@@ -49,6 +53,13 @@ export default function ScanScreen() {
     const { addFoodLog, saveCustomFood } = useFoodLog();
 
     const [mode, setMode] = useState<"photo" | "barcode">(initialMode);
+
+    // Switch to barcode mode if the user is not Pro and currently in photo mode
+    useEffect(() => {
+        if (isReady && !isPro && mode === "photo") {
+            setMode("barcode");
+        }
+    }, [isReady, isPro, mode]);
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<ScannedFood[] | null>(null);
     const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
@@ -105,6 +116,7 @@ export default function ScanScreen() {
 
             const data = await response.json();
             setResults(data.items || []);
+            trackEvent("photo_scanned", { items_count: (data.items || []).length });
             setConfidence(data.confidence || "medium");
         } catch (error: any) {
             Alert.alert("Scan Failed", error.message || "Could not analyze food photo");
@@ -114,6 +126,10 @@ export default function ScanScreen() {
     }, []);
 
     const handleCapture = useCallback(async () => {
+        if (!isPro) {
+            router.push("/paywall");
+            return;
+        }
         if (!cameraRef.current || loading) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -128,9 +144,13 @@ export default function ScanScreen() {
         } catch (error: any) {
             Alert.alert("Capture Failed", error.message || "Could not take photo");
         }
-    }, [loading, analyzeBase64]);
+    }, [loading, analyzeBase64, isPro]);
 
     const handlePickFromGallery = useCallback(async () => {
+        if (!isPro) {
+            router.push("/paywall");
+            return;
+        }
         if (loading) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -146,7 +166,7 @@ export default function ScanScreen() {
         } catch (error: any) {
             Alert.alert("Gallery Failed", error.message || "Could not load image");
         }
-    }, [loading, analyzeBase64]);
+    }, [loading, analyzeBase64, isPro]);
 
     const handleBarcodeScanned = useCallback(async ({ data: barcode }: { data: string }) => {
         if (barcodeProcessing || scannedBarcode === barcode) return;
@@ -206,9 +226,23 @@ export default function ScanScreen() {
 
                     setResults([item]);
                     setConfidence("high");
+                    trackEvent("barcode_scanned", { found_in_off: true });
                     setBarcodeProcessing(false);
                     return;
                 }
+            }
+
+            if (!isPro) {
+                Alert.alert(
+                    "Product Not Found",
+                    `Barcode ${barcode} was not found on Open Food Facts. Pro users can use AI lookup to identify products.`,
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "View Pro", onPress: () => router.push("/paywall") }
+                    ]
+                );
+                setBarcodeProcessing(false);
+                return;
             }
 
             const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -235,6 +269,7 @@ export default function ScanScreen() {
                 const aiData = await aiResp.json();
                 setResults(aiData.items || []);
                 setConfidence(aiData.confidence || "low");
+                trackEvent("barcode_scanned", { found_in_off: false, ai_fallback: true });
             } else {
                 Alert.alert("Not Found", `Barcode ${barcode} not found. Try scanning the nutrition label with the photo scanner instead.`);
             }
@@ -243,7 +278,7 @@ export default function ScanScreen() {
         } finally {
             setBarcodeProcessing(false);
         }
-    }, [barcodeProcessing, scannedBarcode]);
+    }, [barcodeProcessing, scannedBarcode, isPro]);
 
     const handleLogSelectedFoods = useCallback(async () => {
         if (!results || selectedIndexes.length === 0) return;
@@ -290,6 +325,8 @@ export default function ScanScreen() {
                     barcode: scannedBarcode || null,
                 });
             }
+
+            trackEvent("foods_logged", { count: selectedIndexes.length, meal_type: selectedMealType, source: mode });
 
             // Move selected indexes to logged indexes
             setLoggedIndexes(prev => [...prev, ...selectedIndexes]);
@@ -526,7 +563,17 @@ export default function ScanScreen() {
                     <View className="w-12" />
                 </View>
                 <View className="flex-row mx-auto mt-4 bg-black/40 rounded-full p-1" style={{ pointerEvents: 'auto' }}>
-                    <Pressable onPress={() => setMode("photo")} style={{ paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: mode === "photo" ? "#EF4444" : "transparent" }}>
+                    <Pressable
+                        onPress={() => {
+                            if (!isPro) {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                                router.push("/paywall");
+                            } else {
+                                setMode("photo");
+                            }
+                        }}
+                        style={{ paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: mode === "photo" ? "#EF4444" : "transparent" }}
+                    >
                         <Text className="text-white font-sans-bold text-xs">Photo</Text>
                     </Pressable>
                     <Pressable onPress={() => { setMode("barcode"); setScannedBarcode(null); }} style={{ paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: mode === "barcode" ? "#FBBF24" : "transparent" }}>

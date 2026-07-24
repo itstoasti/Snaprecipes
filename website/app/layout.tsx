@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-inter",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["600", "700", "800", "900"],
+  variable: "--font-outfit",
 });
 
 export const metadata: Metadata = {
@@ -96,7 +102,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body
-        className={`${inter.variable} font-sans bg-surface-950 text-white antialiased`}
+        className={`${inter.variable} ${outfit.variable} font-sans bg-surface-950 text-surface-300 antialiased`}
       >
         <GlobalSchema />
         <Script

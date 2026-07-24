@@ -7,7 +7,7 @@ import GlassContainer from "./GlassContainer";
 
 interface StatusModalProps {
     visible: boolean;
-    type: "success" | "error";
+    type: "success" | "error" | "info";
     title: string;
     message: string;
     buttonText?: string;
@@ -25,9 +25,10 @@ export default function StatusModal({
     if (!visible) return null;
 
     const isSuccess = type === "success";
-    const iconName = isSuccess ? "checkmark-circle" : "alert-circle";
-    const iconColor = isSuccess ? "#34D399" : "#EF4444";
-    const iconBg = isSuccess ? "bg-green-500/10" : "bg-red-500/10";
+    const isInfo = type === "info";
+    const iconName = isSuccess ? "checkmark-circle" : (isInfo ? "information-circle" : "alert-circle");
+    const iconColor = isSuccess ? "#34D399" : (isInfo ? "#818CF8" : "#EF4444");
+    const iconBg = isSuccess ? "bg-green-500/10" : (isInfo ? "bg-indigo-500/10" : "bg-red-500/10");
 
     return (
         <Modal transparent visible={visible} animationType="none" statusBarTranslucent>
@@ -65,7 +66,13 @@ export default function StatusModal({
                             {/* Action Button */}
                             <Pressable
                                 onPress={onClose}
-                                className={`w-full py-4 rounded-2xl items-center ${isSuccess ? 'bg-accent shadow-lg shadow-accent/20' : 'bg-surface-800 border border-surface-700'}`}
+                                className={`w-full py-4 rounded-2xl items-center ${
+                                    isSuccess 
+                                        ? 'bg-accent shadow-lg shadow-accent/20' 
+                                        : isInfo 
+                                            ? 'bg-[#818CF8] shadow-lg shadow-[#818CF8]/20' 
+                                            : 'bg-surface-800 border border-surface-700'
+                                }`}
                             >
                                 <Text className="text-white font-sans-bold text-base">
                                     {buttonText}
