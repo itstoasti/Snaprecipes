@@ -1,6 +1,7 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Alert, ActivityIndicator, Platform } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -8,6 +9,7 @@ import { extractFromImage } from "@/lib/extract";
 import { useRecipes } from "@/hooks/useRecipes";
 import { canExtractRecipe, incrementUsage } from "@/lib/usage";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function CameraScanner() {
     const [permission, requestPermission] = useCameraPermissions();
@@ -16,7 +18,13 @@ export default function CameraScanner() {
     const router = useRouter();
     const { insertRecipe, shareRecipeToCommunity } = useRecipes();
     const { isPro } = useRevenueCat();
+    const { colors } = useTheme();
     const [shareToCommunity, setShareToCommunity] = useState(true);
+
+    useEffect(() => {
+        activateKeepAwakeAsync("recipe-camera");
+        return () => { deactivateKeepAwake("recipe-camera"); };
+    }, []);
 
     const handleCapture = async () => {
         if (!cameraRef.current) return;
@@ -25,7 +33,7 @@ export default function CameraScanner() {
         if (!canExtract) {
             Alert.alert(
                 "Usage Limit Reached",
-                "You've reached your free limit of 5 recipe extractions for this month. Upgrade to SnapRecipes Pro for unlimited extractions!",
+                "You've reached your free limit of 10 recipe extractions for this month. Upgrade to SnapRecipes Pro for unlimited extractions!",
                 [
                     { text: "Cancel", style: "cancel" },
                     { text: "Upgrade", onPress: () => { router.push("/paywall"); } }
@@ -90,7 +98,7 @@ export default function CameraScanner() {
     if (!permission.granted) {
         return (
             <View className="flex-1 bg-surface-950 items-center justify-center px-8">
-                <Ionicons name="camera-outline" size={64} color="#6E6E85" />
+                <Ionicons name="camera-outline" size={64} color={colors.textFaint} />
                 <Text className="text-white font-sans-bold text-xl mt-4 mb-2 text-center">
                     Camera Access Needed
                 </Text>
@@ -101,7 +109,7 @@ export default function CameraScanner() {
                     onPress={requestPermission}
                     className="bg-accent px-8 py-3 rounded-2xl"
                 >
-                    <Text className="text-white font-sans-semibold text-base">
+                    <Text className="text-[#FFFFFF] font-sans-semibold text-base">
                         Grant Permission
                     </Text>
                 </Pressable>
@@ -142,7 +150,7 @@ export default function CameraScanner() {
                     >
                         <Ionicons name="close" size={24} color="#FFFFFF" />
                     </Pressable>
-                    <Text className="text-white font-sans-semibold text-base">
+                    <Text className="text-[#FFFFFF] font-sans-semibold text-base">
                         Scan Recipe
                     </Text>
                     <View className="w-10" />
@@ -150,9 +158,9 @@ export default function CameraScanner() {
 
                 {/* Center guide */}
                 <View className="flex-1 items-center justify-center px-10">
-                    <View className="w-full aspect-[3/4] rounded-3xl border-2 border-white/30">
+                    <View className="w-full aspect-[3/4] rounded-3xl border-2 border-[rgba(255,255,255,0.3)]">
                         <View className="flex-1 items-center justify-center">
-                            <Text className="text-white/60 font-sans text-sm text-center">
+                            <Text className="text-[rgba(255,255,255,0.6)] font-sans text-sm text-center">
                                 Position recipe within frame
                             </Text>
                         </View>
@@ -163,10 +171,10 @@ export default function CameraScanner() {
                 <View className="items-center pb-12">
                     <Pressable
                         onPress={() => isPro && setShareToCommunity(!shareToCommunity)}
-                        className={`flex-row items-center px-4 py-2 rounded-full mb-6 shadow-lg ${shareToCommunity || !isPro ? 'bg-accent' : 'bg-surface-800'}`}
+                        className={`flex-row items-center px-4 py-2 rounded-full mb-6 shadow-lg ${shareToCommunity || !isPro ? 'bg-accent' : 'bg-[rgba(26,26,38,0.85)]'}`}
                     >
                         <Ionicons name={(shareToCommunity || !isPro) ? "checkmark-circle" : "ellipse-outline"} size={20} color="#FFF" className="mr-2" style={{ marginRight: 6 }} />
-                        <Text className="text-white font-sans-semibold text-sm mr-2">
+                        <Text className="text-[#FFFFFF] font-sans-semibold text-sm mr-2">
                             Share to Community
                         </Text>
                         {!isPro && <Ionicons name="lock-closed" size={14} color="#FFF" />}
@@ -179,7 +187,7 @@ export default function CameraScanner() {
                     ) : (
                         <Pressable
                             onPress={handleCapture}
-                            className="w-20 h-20 rounded-full bg-white items-center justify-center"
+                            className="w-20 h-20 rounded-full bg-[#FFFFFF] items-center justify-center"
                             style={{
                                 shadowColor: "#FF6B35",
                                 shadowOffset: { width: 0, height: 0 },
@@ -187,7 +195,7 @@ export default function CameraScanner() {
                                 shadowRadius: 20,
                             }}
                         >
-                            <View className="w-16 h-16 rounded-full bg-white border-4 border-surface-950" />
+                            <View className="w-16 h-16 rounded-full bg-[#FFFFFF] border-4 border-surface-950" />
                         </Pressable>
                     )}
                 </View>

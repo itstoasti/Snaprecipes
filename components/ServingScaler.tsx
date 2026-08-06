@@ -41,7 +41,7 @@ function MultiplierButton({
                 }`}
         >
             <Text
-                className={`font-sans-bold text-sm ${isActive ? "text-white" : "text-surface-300"
+                className={`font-sans-bold text-sm ${isActive ? "text-[#FFFFFF]" : "text-surface-300"
                     }`}
             >
                 {value}x

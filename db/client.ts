@@ -1,5 +1,6 @@
 import * as SQLite from "expo-sqlite";
 import { CREATE_TABLES_SQL } from "./schema";
+import { DEFAULT_AISLES } from "@/lib/ingredientCategorizer";
 
 const DB_NAME = "snaprecipes.db";
 
@@ -35,6 +36,25 @@ async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     // Create tables
     await database.execAsync(CREATE_TABLES_SQL);
+
+    // Seed default shopping aisles once (idempotent)
+    try {
+        const aisleCount = await database.getFirstAsync<{ count: number }>(
+            "SELECT COUNT(*) as count FROM shopping_categories"
+        );
+        if (!aisleCount || aisleCount.count === 0) {
+            console.log("Seeding default shopping aisles...");
+            for (let i = 0; i < DEFAULT_AISLES.length; i++) {
+                const aisle = DEFAULT_AISLES[i];
+                await database.runAsync(
+                    "INSERT OR IGNORE INTO shopping_categories (name, emoji, tint, sort_order, is_builtin) VALUES (?, ?, ?, ?, 1)",
+                    [aisle.name, aisle.emoji, aisle.tint, i]
+                );
+            }
+        }
+    } catch (error) {
+        console.warn("Seeding shopping aisles failed:", error);
+    }
 
     // Run safe auto-migrations for new columns
     try {

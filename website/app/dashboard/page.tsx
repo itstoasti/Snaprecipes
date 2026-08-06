@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ExtractionLoader from "@/components/ExtractionLoader";
 import PaywallModal from "@/components/PaywallModal";
+import SavesExplanationModal from "@/components/SavesExplanationModal";
 function checkIsPro(user: any): boolean {
     if (!user) return false;
     const appMeta = user.app_metadata || {};
@@ -107,9 +108,11 @@ export default function DashboardPage() {
     const [communityResults, setCommunityResults] = useState<any[]>([]);
     const [communitySearchLoading, setCommunitySearchLoading] = useState(false);
 
-    // Subscription / Paywall state
+    // Subscription / Paywall / Usage state
     const [showPaywall, setShowPaywall] = useState(false);
     const [managingSubscription, setManagingSubscription] = useState(false);
+    const [monthlySavesCount, setMonthlySavesCount] = useState(0);
+    const [showSavesModal, setShowSavesModal] = useState(false);
 
     useEffect(() => {
         const checkAuthAndFetchData = async () => {
@@ -151,18 +154,21 @@ export default function DashboardPage() {
     const fetchData = async (userId: string) => {
         setLoading(true);
         try {
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
             const [
                 recipesRes,
                 collectionsRes,
                 junctionsRes,
                 tagsRes,
-                recipeTagsRes
+                recipeTagsRes,
+                monthlyRes
             ] = await Promise.all([
                 supabase.from("recipes").select("*").eq("owner_id", userId).order("created_at", { ascending: false }),
                 supabase.from("collections").select("*").eq("owner_id", userId).order("name"),
                 supabase.from("recipe_collections").select("*").eq("owner_id", userId),
                 supabase.from("tags").select("*").eq("owner_id", userId).order("name"),
-                supabase.from("recipe_tags").select("*, tags(name)")
+                supabase.from("recipe_tags").select("*, tags(name)"),
+                supabase.from("recipes").select("id", { count: "exact", head: true }).eq("owner_id", userId).gte("created_at", startOfMonth)
             ]);
 
             if (recipesRes.error) throw recipesRes.error;
@@ -176,6 +182,9 @@ export default function DashboardPage() {
             setRecipeCollections(junctionsRes.data || []);
             setTags(tagsRes.data || []);
             setRecipeTags(recipeTagsRes.data || []);
+            if (monthlyRes.count !== null) {
+                setMonthlySavesCount(monthlyRes.count);
+            }
 
         } catch (err: any) {
             console.error("Error fetching dashboard data:", err);
@@ -287,6 +296,10 @@ export default function DashboardPage() {
 
     const handleSaveCommunityRecipeToCollection = async (publicRecipe: any) => {
         if (!user || !selectedCollection) return;
+        if (!isProUser && monthlySavesCount >= 10) {
+            setShowSavesModal(true);
+            return;
+        }
         try {
             // Insert recipe into user's library
             const { data: recipeRow, error: recipeError } = await supabase
@@ -383,6 +396,7 @@ export default function DashboardPage() {
             // Update local state
             setRecipes([...recipes, recipeRow]);
             setRecipeCollections([...recipeCollections, ...(junctionData || [])]);
+            setMonthlySavesCount((prev) => prev + 1);
             // Remove from community results so it disappears
             setCommunityResults(communityResults.filter(r => r.id !== publicRecipe.id));
         } catch (err: any) {
@@ -396,6 +410,11 @@ export default function DashboardPage() {
         setImportError("");
         const trimmedUrl = importUrl.trim();
         if (!trimmedUrl) return;
+
+        if (!isProUser && monthlySavesCount >= 10) {
+            setShowSavesModal(true);
+            return;
+        }
 
         try {
             new URL(trimmedUrl);
@@ -558,6 +577,7 @@ export default function DashboardPage() {
             }
 
             // Clear input and redirect
+            setMonthlySavesCount((prev) => prev + 1);
             setImportUrl("");
             router.push(`/dashboard/recipes/${recipeRow.id}?isNew=true`);
         } catch (err: any) {
@@ -605,9 +625,23 @@ export default function DashboardPage() {
                 <div className="max-w-7xl mx-auto px-6">
                     {/* Header */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-                        <div>
-                            <span className="text-accent font-semibold text-sm uppercase tracking-wider">My Library</span>
-                            <h1 className="text-3xl md:text-4xl font-bold mt-1">Recipe Dashboard</h1>
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <div>
+                                <span className="text-accent font-semibold text-sm uppercase tracking-wider">My Library</span>
+                                <h1 className="text-3xl md:text-4xl font-bold mt-1">Recipe Dashboard</h1>
+                            </div>
+                            {!isProUser && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSavesModal(true)}
+                                    className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-900 border border-surface-750 hover:border-surface-600 transition-all cursor-pointer shadow-sm group mt-1"
+                                >
+                                    <span className={`w-2 h-2 rounded-full ${monthlySavesCount >= 10 ? "bg-red-500 animate-pulse" : "bg-accent"}`} />
+                                    <span className="text-xs font-bold text-surface-300 group-hover:text-white uppercase tracking-wider">
+                                        Saves: {monthlySavesCount}/10 Free
+                                    </span>
+                                </button>
+                            )}
                         </div>
 
                         {/* Import Bar */}
@@ -1373,6 +1407,14 @@ export default function DashboardPage() {
                     </div>
                 );
             })()}
+
+            {/* Saves Explanation Modal */}
+            <SavesExplanationModal
+                isOpen={showSavesModal}
+                usageCount={monthlySavesCount}
+                onClose={() => setShowSavesModal(false)}
+                onUpgrade={() => setShowPaywall(true)}
+            />
 
             {/* Paywall Modal */}
             <PaywallModal

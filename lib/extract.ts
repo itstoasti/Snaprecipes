@@ -180,10 +180,90 @@ function extractRecipeSection(content: string, maxChars: number = 40000): string
     return content.substring(0, maxChars);
 }
 
+export interface ExtractionStreamHandlers {
+    onStage?: (stage: string) => void;
+    onToken?: (accumulatedText: string) => void;
+    onContext?: (snippet: string) => void;
+}
+
+/**
+ * Consume the extract-recipe SSE stream, invoking handlers for stage/token
+ * events and resolving with the final `done` payload. Falls back to buffered
+ * parsing on runtimes where fetch responses are not streamable.
+ */
+async function consumeExtractionStream(
+    response: Response,
+    handlers: ExtractionStreamHandlers
+): Promise<any> {
+    let accumulated = "";
+    let result: any = undefined;
+    let streamError: string | null = null;
+
+    const handleEvent = (event: string, dataStr: string) => {
+        let data: any;
+        try {
+            data = JSON.parse(dataStr);
+        } catch {
+            return;
+        }
+        if (event === "stage" && data.stage) {
+            handlers.onStage?.(data.stage);
+        } else if (event === "token" && typeof data.t === "string") {
+            accumulated += data.t;
+            handlers.onToken?.(accumulated);
+        } else if (event === "done") {
+            result = data;
+        } else if (event === "error") {
+            streamError = data.error || "Extraction stream failed";
+        }
+    };
+
+    const parseBuffer = (buf: string): string => {
+        let rest = buf;
+        let sepIdx;
+        while ((sepIdx = rest.indexOf("\n\n")) !== -1) {
+            const rawEvent = rest.slice(0, sepIdx);
+            rest = rest.slice(sepIdx + 2);
+            let eventName = "message";
+            const dataLines: string[] = [];
+            for (const line of rawEvent.split("\n")) {
+                if (line.startsWith("event:")) eventName = line.slice(6).trim();
+                else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+            }
+            if (dataLines.length > 0) handleEvent(eventName, dataLines.join("\n"));
+        }
+        return rest;
+    };
+
+    const body: any = (response as any).body;
+    if (body && typeof body.getReader === "function") {
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += typeof value === "string" ? value : decoder.decode(value, { stream: true });
+            buffer = parseBuffer(buffer);
+        }
+        parseBuffer(buffer + "\n\n");
+    } else {
+        const text = await response.text();
+        parseBuffer(text + "\n\n");
+    }
+
+    if (streamError) throw new Error(streamError);
+    return result;
+}
+
 /**
  * Extract a recipe from a URL using Gemini or OpenAI
  */
-export async function extractFromUrl(url: string, reCacheOnly = false): Promise<ExtractedRecipe[]> {
+export async function extractFromUrl(
+    url: string,
+    reCacheOnly = false,
+    handlers?: ExtractionStreamHandlers
+): Promise<ExtractedRecipe[]> {
     let markdownContent = "";
     let ogImage = "";
     let socialCaption = "";
@@ -195,6 +275,7 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
     const isTikTok = url.includes("tiktok.com");
     const isInstagram = url.includes("instagram.com");
     if (isTikTok) {
+        handlers?.onStage?.("social:meta");
         try {
             const tikwmResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`, {
                 headers: { "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)" },
@@ -242,6 +323,7 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
     }
 
     // Step 3: Fetch page content via Jina Reader (for all URLs including TikTok as supplement)
+    handlers?.onStage?.("scrape:client");
     try {
         const response = await fetch(`https://r.jina.ai/${url}`, {
             headers: {
@@ -280,6 +362,15 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
         } catch (e) {
             if (__DEV__) console.log("JSON-LD extraction failed (non-blocking):", e);
         }
+    }
+
+    // Hand the loader whatever context we managed to scrape so it can generate
+    // dish-specific banter while the heavy AI call runs.
+    if (handlers?.onContext) {
+        const snippetParts: string[] = [];
+        if (socialCaption) snippetParts.push(socialCaption.replace(/\s+/g, " ").trim());
+        if (markdownContent) snippetParts.push(markdownContent.substring(0, 600).replace(/\s+/g, " ").trim());
+        handlers.onContext((snippetParts.join(" | ") || url).substring(0, 1200));
     }
 
     // Smart truncation: find the recipe-relevant section instead of blindly taking the first 15K chars
@@ -352,13 +443,70 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
             ogImageUrl: ogImage,
             slideshowImageUrls: slideshowImages.length > 0 ? slideshowImages : undefined,
             isInstagram: isInstagram || undefined,
-            videoUrl: tiktokVideoUrl
+            videoUrl: tiktokVideoUrl,
+            stream: handlers ? true : undefined
         })
     });
 
     if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Detailed Edge Function Error: ${errorText} (Status: ${response.status})`);
+    }
+
+    const finalizeRecipeImage = (recipe: ExtractedRecipe): ExtractedRecipe => {
+        // Instagram/Facebook CDN URLs often fail to load in apps due to expiring signatures in query params
+        // Check if the extracted image is from a problematic CDN.
+        // NOTE: We do NOT include TikTok here anymore, because TikTok images *need* their query params to load correctly,
+        // and the wsrv.nl proxy strips them and breaks the image entirely.
+        const isProblematicCdn = recipe.imageUrl && (
+            recipe.imageUrl.includes("cdninstagram.com") ||
+            recipe.imageUrl.includes("fbcdn.net") ||
+            recipe.imageUrl.includes("scontent")
+        );
+
+        if (isProblematicCdn && recipe.imageUrl) {
+            if (__DEV__) console.log("Detected problematic CDN image URL, attempting to clean it.");
+            try {
+                // Option 1: Strip query parameters that cause 403 Forbidden on expiring signatures
+                const urlObj = new URL(recipe.imageUrl);
+                const cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
+
+                // Option 2: Wrap it in a reliable image proxy that bypasses CDN hotlink protection
+                // We use wsrv.nl (images.weserv.nl) which is a free caching proxy often used for mobile apps
+                recipe.imageUrl = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
+                if (__DEV__) console.log("Proxied Cleaned URL:", recipe.imageUrl);
+            } catch (e) {
+                console.warn("Failed to clean/proxy CDN URL", e);
+            }
+        }
+
+        // If no image was extracted or if the AI returned a messy one, and we have a clean OG image fallback
+        if ((!recipe.imageUrl || recipe.imageUrl === "") && ogImage) {
+            if (__DEV__) console.log("Using OG image fallback:", ogImage);
+            recipe.imageUrl = ogImage;
+        } else if (ogImage && recipe.imageUrl && recipe.imageUrl.includes("cdninstagram")) {
+             // Even after cleaning, IG URLs can be very stubborn over time.
+             // If we successfully grabbed a generic OG image earlier, it is much safer
+             // to use it as a fallback instead of a proxy-wrapped CDN image.
+             if (__DEV__) console.log("Replacing stubborn IG CDN url with clean OG image fallback");
+             recipe.imageUrl = ogImage;
+        }
+
+        return recipe;
+    };
+
+    // Streaming flow: consume SSE events and resolve with the final payload
+    if (handlers) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("text/event-stream")) {
+            const streamed = await consumeExtractionStream(response, handlers);
+            if (!streamed) throw new Error("Empty response from AI engine");
+            if (streamed.slideshow && streamed.recipes && Array.isArray(streamed.recipes)) {
+                if (__DEV__) console.log(`[Slideshow] Received ${streamed.recipes.length} recipes from streamed slideshow extraction`);
+                return streamed.recipes.map((r: any) => validateRecipe(r));
+            }
+            return [finalizeRecipeImage(validateRecipe(streamed))];
+        }
     }
 
     const data = await response.json();
@@ -385,47 +533,7 @@ export async function extractFromUrl(url: string, reCacheOnly = false): Promise<
     }
 
     // Single recipe flow (normal extraction)
-    const recipe = validateRecipe(data);
-
-    // Instagram/Facebook CDN URLs often fail to load in apps due to expiring signatures in query params
-    // Check if the extracted image is from a problematic CDN.
-    // NOTE: We do NOT include TikTok here anymore, because TikTok images *need* their query params to load correctly,
-    // and the wsrv.nl proxy strips them and breaks the image entirely.
-    const isProblematicCdn = recipe.imageUrl && (
-        recipe.imageUrl.includes("cdninstagram.com") ||
-        recipe.imageUrl.includes("fbcdn.net") ||
-        recipe.imageUrl.includes("scontent")
-    );
-
-    if (isProblematicCdn && recipe.imageUrl) {
-        if (__DEV__) console.log("Detected problematic CDN image URL, attempting to clean it.");
-        try {
-            // Option 1: Strip query parameters that cause 403 Forbidden on expiring signatures
-            const urlObj = new URL(recipe.imageUrl);
-            const cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
-            
-            // Option 2: Wrap it in a reliable image proxy that bypasses CDN hotlink protection
-            // We use wsrv.nl (images.weserv.nl) which is a free caching proxy often used for mobile apps
-            recipe.imageUrl = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
-            if (__DEV__) console.log("Proxied Cleaned URL:", recipe.imageUrl);
-        } catch (e) {
-            console.warn("Failed to clean/proxy CDN URL", e);
-        }
-    }
-
-    // If no image was extracted or if the AI returned a messy one, and we have a clean OG image fallback
-    if ((!recipe.imageUrl || recipe.imageUrl === "") && ogImage) {
-        if (__DEV__) console.log("Using OG image fallback:", ogImage);
-        recipe.imageUrl = ogImage;
-    } else if (ogImage && recipe.imageUrl && recipe.imageUrl.includes("cdninstagram")) {
-         // Even after cleaning, IG URLs can be very stubborn over time.
-         // If we successfully grabbed a generic OG image earlier, it is much safer
-         // to use it as a fallback instead of a proxy-wrapped CDN image.
-         if (__DEV__) console.log("Replacing stubborn IG CDN url with clean OG image fallback");
-         recipe.imageUrl = ogImage;
-    }
-
-    return [recipe];
+    return [finalizeRecipeImage(validateRecipe(data))];
 }
 
 /**

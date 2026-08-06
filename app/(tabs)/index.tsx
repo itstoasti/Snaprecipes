@@ -13,6 +13,7 @@ import ImportModal from "@/components/ImportModal";
 import SavesExplanationModal from "@/components/SavesExplanationModal";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { canExtractRecipe, getCurrentUsage } from "@/lib/usage";
+import { useTheme } from "@/hooks/useTheme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -23,6 +24,7 @@ export default function GroupedDashboard() {
     const { dailyTotals, refresh: refreshLogs } = useFoodLog();
     const { collections } = useCollections();
     const { isPro } = useRevenueCat();
+    const { colors } = useTheme();
     
     const [trending, setTrending] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -108,15 +110,15 @@ export default function GroupedDashboard() {
                                 className="h-12 px-4 rounded-2xl bg-surface-900 border border-white/5 flex-row items-center justify-center"
                                 style={{ gap: 6 }}
                             >
-                                <View className="w-2 h-2 rounded-full" style={{ backgroundColor: usageCount >= 5 ? "#EF4444" : "#FF6B35" }} />
-                                <Text className="text-white font-sans-bold text-xs">{usageCount}/5 Saves</Text>
+                                <View className="w-2 h-2 rounded-full" style={{ backgroundColor: usageCount >= 10 ? "#EF4444" : "#FF6B35" }} />
+                                <Text className="text-white font-sans-bold text-xs">{usageCount}/10 Saves</Text>
                             </Pressable>
                         )}
                         <Pressable 
                             onPress={() => router.push("/settings")}
                             className="w-12 h-12 rounded-2xl bg-surface-900 border border-white/5 items-center justify-center"
                         >
-                            <Ionicons name="person-outline" size={24} color="white" />
+                            <Ionicons name="person-outline" size={24} color={colors.text} />
                         </Pressable>
                     </View>
                 </View>
@@ -129,14 +131,14 @@ export default function GroupedDashboard() {
                         style={{ height: 180 }}
                     >
                         <View className="flex-row justify-between items-start">
-                            <View className="w-12 h-12 rounded-2xl bg-white/20 items-center justify-center">
-                                <Ionicons name="cloud-download" size={28} color="white" />
+                            <View className="w-12 h-12 rounded-2xl bg-[rgba(255,255,255,0.2)] items-center justify-center">
+                                <Ionicons name="cloud-download" size={28} color="#FFFFFF" />
                             </View>
-                            <Ionicons name="sparkles" size={20} color="white" className="opacity-40" />
+                            <Ionicons name="sparkles" size={20} color="#FFFFFF" className="opacity-40" />
                         </View>
                         <View>
-                            <Text className="text-white font-sans-bold text-2xl leading-tight">Import New Recipe</Text>
-                            <Text className="text-white/70 font-sans text-sm mt-1">URL, Video, or Photo</Text>
+                            <Text className="text-[#FFFFFF] font-sans-bold text-2xl leading-tight">Import New Recipe</Text>
+                            <Text className="text-[rgba(255,255,255,0.7)] font-sans text-sm mt-1">URL, Video, or Photo</Text>
                         </View>
                     </Pressable>
                 </View>

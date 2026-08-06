@@ -6,10 +6,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
 import { supabase } from "@/lib/supabase";
 import { initialSync } from "@/lib/sync";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function AuthScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -64,7 +66,7 @@ export default function AuthScreen() {
                     onPress={() => router.back()}
                     className="w-10 h-10 items-center justify-center rounded-full bg-surface-900"
                 >
-                    <Ionicons name="close" size={24} color="#FFFFFF" />
+                    <Ionicons name="close" size={24} color={colors.text} />
                 </Pressable>
                 <Text className="text-white font-sans-bold text-lg">Sign In</Text>
                 <View className="w-10" />
@@ -83,7 +85,7 @@ export default function AuthScreen() {
 
                 <Animated.View entering={SlideInDown.delay(300)} className="bg-surface-900 rounded-3xl p-6 border border-surface-800">
                     <View className="flex-row items-center bg-surface-950 border border-surface-800 rounded-xl px-4 py-2 mb-4">
-                        <Ionicons name="mail" size={20} color="#9D9DB0" className="mr-3" />
+                        <Ionicons name="mail" size={20} color={colors.textSecondary} className="mr-3" />
                         <TextInput
                             value={email}
                             onChangeText={setEmail}
@@ -97,7 +99,7 @@ export default function AuthScreen() {
                     </View>
 
                     <View className="flex-row items-center bg-surface-950 border border-surface-800 rounded-xl px-4 py-2 mb-8">
-                        <Ionicons name="lock-closed" size={20} color="#9D9DB0" className="mr-3" />
+                        <Ionicons name="lock-closed" size={20} color={colors.textSecondary} className="mr-3" />
                         <TextInput
                             value={password}
                             onChangeText={setPassword}
@@ -116,7 +118,7 @@ export default function AuthScreen() {
                         {loading ? (
                             <ActivityIndicator color="#FFF" />
                         ) : (
-                            <Text className="text-white font-sans-bold text-lg">Sign In</Text>
+                            <Text className="text-[#FFFFFF] font-sans-bold text-lg">Sign In</Text>
                         )}
                     </Pressable>
 

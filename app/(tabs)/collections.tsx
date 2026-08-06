@@ -105,7 +105,7 @@ export default function LibraryScreen() {
                         Your Hub
                     </Text>
                     <Text className="text-white font-sans-bold text-4xl mt-1">
-                        Library
+                        Hub
                     </Text>
                 </View>
 

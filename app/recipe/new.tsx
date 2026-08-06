@@ -23,6 +23,7 @@ import { Image } from "expo-image";
 import { useAppReview } from "@/hooks/useAppReview";
 import ReviewPromptModal from "@/components/ReviewPromptModal";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { useTheme } from "@/hooks/useTheme";
 
 function FormInput({
     label,
@@ -65,6 +66,7 @@ export default function NewRecipeScreen() {
     const [loading, setLoading] = useState(false);
     const { showPrePrompt, recordSuccessfulSave, handlePrePromptResponse } = useAppReview();
     const { isPro } = useRevenueCat();
+    const { colors } = useTheme();
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -162,7 +164,7 @@ export default function NewRecipeScreen() {
                     onPress={() => router.back()}
                     className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center"
                 >
-                    <Ionicons name="close" size={20} color="#FFFFFF" />
+                    <Ionicons name="close" size={20} color={colors.text} />
                 </Pressable>
                 <Text className="text-white font-sans-bold text-lg">Add Recipe</Text>
                 <View className="w-10 h-10" />
@@ -188,7 +190,7 @@ export default function NewRecipeScreen() {
                                 />
                             ) : (
                                 <View className="items-center">
-                                    <Ionicons name="camera" size={32} color="#6E6E85" />
+                                    <Ionicons name="camera" size={32} color={colors.textFaint} />
                                     <Text className="text-surface-400 font-sans-medium mt-2">
                                         Add Recipe Photo
                                     </Text>
@@ -300,7 +302,7 @@ export default function NewRecipeScreen() {
                             </Text>
                         </View>
                         {!isPro && (
-                            <Ionicons name="lock-closed" size={16} color="#6E6E85" />
+                            <Ionicons name="lock-closed" size={16} color={colors.textFaint} />
                         )}
                     </Pressable>
                 </Animated.View>

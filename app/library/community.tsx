@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import GlassContainer from "@/components/GlassContainer";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { useTheme } from "@/hooks/useTheme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -27,6 +28,7 @@ interface PublicRecipe {
 export default function CommunityScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
     const [recipes, setRecipes] = useState<PublicRecipe[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -106,7 +108,7 @@ export default function CommunityScreen() {
                             {/* Save Count Badge */}
                             <View className="absolute bottom-2 right-2 bg-black/50 px-2 py-1 rounded-full flex-row items-center">
                                 <Ionicons name="heart" size={10} color="#F472B6" />
-                                <Text className="text-white font-sans-bold text-[9px] ml-1">{item.save_count}</Text>
+                                <Text className="text-[#FFFFFF] font-sans-bold text-[9px] ml-1">{item.save_count}</Text>
                             </View>
                         </View>
                         
@@ -138,7 +140,7 @@ export default function CommunityScreen() {
                         onPress={() => router.back()}
                         className="w-10 h-10 rounded-full bg-surface-900 items-center justify-center mr-3"
                     >
-                        <Ionicons name="chevron-back" size={24} color="white" />
+                        <Ionicons name="chevron-back" size={24} color={colors.text} />
                     </Pressable>
                     <View>
                         <Text className="text-white font-sans-bold text-2xl">Community</Text>
@@ -150,19 +152,19 @@ export default function CommunityScreen() {
             {/* Search Bar */}
             <View className="px-5 mb-4">
                 <View className="flex-row items-center bg-surface-900 px-4 py-3 rounded-2xl border border-surface-800">
-                    <Ionicons name="search" size={20} color="#6E6E85" />
+                    <Ionicons name="search" size={20} color={colors.textFaint} />
                     <TextInput
                         value={searchQuery}
                         onChangeText={handleSearch}
                         onSubmitEditing={submitSearch}
                         placeholder="Search community recipes..."
-                        placeholderTextColor="#6E6E85"
+                        placeholderTextColor={colors.placeholder}
                         className="flex-1 ml-3 text-white font-sans"
                         returnKeyType="search"
                     />
                     {searchQuery.length > 0 && (
                         <Pressable onPress={() => { setSearchQuery(""); fetchCommunityRecipes(""); }}>
-                            <Ionicons name="close-circle" size={20} color="#6E6E85" />
+                            <Ionicons name="close-circle" size={20} color={colors.textFaint} />
                         </Pressable>
                     )}
                 </View>

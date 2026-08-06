@@ -93,6 +93,16 @@ export interface ShoppingItem {
     created_at: string;
 }
 
+export interface ShoppingCategory {
+    id: number;
+    name: string;
+    emoji: string;
+    tint: string;
+    sort_order: number;
+    is_builtin: boolean;
+    created_at: string;
+}
+
 export interface FoodLog {
     id: number;
     remote_id: string | null;
@@ -275,6 +285,16 @@ export const CREATE_TABLES_SQL = `
     source_recipe_id INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (source_recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS shopping_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    emoji TEXT NOT NULL DEFAULT '🛒',
+    tint TEXT NOT NULL DEFAULT '#8B8BA3',
+    sort_order INTEGER NOT NULL DEFAULT 99,
+    is_builtin INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS food_logs (

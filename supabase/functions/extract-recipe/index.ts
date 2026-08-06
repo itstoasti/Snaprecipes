@@ -1150,6 +1150,17 @@ Deno.serve(async (req: Request) => {
             });
         }
 
+        // ── SSE STREAMING SETUP ───────────────────────────────────
+        // Opt-in via { stream: true }. The client receives stage events as the
+        // pipeline progresses, live Gemini token chunks, and a final `done`
+        // event carrying the fully post-processed recipe (image caching and
+        // community save included). Non-stream callers are unaffected.
+        const sse = (body.stream && !reCacheOnly) ? createSseEmitter() : null;
+        const emitStage = (stage: string) => { sse?.send("stage", { stage }); };
+        const emitToken = (piece: string) => { sse?.send("token", { t: piece }); };
+        emitStage("start");
+
+        const runPipeline = async (): Promise<any> => {
         // ----- Server-side scraping fallback -----
         // If client signals scrape failure, try from the server to supplement content
         let contentForAI = clientContent || "";
@@ -1161,6 +1172,7 @@ Deno.serve(async (req: Request) => {
         let youtubeHasRecipeScrape = false;
         
         if (isYouTube && !imageBase64) {
+            emitStage("youtube");
             console.log(`[YouTube] Detected YouTube URL: ${url}`);
             youtubeData = await extractYouTubeData(url);
             if (youtubeData) {
@@ -1204,6 +1216,7 @@ Deno.serve(async (req: Request) => {
         }
         
         if (url && scrapeFailed && !imageBase64 && !isYouTube) {
+            emitStage("scrape:server");
             console.log(`[Server Scrape] Client scrape failed, attempting server-side fetch for: ${url}`);
             try {
                 const scraped = await serverSideScrape(url);
@@ -1281,6 +1294,7 @@ Deno.serve(async (req: Request) => {
         
         // TikTok/Instagram/Facebook video: download from URL
         if (resolvedVideoUrl && !imageBase64 && !videoBase64) {
+            emitStage("video:process");
             console.log(`[Video Pipeline] Processing video from: ${resolvedVideoUrl.substring(0, 80)}...`);
             if (activeProvider === "openai") {
                 if (DEFAULT_OPENAI_KEY) {
@@ -1353,6 +1367,7 @@ Deno.serve(async (req: Request) => {
         }
 
         if (resolvedSlideshowUrls.length > 1) {
+            emitStage("slideshow:process");
             console.log(`[Slideshow] Processing ${resolvedSlideshowUrls.length} slideshow images via Gemini Vision`);
             
             // Download all images server-side and convert to base64
@@ -1529,9 +1544,7 @@ Deno.serve(async (req: Request) => {
 
                 // Return the array of recipes directly
                 // The client will handle saving each one
-                return new Response(JSON.stringify({ slideshow: true, recipes }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                });
+                return { slideshow: true, recipes };
             } else {
                 console.log(`[Slideshow] No images could be downloaded, falling back to text-based extraction`);
             }
@@ -1542,6 +1555,7 @@ Deno.serve(async (req: Request) => {
 
         if (activeProvider === "openai") {
             // ----- OpenAI Logic -----
+            emitStage("generate:start");
             const payload: any = {
                 model: "gpt-4o",
                 response_format: { type: "json_object" },
@@ -1565,7 +1579,7 @@ Deno.serve(async (req: Request) => {
                     content: `Please extract the recipe from the following text and metadata:\n\n${contentForAI}`
                 });
             } else {
-                return new Response(JSON.stringify({ error: "Provide contentForAI or imageBase64" }), { status: 400, headers: corsHeaders });
+                throw new Error("Provide contentForAI or imageBase64");
             }
 
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1619,27 +1633,76 @@ Deno.serve(async (req: Request) => {
                     text: `${activePrompt}\n\n---\n\n${contentForAI}`
                 });
             } else {
-                return new Response(JSON.stringify({ error: "Provide contentForAI, videoBase64 or imageBase64" }), { status: 400, headers: corsHeaders });
+                throw new Error("Provide contentForAI, videoBase64 or imageBase64");
             }
 
             let geminiSuccess = false;
             try {
-                console.log(`[Gemini] Attempting extraction using model: ${targetModel}`);
-                const response = await fetch(endpoint, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                });
+                if (sse) {
+                    // Stream Gemini output straight to the client as `token` events
+                    emitStage("generate:start");
+                    const streamEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?alt=sse&key=${activeKey}`;
+                    console.log(`[Gemini] Attempting streaming extraction using model: ${targetModel}`);
+                    const response = await fetch(streamEndpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (aiResponseText) {
-                        geminiSuccess = true;
+                    if (response.ok && response.body) {
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let sseBuffer = "";
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            sseBuffer += decoder.decode(value, { stream: true });
+                            let newlineIdx;
+                            while ((newlineIdx = sseBuffer.indexOf("\n")) !== -1) {
+                                const line = sseBuffer.slice(0, newlineIdx).trim();
+                                sseBuffer = sseBuffer.slice(newlineIdx + 1);
+                                if (!line.startsWith("data:")) continue;
+                                const chunkJson = line.slice(5).trim();
+                                if (!chunkJson || chunkJson === "[DONE]") continue;
+                                try {
+                                    const chunk = JSON.parse(chunkJson);
+                                    const piece = (chunk.candidates?.[0]?.content?.parts || [])
+                                        .map((p: any) => p.text || "")
+                                        .join("");
+                                    if (piece) {
+                                        aiResponseText += piece;
+                                        emitToken(piece);
+                                    }
+                                } catch {
+                                    // Malformed chunk fragment — skip
+                                }
+                            }
+                        }
+                        if (aiResponseText) {
+                            geminiSuccess = true;
+                        }
+                    } else {
+                        const err = await response.text().catch(() => "");
+                        console.error(`[Gemini] Stream API returned error status ${response.status}: ${err}`);
                     }
                 } else {
-                    const err = await response.text();
-                    console.error(`[Gemini] API returned error status ${response.status}: ${err}`);
+                    console.log(`[Gemini] Attempting extraction using model: ${targetModel}`);
+                    const response = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (aiResponseText) {
+                            geminiSuccess = true;
+                        }
+                    } else {
+                        const err = await response.text();
+                        console.error(`[Gemini] API returned error status ${response.status}: ${err}`);
+                    }
                 }
             } catch (e) {
                 console.error(`[Gemini] API fetch failed:`, e);
@@ -1679,6 +1742,7 @@ Deno.serve(async (req: Request) => {
         // ── IMAGE CACHING PIPELINE ─────────────────────────────────
         // Cache images from ephemeral sources like Instagram/TikTok
         if (parsedData.imageUrl && url) {
+            emitStage("image:cache");
             // Hard clean the URL
             parsedData.imageUrl = parsedData.imageUrl.trim().replace(/[.,!?;]+$/, "");
             
@@ -1693,6 +1757,7 @@ Deno.serve(async (req: Request) => {
         // For anonymous (free-tier) users, store an anonymized copy
         // in public_recipes for the future Discover feature.
         if (!callerUserId && parsedData.title && url) {
+            emitStage("community:save");
             try {
                 const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
                 const serviceClient = createClient(
@@ -1762,7 +1827,31 @@ Deno.serve(async (req: Request) => {
         }
         // ── END COMMUNITY PIPELINE ─────────────────────────────────
 
-        return new Response(JSON.stringify(parsedData), {
+        return parsedData;
+        };
+
+        // ── RUN / STREAM THE PIPELINE ─────────────────────────────
+        if (sse) {
+            runPipeline().then((result) => {
+                if (result instanceof Response) {
+                    sse.send("error", { error: "Unexpected response shape in stream mode" });
+                } else {
+                    sse.send("done", result);
+                }
+            }).catch((err) => {
+                console.error("[Stream] Pipeline error:", err);
+                sse.send("error", { error: String(err?.message || err) });
+            }).finally(() => {
+                sse.close();
+            });
+            return sse.response;
+        }
+
+        const pipelineResult = await runPipeline();
+        if (pipelineResult instanceof Response) {
+            return pipelineResult;
+        }
+        return new Response(JSON.stringify(pipelineResult), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
 
@@ -1773,6 +1862,39 @@ Deno.serve(async (req: Request) => {
         });
     }
 });
+
+/**
+ * Tiny Server-Sent-Events emitter. Returns a Response whose body is written
+ * to incrementally via send(), then finished with close().
+ */
+function createSseEmitter() {
+    const encoder = new TextEncoder();
+    let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const body = new ReadableStream<Uint8Array>({
+        start(c) { controller = c; },
+    });
+    const send = (event: string, data: any) => {
+        if (!controller) return;
+        try {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {
+            // Stream already closed — drop the event
+        }
+    };
+    const close = () => {
+        try { controller?.close(); } catch { /* already closed */ }
+        controller = null;
+    };
+    const response = new Response(body, {
+        headers: {
+            ...corsHeaders,
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    });
+    return { send, close, response };
+}
 
 /**
  * Shared logic to download an image from an ephemeral URL and upload to Supabase Storage.

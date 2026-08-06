@@ -44,7 +44,7 @@ function FilterChip({
                 }`}
         >
             <Text
-                className={`font-sans-medium text-xs ${isActive ? "text-white" : "text-surface-300"
+                className={`font-sans-medium text-xs ${isActive ? "text-[#FFFFFF]" : "text-surface-300"
                     }`}
             >
                 {item.label}

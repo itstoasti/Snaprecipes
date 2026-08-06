@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+    darkMode: "class",
     content: [
         "./app/**/*.{js,jsx,ts,tsx}",
         "./components/**/*.{js,jsx,ts,tsx}",
@@ -9,19 +10,20 @@ module.exports = {
         extend: {
             colors: {
                 surface: {
-                    DEFAULT: "#0A0A0F",
-                    50: "#F8F8FC",
-                    100: "#F0F0F5",
-                    200: "#E1E1EA",
-                    300: "#C8C8D4",
-                    400: "#9D9DB0",
-                    500: "#6E6E85",
-                    600: "#4A4A5E",
-                    700: "#2D2D3D",
-                    800: "#1A1A26",
-                    900: "#0F0F18",
-                    950: "#0A0A0F",
+                    DEFAULT: "rgb(var(--surface-950) / <alpha-value>)",
+                    50: "rgb(var(--surface-50) / <alpha-value>)",
+                    100: "rgb(var(--surface-100) / <alpha-value>)",
+                    200: "rgb(var(--surface-200) / <alpha-value>)",
+                    300: "rgb(var(--surface-300) / <alpha-value>)",
+                    400: "rgb(var(--surface-400) / <alpha-value>)",
+                    500: "rgb(var(--surface-500) / <alpha-value>)",
+                    600: "rgb(var(--surface-600) / <alpha-value>)",
+                    700: "rgb(var(--surface-700) / <alpha-value>)",
+                    800: "rgb(var(--surface-800) / <alpha-value>)",
+                    900: "rgb(var(--surface-900) / <alpha-value>)",
+                    950: "rgb(var(--surface-950) / <alpha-value>)",
                 },
+                white: "rgb(var(--color-ink) / <alpha-value>)",
                 accent: {
                     DEFAULT: "#FF6B35",
                     light: "#FF8F5E",

@@ -11,12 +11,14 @@ import GlassContainer from "@/components/GlassContainer";
 import Animated, { FadeInDown, SlideInRight } from "react-native-reanimated";
 import { format, addDays, isSameDay } from "@/lib/dateUtils";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/hooks/useTheme";
 
 type SelectorTab = "mine" | "community";
 
 export default function MealPrepScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
     const { plans, loading, addRecipeToPlan, removeFromPlan } = useMealPlans();
     const { recipes, saveCommunityRecipe } = useRecipes();
 
@@ -133,7 +135,7 @@ export default function MealPrepScreen() {
                         onPress={() => router.back()}
                         className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center mr-3"
                     >
-                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={20} color={colors.text} />
                     </Pressable>
                     <Text className="text-white font-sans-bold text-3xl">Meal Prep</Text>
                 </View>
@@ -161,14 +163,14 @@ export default function MealPrepScreen() {
                                 onPress={() => setSelectedDate(item)}
                                 className={`items-center justify-center w-16 h-24 rounded-3xl mr-3 ${active ? 'bg-emerald-500' : 'bg-surface-800'}`}
                             >
-                                <Text className={`text-[10px] uppercase font-sans-bold ${active ? 'text-white' : 'text-surface-400'}`}>
+                                <Text className={`text-[10px] uppercase font-sans-bold ${active ? 'text-[#FFFFFF]' : 'text-surface-400'}`}>
                                     {format(item, "EEE")}
                                 </Text>
-                                <Text className={`text-xl font-sans-bold mt-1 ${active ? 'text-white' : 'text-white'}`}>
+                                <Text className={`text-xl font-sans-bold mt-1 ${active ? 'text-[#FFFFFF]' : 'text-white'}`}>
                                     {format(item, "d")}
                                 </Text>
                                 {plans.some(p => p.planned_date === format(item, "yyyy-MM-dd")) && (
-                                    <View className={`w-1.5 h-1.5 rounded-full mt-2 ${active ? 'bg-white' : 'bg-emerald-500'}`} />
+                                    <View className={`w-1.5 h-1.5 rounded-full mt-2 ${active ? 'bg-[#FFFFFF]' : 'bg-emerald-500'}`} />
                                 )}
                             </Pressable>
                         );
@@ -191,7 +193,7 @@ export default function MealPrepScreen() {
 
                 {dailyPlans.length === 0 ? (
                     <View className="flex-1 items-center justify-center opacity-40">
-                        <Ionicons name="restaurant-outline" size={60} color="#FFFFFF" />
+                        <Ionicons name="restaurant-outline" size={60} color={colors.text} />
                         <Text className="text-white font-sans mt-4">No meals planned for this day</Text>
                     </View>
                 ) : (
@@ -253,7 +255,7 @@ export default function MealPrepScreen() {
                         <View className="flex-row items-center justify-between mb-4">
                             <Text className="text-white font-sans-bold text-xl">Select a Recipe</Text>
                             <Pressable onPress={handleCloseSelector}>
-                                <Ionicons name="close" size={24} color="#FFFFFF" />
+                                <Ionicons name="close" size={24} color={colors.text} />
                             </Pressable>
                         </View>
 
@@ -261,7 +263,7 @@ export default function MealPrepScreen() {
                         <View
                             style={{
                                 flexDirection: "row",
-                                backgroundColor: "#1A1A2E",
+                                backgroundColor: colors.elevated,
                                 borderRadius: 14,
                                 padding: 3,
                                 marginBottom: 12,
@@ -278,7 +280,7 @@ export default function MealPrepScreen() {
                                 }}
                             >
                                 <Text style={{
-                                    color: selectorTab === "mine" ? "#FFF" : "#6E6E85",
+                                    color: selectorTab === "mine" ? "#FFF" : colors.textFaint,
                                     fontWeight: "700",
                                     fontSize: 14,
                                 }}>
@@ -296,7 +298,7 @@ export default function MealPrepScreen() {
                                 }}
                             >
                                 <Text style={{
-                                    color: selectorTab === "community" ? "#FFF" : "#6E6E85",
+                                    color: selectorTab === "community" ? "#FFF" : colors.textFaint,
                                     fontWeight: "700",
                                     fontSize: 14,
                                 }}>
@@ -312,7 +314,7 @@ export default function MealPrepScreen() {
                                 value={searchQuery}
                                 onChangeText={handleSearchChange}
                                 placeholder={selectorTab === "mine" ? "Search your recipes…" : "Search community recipes…"}
-                                placeholderTextColor="#4A4A5E"
+                                placeholderTextColor={colors.placeholder}
                                 className="flex-1 text-white font-sans ml-2"
                                 autoFocus={false}
                                 autoCapitalize="none"
@@ -338,7 +340,7 @@ export default function MealPrepScreen() {
                             keyExtractor={(item) => `${selectorTab}-${item.id}`}
                             ListEmptyComponent={() => (
                                 <View className="items-center justify-center py-20 opacity-40">
-                                    <Ionicons name={selectorTab === "mine" ? "book-outline" : "globe-outline"} size={48} color="#FFFFFF" />
+                                    <Ionicons name={selectorTab === "mine" ? "book-outline" : "globe-outline"} size={48} color={colors.text} />
                                     <Text className="text-white font-sans mt-4 text-center px-8">
                                         {searchQuery.trim()
                                             ? `No recipes found matching "${searchQuery}"`

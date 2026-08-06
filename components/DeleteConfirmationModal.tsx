@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 import GlassContainer from "./GlassContainer";
+import { useTheme } from "@/hooks/useTheme";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -20,6 +21,8 @@ export default function DeleteConfirmationModal({
     onCancel,
     onConfirm,
 }: DeleteConfirmationModalProps) {
+    const { isDark } = useTheme();
+
     if (!visible) return null;
 
     return (
@@ -31,7 +34,7 @@ export default function DeleteConfirmationModal({
                     exiting={FadeOut}
                     className="absolute inset-0"
                 >
-                    <BlurView intensity={20} tint="dark" className="flex-1 bg-black/70" />
+                    <BlurView intensity={20} tint={isDark ? "dark" : "light"} className="flex-1 bg-black/70" />
                 </Animated.View>
 
                 {/* Touch Overlay */}
@@ -73,7 +76,7 @@ export default function DeleteConfirmationModal({
                                             onPress={onConfirm}
                                             className="flex-1 py-4 bg-red-500 rounded-xl items-center"
                                         >
-                                            <Text className="text-white font-sans-semibold text-base">Delete</Text>
+                                            <Text className="text-[#FFFFFF] font-sans-semibold text-base">Delete</Text>
                                         </Pressable>
                                     </View>
                                 </View>

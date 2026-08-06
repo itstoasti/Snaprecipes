@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, PublicRecipe } from "@/lib/supabase";
+import SavesExplanationModal from "@/components/SavesExplanationModal";
+import PaywallModal from "@/components/PaywallModal";
 
 type RecipeDetailActionsProps = {
     recipe: PublicRecipe;
@@ -13,6 +15,11 @@ export default function RecipeDetailActions({ recipe }: RecipeDetailActionsProps
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    
+    // Usage & Modals state
+    const [usageCount, setUsageCount] = useState(0);
+    const [showSavesModal, setShowSavesModal] = useState(false);
+    const [showPaywall, setShowPaywall] = useState(false);
     
     // Save state
     const [savedRecipeId, setSavedRecipeId] = useState<string | null>(null);
@@ -87,6 +94,25 @@ export default function RecipeDetailActions({ recipe }: RecipeDetailActionsProps
             router.push(`/auth?redirect=${encodeURIComponent(target)}`);
             return;
         }
+
+        const isPro = !!(user.app_metadata?.is_pro || user.user_metadata?.is_pro);
+        if (!isPro) {
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            const { count } = await supabase
+                .from("recipes")
+                .select("id", { count: "exact", head: true })
+                .eq("owner_id", user.id)
+                .gte("created_at", startOfMonth);
+
+            const currentCount = count || 0;
+            setUsageCount(currentCount);
+
+            if (currentCount >= 5) {
+                setShowSavesModal(true);
+                return;
+            }
+        }
+
         setSaving(true);
 
         try {
@@ -417,6 +443,20 @@ export default function RecipeDetailActions({ recipe }: RecipeDetailActionsProps
                     )}
                 </button>
             )}
+
+            <SavesExplanationModal
+                isOpen={showSavesModal}
+                usageCount={usageCount}
+                onClose={() => setShowSavesModal(false)}
+                onUpgrade={() => setShowPaywall(true)}
+            />
+
+            <PaywallModal
+                isOpen={showPaywall}
+                onClose={() => setShowPaywall(false)}
+                userId={user?.id || ""}
+                userEmail={user?.email}
+            />
         </div>
     );
 }

@@ -12,7 +12,7 @@ const FAQS: FAQItem[] = [
     {
         question: "Is Snap Recipes free? What is the monthly limit?",
         answer:
-            "Yes — Snap Recipes is free forever, and every core tool is included on the free plan: your recipe library, meal planning, smart grocery lists, Cook Mode, the calorie & macro tracker, the community library, and cross-device sync. The only limit is on imports: free accounts can save 5 recipes per calendar month (the count resets on the 1st). Need more than that? Pro removes the cap.",
+            "Yes — Snap Recipes offers a free plan, and every core tool is included on the free tier: your recipe library, meal planning, smart grocery lists, Cook Mode, the calorie & macro tracker, the community library, and cross-device sync. The only limit is on imports: free accounts can save 10 recipes per calendar month (the count resets on the 1st). Need more than that? Pro removes the cap.",
     },
     {
         question: "What do I get with Pro, and what does it cost?",

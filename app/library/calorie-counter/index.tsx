@@ -21,6 +21,7 @@ import * as Haptics from "expo-haptics";
 import MoveMealModal from "@/components/MoveMealModal";
 import { BlurView } from "expo-blur";
 import { trackEvent } from "@/lib/analytics";
+import { useTheme } from "@/hooks/useTheme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -42,6 +43,7 @@ function getDefaultMealType(): "breakfast" | "lunch" | "dinner" | "snack" {
 export default function CalorieCounterScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { isDark, colors } = useTheme();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const { logs, loading, dailyTotals, mealGroups, goals, removeFoodLog, updateMealType, updateFoodLog, refresh } =
         useFoodLog(selectedDate);
@@ -226,7 +228,7 @@ export default function CalorieCounterScreen() {
                         onPress={() => handleAddFood(mealType)}
                         style={{
                             borderWidth: 1,
-                            borderColor: "rgba(255,255,255,0.06)",
+                            borderColor: colors.hairline,
                             borderStyle: "dashed",
                             borderRadius: 16,
                             paddingVertical: 14,
@@ -253,7 +255,7 @@ export default function CalorieCounterScreen() {
                         onPress={() => router.back()}
                         className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center mr-3"
                     >
-                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={20} color={colors.text} />
                     </Pressable>
                     <Text className="text-white font-sans-bold text-2xl">Calorie Counter</Text>
                 </View>
@@ -282,7 +284,7 @@ export default function CalorieCounterScreen() {
                                     height: 80,
                                     borderRadius: 22,
                                     marginRight: 10,
-                                    backgroundColor: active ? "#EF4444" : "rgba(255,255,255,0.04)",
+                                    backgroundColor: active ? "#EF4444" : colors.card,
                                 }}
                             >
                                 <Text
@@ -290,7 +292,7 @@ export default function CalorieCounterScreen() {
                                         fontSize: 10,
                                         textTransform: "uppercase",
                                         fontFamily: "Inter_600SemiBold",
-                                        color: active ? "#FFF" : "#6E6E85",
+                                        color: active ? "#FFF" : colors.textFaint,
                                     }}
                                 >
                                     {format(item, "EEE")}
@@ -299,7 +301,7 @@ export default function CalorieCounterScreen() {
                                     style={{
                                         fontSize: 18,
                                         fontFamily: "Inter_700Bold",
-                                        color: "#FFF",
+                                        color: active ? "#FFF" : colors.text,
                                         marginTop: 2,
                                     }}
                                 >
@@ -335,7 +337,7 @@ export default function CalorieCounterScreen() {
                                 }}
                                 hitSlop={10}
                             >
-                                <Ionicons name="information-circle-outline" size={18} color="#9D9DB0" />
+                                <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
                             </Pressable>
                         </View>
                         <View className="items-center mb-4">
@@ -349,7 +351,7 @@ export default function CalorieCounterScreen() {
                             />
                             <Text
                                 style={{
-                                    color: remaining >= 0 ? "rgba(255,255,255,0.4)" : "#EF4444",
+                                    color: remaining >= 0 ? colors.textFaint : "#EF4444",
                                     fontFamily: "Inter_500Medium",
                                     fontSize: 12,
                                     marginTop: 6,
@@ -464,7 +466,7 @@ export default function CalorieCounterScreen() {
                 <Modal transparent visible animationType="none" statusBarTranslucent>
                     <View className="flex-1">
                         <Animated.View entering={FadeIn} exiting={FadeOut} className="absolute inset-0">
-                            <BlurView intensity={20} tint="dark" className="flex-1 bg-black/70" />
+                            <BlurView intensity={20} tint={isDark ? "dark" : "light"} className="flex-1 bg-black/70" />
                         </Animated.View>
                         <Pressable className="flex-1 justify-end" onPress={() => setDeleteTarget(null)}>
                             <Pressable onPress={(e) => e.stopPropagation()}>
@@ -481,7 +483,7 @@ export default function CalorieCounterScreen() {
                                             <View className="flex-row w-full" style={{ gap: 12 }}>
                                                 <Pressable
                                                     onPress={() => setDeleteTarget(null)}
-                                                    style={{ flex: 1, paddingVertical: 14, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 14, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" }}
+                                                    style={{ flex: 1, paddingVertical: 14, backgroundColor: colors.card, borderRadius: 14, alignItems: "center", borderWidth: 1, borderColor: colors.hairline }}
                                                 >
                                                     <Text className="text-white font-sans-semibold text-base">Cancel</Text>
                                                 </Pressable>
@@ -496,7 +498,7 @@ export default function CalorieCounterScreen() {
                                                     }}
                                                     style={{ flex: 1, paddingVertical: 14, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}
                                                 >
-                                                    <Text className="text-white font-sans-semibold text-base">Remove</Text>
+                                                    <Text className="text-[#FFFFFF] font-sans-semibold text-base">Remove</Text>
                                                 </Pressable>
                                             </View>
                                         </View>
@@ -509,7 +511,7 @@ export default function CalorieCounterScreen() {
             )}
             {/* Goals Info Modal */}
             <Modal visible={showGoalInfo} transparent animationType="fade">
-                <BlurView intensity={40} tint="dark" className="flex-1 items-center justify-center px-8">
+                <BlurView intensity={40} tint={isDark ? "dark" : "light"} className="flex-1 items-center justify-center px-8">
                     <Animated.View entering={FadeInDown} exiting={FadeOut}>
                         <GlassContainer className="w-full p-7 rounded-[32px] border border-white/10 overflow-hidden">
                             <View className="items-center mb-4">
@@ -530,7 +532,7 @@ export default function CalorieCounterScreen() {
                                     }}
                                     className="bg-accent py-4 rounded-2xl items-center shadow-lg shadow-accent/20"
                                 >
-                                    <Text className="text-white font-sans-bold text-base">Go to Settings</Text>
+                                    <Text className="text-[#FFFFFF] font-sans-bold text-base">Go to Settings</Text>
                                 </Pressable>
                                 <Pressable 
                                     onPress={() => setShowGoalInfo(false)}

@@ -12,10 +12,13 @@ import GlassContainer from "@/components/GlassContainer";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as SecureStore from "expo-secure-store";
 import { AI_PROVIDER_STORE } from "@/lib/constants";
+import { format } from "@/lib/dateUtils";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { trackEvent } from "@/lib/analytics";
+import { useTheme } from "@/hooks/useTheme";
 
 interface ScannedFood {
     food_name: string;
@@ -40,12 +43,13 @@ const MEAL_TYPES = [
 export default function ScanScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
     const [permission, requestPermission] = useCameraPermissions();
     const { isPro, isReady } = useRevenueCat();
 
     const cameraRef = useRef<CameraView>(null);
     const params = useLocalSearchParams<{ date: string; mealType: string; mode: string }>();
-    const logDate = params.date || new Date().toISOString().split("T")[0];
+    const logDate = params.date || format(new Date(), "yyyy-MM-dd");
     const mealType = (params.mealType || "snack") as "breakfast" | "lunch" | "dinner" | "snack";
     const initialMode = (params.mode || "barcode") as "photo" | "barcode";
     const [selectedMealType, setSelectedMealType] = useState<"breakfast" | "lunch" | "dinner" | "snack">(mealType);
@@ -91,6 +95,11 @@ export default function ScanScreen() {
         return () => clearTimeout(timer);
     }, []);
 
+    useEffect(() => {
+        activateKeepAwakeAsync("food-scanner");
+        return () => { deactivateKeepAwake("food-scanner"); };
+    }, []);
+
     // ── Photo Capture → AI Analysis ──
     const analyzeBase64 = useCallback(async (base64: string) => {
         setLoading(true);
@@ -112,7 +121,16 @@ export default function ScanScreen() {
                 body: JSON.stringify({ imageBase64: base64, provider }),
             });
 
-            if (!response.ok) throw new Error("AI analysis failed");
+            if (!response.ok) {
+                let detail = "";
+                try { detail = await response.text(); } catch {}
+                let message = `AI analysis failed (status ${response.status})`;
+                try {
+                    const parsed = JSON.parse(detail);
+                    if (parsed?.error) message = `AI analysis failed: ${String(parsed.error).substring(0, 300)}`;
+                } catch {}
+                throw new Error(message);
+            }
 
             const data = await response.json();
             setResults(data.items || []);
@@ -136,7 +154,7 @@ export default function ScanScreen() {
         try {
             const photo = await cameraRef.current.takePictureAsync({
                 base64: true,
-                quality: 0.7,
+                quality: 0.5,
             });
 
             if (!photo?.base64) throw new Error("Failed to capture photo");
@@ -158,7 +176,7 @@ export default function ScanScreen() {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 base64: true,
-                quality: 0.7,
+                quality: 0.5,
             });
 
             if (result.canceled || !result.assets?.[0]?.base64) return;
@@ -353,10 +371,10 @@ export default function ScanScreen() {
         return (
             <View className="flex-1 bg-surface-950 items-center justify-center px-8">
                 <Stack.Screen options={{ headerShown: false }} />
-                <Ionicons name="camera-outline" size={64} color="#6E6E85" />
+                <Ionicons name="camera-outline" size={64} color={colors.textFaint} />
                 <Text className="text-white font-sans-bold text-xl mt-4 mb-2 text-center">Camera Access Needed</Text>
                 <Pressable onPress={requestPermission} style={{ backgroundColor: "#EF4444", paddingHorizontal: 32, paddingVertical: 12, borderRadius: 16 }}>
-                    <Text className="text-white font-sans-bold text-base">Grant Permission</Text>
+                    <Text className="text-[#FFFFFF] font-sans-bold text-base">Grant Permission</Text>
                 </Pressable>
             </View>
         );
@@ -369,11 +387,11 @@ export default function ScanScreen() {
                 {/* Header */}
                 <View className="px-5 flex-row items-center justify-between mb-4">
                     <Pressable onPress={() => router.back()} className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center">
-                        <Ionicons name="close" size={20} color="#FFFFFF" />
+                        <Ionicons name="close" size={20} color={colors.text} />
                     </Pressable>
                     <Text className="text-white font-sans-bold text-xl">Results</Text>
                     <Pressable onPress={handleRetake} className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center">
-                        <Ionicons name="camera-outline" size={20} color="#FFFFFF" />
+                        <Ionicons name="camera-outline" size={20} color={colors.text} />
                     </Pressable>
                 </View>
                 <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }}>
@@ -394,8 +412,8 @@ export default function ScanScreen() {
                                             className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
                                             style={isSelected ? { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" } : undefined}
                                         >
-                                            <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : "#6E6E85"} />
-                                            <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : "#6E6E85" }}>
+                                            <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : colors.textFaint} />
+                                            <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : colors.textFaint }}>
                                                 {t.label}
                                             </Text>
                                         </Pressable>
@@ -482,7 +500,7 @@ export default function ScanScreen() {
                                                     }}
                                                     className="w-8 h-8 rounded-full bg-surface-800 items-center justify-center border border-white/5"
                                                 >
-                                                    <Ionicons name="remove" size={16} color="white" />
+                                                    <Ionicons name="remove" size={16} color={colors.text} />
                                                 </Pressable>
                                                 <Text className="text-white font-sans-bold text-sm min-w-[20px] text-center">
                                                     {itemQty}
@@ -497,7 +515,7 @@ export default function ScanScreen() {
                                                     }}
                                                     className="w-8 h-8 rounded-full bg-surface-800 items-center justify-center border border-white/5"
                                                 >
-                                                    <Ionicons name="add" size={16} color="white" />
+                                                    <Ionicons name="add" size={16} color={colors.text} />
                                                 </Pressable>
                                             </View>
                                         </View>
@@ -513,7 +531,7 @@ export default function ScanScreen() {
                             onPress={handleLogSelectedFoods} 
                             style={{ backgroundColor: "#EF4444", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 8 }}
                         >
-                            <Text className="text-white font-sans-bold text-base">
+                            <Text className="text-[#FFFFFF] font-sans-bold text-base">
                                 Log {selectedIndexes.length} Selected {selectedIndexes.length === 1 ? "Item" : "Items"}
                             </Text>
                         </Pressable>
@@ -525,7 +543,7 @@ export default function ScanScreen() {
                             onPress={() => router.replace("/library/calorie-counter")} 
                             style={{ backgroundColor: "#10B981", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 8, marginBottom: 16 }}
                         >
-                            <Text className="text-white font-sans-bold text-base">Done Logging</Text>
+                            <Text className="text-[#FFFFFF] font-sans-bold text-base">Done Logging</Text>
                         </Pressable>
                     )}
 
@@ -558,7 +576,7 @@ export default function ScanScreen() {
                         <Ionicons name="close" size={28} color="#FFFFFF" />
                     </Pressable>
                     <View className="bg-black/40 px-4 py-2 rounded-full">
-                        <Text className="text-white font-sans-bold text-xs uppercase tracking-widest">{mode === "barcode" ? "Barcode" : "AI Photo"}</Text>
+                        <Text className="text-[#FFFFFF] font-sans-bold text-xs uppercase tracking-widest">{mode === "barcode" ? "Barcode" : "AI Photo"}</Text>
                     </View>
                     <View className="w-12" />
                 </View>
@@ -574,17 +592,17 @@ export default function ScanScreen() {
                         }}
                         style={{ paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: mode === "photo" ? "#EF4444" : "transparent" }}
                     >
-                        <Text className="text-white font-sans-bold text-xs">Photo</Text>
+                        <Text className="text-[#FFFFFF] font-sans-bold text-xs">Photo</Text>
                     </Pressable>
                     <Pressable onPress={() => { setMode("barcode"); setScannedBarcode(null); }} style={{ paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: mode === "barcode" ? "#FBBF24" : "transparent" }}>
-                        <Text className="text-white font-sans-bold text-xs">Barcode</Text>
+                        <Text className="text-[#FFFFFF] font-sans-bold text-xs">Barcode</Text>
                     </Pressable>
                 </View>
                 <View className="flex-1 items-center justify-center px-10">
-                    {mode === "photo" ? <View className="w-full aspect-square rounded-3xl border-2 border-white/30" /> : (
+                    {mode === "photo" ? <View className="w-full aspect-square rounded-3xl border-2 border-[rgba(255,255,255,0.3)]" /> : (
                         <View style={{ width: "90%", height: 200, borderRadius: 20, borderWidth: 2, borderColor: "rgba(251,191,36,0.5)", alignItems: "center", justifyContent: "center" }}>
                             <Ionicons name="barcode-outline" size={64} color="rgba(251,191,36,0.5)" />
-                            <Text className="text-white/60 font-sans text-sm text-center mt-2">{barcodeProcessing ? "Looking up..." : "Align barcode in this area"}</Text>
+                            <Text className="text-[rgba(255,255,255,0.6)] font-sans text-sm text-center mt-2">{barcodeProcessing ? "Looking up..." : "Align barcode in this area"}</Text>
                         </View>
                     )}
                 </View>
@@ -602,12 +620,12 @@ export default function ScanScreen() {
                             <View style={{ width: 48, height: 48 }} />
                         </View>
                     )}
-                    {mode === "barcode" && <View className="items-center"><Text className="text-white/40 font-sans text-xs">Auto-detects barcodes</Text></View>}
+                    {mode === "barcode" && <View className="items-center"><Text className="text-[rgba(255,255,255,0.4)] font-sans text-xs">Auto-detects barcodes</Text></View>}
                 </View>
                 {(loading || barcodeProcessing) && (
                     <View className="absolute inset-0 bg-black/60 items-center justify-center">
                         <ActivityIndicator size="large" color="#EF4444" />
-                        <Text className="text-white font-sans-bold mt-4">{barcodeProcessing ? "Identifying Barcode..." : "AI is Analyzing..."}</Text>
+                        <Text className="text-[#FFFFFF] font-sans-bold mt-4">{barcodeProcessing ? "Identifying Barcode..." : "AI is Analyzing..."}</Text>
                     </View>
                 )}
             </View>

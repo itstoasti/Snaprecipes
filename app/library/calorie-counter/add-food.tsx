@@ -16,8 +16,10 @@ import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import { BlurView } from "expo-blur";
 import { AI_PROVIDER_STORE } from "@/lib/constants";
+import { format } from "@/lib/dateUtils";
 import { searchRawFoods } from "@/lib/rawFoods";
 import { trackEvent } from "@/lib/analytics";
+import { useTheme } from "@/hooks/useTheme";
 
 type Tab = "search" | "scan" | "quick" | "recipe";
 
@@ -60,8 +62,9 @@ const MEAL_TYPES = [
 export default function AddFoodScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { isDark, colors } = useTheme();
     const params = useLocalSearchParams<{ date: string; mealType: string }>();
-    const logDate = params.date || new Date().toISOString().split("T")[0];
+    const logDate = params.date || format(new Date(), "yyyy-MM-dd");
     const mealType = (params.mealType || "snack") as "breakfast" | "lunch" | "dinner" | "snack";
     const [selectedMealType, setSelectedMealType] = useState<"breakfast" | "lunch" | "dinner" | "snack">(mealType);
 
@@ -456,7 +459,7 @@ export default function AddFoodScreen() {
         });
         trackEvent("food_logged", { source: "search", source_type: food.source, calories: food.calories * qty, quantity: qty });
         router.back();
-    }, [addFoodLog, saveCustomFood, mealType, logDate, router]);
+    }, [addFoodLog, saveCustomFood, selectedMealType, logDate, router]);
 
     // ── Quick Add ──
     const handleQuickAdd = useCallback(async () => {
@@ -492,7 +495,7 @@ export default function AddFoodScreen() {
         });
         trackEvent("food_logged", { source: "quick_add", calories: cal * qtyVal, quantity: qtyVal });
         router.back();
-    }, [quick, addFoodLog, saveCustomFood, mealType, logDate, router]);
+    }, [quick, addFoodLog, saveCustomFood, selectedMealType, logDate, router]);
 
     // ── Log from Recipe ──
     const handleLogRecipe = useCallback(async (recipe: any, qty: number = 1) => {
@@ -510,7 +513,7 @@ export default function AddFoodScreen() {
         });
         trackEvent("food_logged", { source: "recipe", calories: (recipe.calories || 0) * qty, quantity: qty });
         router.back();
-    }, [addFoodLog, mealType, logDate, router]);
+    }, [addFoodLog, selectedMealType, logDate, router]);
 
     const handleRecipeSearch = useCallback(async (text: string) => {
         setRecipeSearch(text);
@@ -604,7 +607,7 @@ export default function AddFoodScreen() {
             <View className="px-5 flex-row items-center justify-between mb-4">
                 <View className="flex-row items-center">
                     <Pressable onPress={() => router.back()} className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center mr-3">
-                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={20} color={colors.text} />
                     </Pressable>
                     <View>
                         <Text className="text-white font-sans-bold text-xl">Add Food</Text>
@@ -625,8 +628,8 @@ export default function AddFoodScreen() {
                         className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
                         style={tab === t.key ? { backgroundColor: "rgba(239,68,68,0.15)" } : undefined}
                     >
-                        <Ionicons name={t.icon} size={14} color={tab === t.key ? "#EF4444" : "#6E6E85"} />
-                        <Text className="font-sans-bold text-xs ml-1" style={{ color: tab === t.key ? "#EF4444" : "#6E6E85" }}>
+                        <Ionicons name={t.icon} size={14} color={tab === t.key ? "#EF4444" : colors.textFaint} />
+                        <Text className="font-sans-bold text-xs ml-1" style={{ color: tab === t.key ? "#EF4444" : colors.textFaint }}>
                             {t.label}
                         </Text>
                     </Pressable>
@@ -642,7 +645,7 @@ export default function AddFoodScreen() {
                             value={searchQuery}
                             onChangeText={handleSearchInput}
                             placeholder='Type any food... e.g. "apple" or "chicken breast"'
-                            placeholderTextColor="#4A4A5E"
+                            placeholderTextColor={colors.placeholder}
                             className="flex-1 text-white font-sans ml-2"
                             returnKeyType="search"
                             onSubmitEditing={() => performSearch(searchQuery)}
@@ -693,7 +696,7 @@ export default function AddFoodScreen() {
 
                     {!searching && searchQuery.trim().length > 0 && searchResults.length === 0 && aiLookedUp && (
                         <Animated.View entering={FadeIn} className="items-center py-10 opacity-50">
-                            <Ionicons name="alert-circle-outline" size={40} color="#FFF" />
+                            <Ionicons name="alert-circle-outline" size={40} color={colors.text} />
                             <Text className="text-white font-sans mt-3 text-center text-sm">
                                 Couldn't identify "{searchQuery}".{"\n"}Try a more specific name or use Manual entry.
                             </Text>
@@ -723,7 +726,7 @@ export default function AddFoodScreen() {
                                 </View>
                             ) : !searching && !searchQuery.trim() ? (
                                 <View className="items-center justify-center py-16 opacity-40">
-                                    <Ionicons name="nutrition" size={48} color="#FFFFFF" />
+                                    <Ionicons name="nutrition" size={48} color={colors.text} />
                                     <Text className="text-white font-sans mt-4 text-center text-sm">
                                         Type any food to search.
                                     </Text>
@@ -842,7 +845,7 @@ export default function AddFoodScreen() {
                                             Take a picture of your meal and AI will estimate the calories and macros
                                         </Text>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                                    <Ionicons name="chevron-forward" size={20} color={colors.textFaint} />
                                 </View>
                             </GlassContainer>
                         </Pressable>
@@ -863,7 +866,7 @@ export default function AddFoodScreen() {
                                             Scan a packaged food barcode to pull nutrition from our database
                                         </Text>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                                    <Ionicons name="chevron-forward" size={20} color={colors.textFaint} />
                                 </View>
                             </GlassContainer>
                         </Pressable>
@@ -888,14 +891,14 @@ export default function AddFoodScreen() {
                             onPress={() => setRecipeTab("mine")}
                             className={`flex-1 flex-row items-center justify-center py-2 rounded-xl ${recipeTab === "mine" ? "bg-surface-800 shadow-sm" : ""}`}
                         >
-                            <Ionicons name="book" size={14} color={recipeTab === "mine" ? "#FFFFFF" : "#6E6E85"} />
+                            <Ionicons name="book" size={14} color={recipeTab === "mine" ? colors.text : colors.textFaint} />
                             <Text className={`font-sans-bold text-xs ml-2 ${recipeTab === "mine" ? "text-white" : "text-surface-400"}`}>My Recipes</Text>
                         </Pressable>
                         <Pressable
                             onPress={() => setRecipeTab("community")}
                             className={`flex-1 flex-row items-center justify-center py-2 rounded-xl ${recipeTab === "community" ? "bg-surface-800 shadow-sm" : ""}`}
                         >
-                            <Ionicons name="globe" size={14} color={recipeTab === "community" ? "#FFFFFF" : "#6E6E85"} />
+                            <Ionicons name="globe" size={14} color={recipeTab === "community" ? colors.text : colors.textFaint} />
                             <Text className={`font-sans-bold text-xs ml-2 ${recipeTab === "community" ? "text-white" : "text-surface-400"}`}>Community</Text>
                         </Pressable>
                     </View>
@@ -905,8 +908,8 @@ export default function AddFoodScreen() {
                         <TextInput 
                             value={recipeSearch} 
                             onChangeText={handleRecipeSearch} 
-                            placeholder={recipeTab === "mine" ? "Search your recipes..." : "Search community recipes..."} 
-                            placeholderTextColor="#4A4A5E" 
+                            placeholder={recipeTab === "mine" ? "Search your recipes..." : "Search community recipes..."}
+                            placeholderTextColor={colors.placeholder}
                             className="flex-1 text-white font-sans ml-2" 
                         />
                         {loadingCommunity && <ActivityIndicator size="small" color="#EF4444" className="ml-2" />}
@@ -918,7 +921,7 @@ export default function AddFoodScreen() {
                         showsVerticalScrollIndicator={false}
                         ListEmptyComponent={() => (
                             <View className="items-center justify-center py-16 opacity-40">
-                                <Ionicons name={recipeTab === "mine" ? "book-outline" : "globe-outline"} size={48} color="#FFFFFF" />
+                                <Ionicons name={recipeTab === "mine" ? "book-outline" : "globe-outline"} size={48} color={colors.text} />
                                 <Text className="text-white font-sans mt-4 text-center">
                                     {recipeTab === "mine" ? "No recipes with nutrition data found." : "No community recipes found."}
                                 </Text>
@@ -982,7 +985,7 @@ export default function AddFoodScreen() {
                                         value={quick[field.key]}
                                         onChangeText={(v) => setQuick((p) => ({ ...p, [field.key]: v }))}
                                         placeholder={field.placeholder}
-                                        placeholderTextColor="#3A3A4E"
+                                        placeholderTextColor={colors.placeholder}
                                         keyboardType={field.kb as any}
                                         className="bg-surface-900 text-white font-sans px-4 py-3 rounded-xl"
                                     />
@@ -1004,8 +1007,8 @@ export default function AddFoodScreen() {
                                                 className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
                                                 style={isSelected ? { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" } : undefined}
                                             >
-                                                <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : "#6E6E85"} />
-                                                <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : "#6E6E85" }}>
+                                                <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : colors.textFaint} />
+                                                <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : colors.textFaint }}>
                                                     {t.label}
                                                 </Text>
                                             </Pressable>
@@ -1014,7 +1017,7 @@ export default function AddFoodScreen() {
                                 </View>
                             </View>
                             <Pressable onPress={handleQuickAdd} style={{ backgroundColor: "#EF4444", borderRadius: 16, paddingVertical: 14, alignItems: "center", marginTop: 8 }}>
-                                <Text className="text-white font-sans-bold text-sm">Add to Log</Text>
+                                <Text className="text-[#FFFFFF] font-sans-bold text-sm">Add to Log</Text>
                             </Pressable>
                         </GlassContainer>
                     </Animated.View>
@@ -1053,7 +1056,7 @@ export default function AddFoodScreen() {
                     <Modal transparent visible={logTarget !== null} animationType="none" statusBarTranslucent>
                         <View className="flex-1">
                             <Animated.View entering={FadeIn} exiting={FadeOut} className="absolute inset-0">
-                                <BlurView intensity={20} tint="dark" className="flex-1 bg-black/70" />
+                                <BlurView intensity={20} tint={isDark ? "dark" : "light"} className="flex-1 bg-black/70" />
                             </Animated.View>
                             <Pressable className="flex-1 justify-end" onPress={() => setLogTarget(null)}>
                                 <Pressable onPress={(e) => e.stopPropagation()}>
@@ -1106,7 +1109,7 @@ export default function AddFoodScreen() {
                                                             onPress={handleDecrement} 
                                                             className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
                                                         >
-                                                            <Ionicons name="remove" size={20} color="white" />
+                                                            <Ionicons name="remove" size={20} color={colors.text} />
                                                         </Pressable>
                                                         <TextInput
                                                             value={servingQtyStr}
@@ -1122,7 +1125,7 @@ export default function AddFoodScreen() {
                                                             onPress={handleIncrement} 
                                                             className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
                                                         >
-                                                            <Ionicons name="add" size={20} color="white" />
+                                                            <Ionicons name="add" size={20} color={colors.text} />
                                                         </Pressable>
                                                     </View>
                                                 </View>
@@ -1143,8 +1146,8 @@ export default function AddFoodScreen() {
                                                                     className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
                                                                     style={isSelected ? { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" } : undefined}
                                                                 >
-                                                                    <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : "#6E6E85"} />
-                                                                    <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : "#6E6E85" }}>
+                                                                    <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : colors.textFaint} />
+                                                                    <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : colors.textFaint }}>
                                                                         {t.label}
                                                                     </Text>
                                                                 </Pressable>
@@ -1157,7 +1160,7 @@ export default function AddFoodScreen() {
                                                 <View className="flex-row" style={{ gap: 12 }}>
                                                     <Pressable
                                                         onPress={() => setLogTarget(null)}
-                                                        style={{ flex: 1, paddingVertical: 14, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 14, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" }}
+                                                        style={{ flex: 1, paddingVertical: 14, backgroundColor: colors.card, borderRadius: 14, alignItems: "center", borderWidth: 1, borderColor: colors.hairline }}
                                                     >
                                                         <Text className="text-white font-sans-semibold text-base">Cancel</Text>
                                                     </Pressable>
@@ -1176,7 +1179,7 @@ export default function AddFoodScreen() {
                                                         }}
                                                         style={{ flex: 1, paddingVertical: 14, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}
                                                     >
-                                                        <Text className="text-white font-sans-semibold text-base">Log Food</Text>
+                                                        <Text className="text-[#FFFFFF] font-sans-semibold text-base">Log Food</Text>
                                                     </Pressable>
                                                 </View>
                                             </View>

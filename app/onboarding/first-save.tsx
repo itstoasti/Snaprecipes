@@ -52,7 +52,7 @@ export default function FirstSaveScreen() {
                         className="bg-accent w-full py-4 rounded-2xl items-center flex-row justify-center shadow-lg shadow-accent/30"
                     >
                         <Ionicons name="add-circle" size={24} color="#FFFFFF" className="mr-2" />
-                        <Text className="text-white font-sans-bold text-lg">Save First Recipe</Text>
+                        <Text className="text-[#FFFFFF] font-sans-bold text-lg">Save First Recipe</Text>
                     </Pressable>
 
                     <Pressable

@@ -23,6 +23,7 @@ import * as Haptics from "expo-haptics";
 import GlassContainer from "./GlassContainer";
 import { scaleQuantity } from "./ServingScaler";
 import type { Ingredient, Step } from "@/db/schema";
+import { useTheme } from "@/hooks/useTheme";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -79,6 +80,7 @@ export default function CookMode({
     const insets = useSafeAreaInsets();
     const [expandedTaskIndex, setExpandedTaskIndex] = useState(0);
     const scrollRef = useRef<ScrollView>(null);
+    const { colors } = useTheme();
 
     // Build unified task list: Ingredients first, then each step
     const tasks: Task[] = useMemo(() => {
@@ -162,14 +164,14 @@ export default function CookMode({
                     onPress={onExit}
                     className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center"
                 >
-                    <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                    <Ionicons name="arrow-back" size={22} color={colors.text} />
                 </Pressable>
                 <Text className="text-white font-sans-bold text-lg">Cook Mode</Text>
                 <Pressable
                     onPress={onExit}
                     className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center"
                 >
-                    <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+                    <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
                 </Pressable>
             </View>
 
@@ -230,7 +232,7 @@ export default function CookMode({
                                         disabled={expandedTaskIndex === totalTasks - 1}
                                         className={`px-5 py-2 rounded-xl ${expandedTaskIndex === totalTasks - 1 ? "bg-[#34D399]/30" : "bg-[#34D399]"}`}
                                     >
-                                        <Text className={`font-sans-bold text-sm ${expandedTaskIndex === totalTasks - 1 ? "text-[#34D399]/60" : "text-surface-950"}`}>
+                                        <Text className={`font-sans-bold text-sm ${expandedTaskIndex === totalTasks - 1 ? "text-[#34D399]/60" : "text-[#0A0A0F]"}`}>
                                             Next
                                         </Text>
                                     </Pressable>
@@ -298,7 +300,7 @@ export default function CookMode({
                                     <Ionicons
                                         name={isExpanded ? "chevron-up" : "chevron-forward"}
                                         size={18}
-                                        color={isExpanded ? "#34D399" : "#6E6E85"}
+                                        color={isExpanded ? "#34D399" : colors.textFaint}
                                     />
                                 </Pressable>
 

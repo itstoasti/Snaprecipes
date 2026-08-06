@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
 
             const parts: any[] = [{ text: FOOD_ANALYSIS_PROMPT }];
             if (imageBase64) {

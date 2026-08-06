@@ -32,15 +32,20 @@ let isConfigured = false;
 export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
     const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
-    const [isReady, setIsReady] = useState(false);
+    const [rcReady, setRcReady] = useState(false);
+    const [sessionResolved, setSessionResolved] = useState(false);
     const [session, setSession] = useState<any>(null);
 
     // 1. Initial configuration & Auth Tracking
     useEffect(() => {
         // Track Supabase session for Expo Go "Virtual Pro" mode
-        supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setSessionResolved(true);
+        }).catch(() => setSessionResolved(true));
         const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
+            setSessionResolved(true);
         });
 
         const init = async () => {
@@ -51,7 +56,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 console.log("Expo Go app detected. RevenueCat native features unavailable.");
                 // We do NOT provide mock offerings here to preserve production integrity.
                 // The paywall will correctly show its "Loading..." state.
-                setIsReady(true);
+                setRcReady(true);
                 return;
             }
 
@@ -65,6 +70,21 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                     isConfigured = true;
                 }
 
+                // Identify RevenueCat with the Supabase user BEFORE reading customer
+                // info, so entitlements reflect the real user by the time we flip
+                // ready. Otherwise fast SDK init can report anonymous customer info
+                // and Pro users briefly (or permanently in the share extension) look
+                // like free users.
+                try {
+                    const { data: { session: currentSession } } = await supabase.auth.getSession();
+                    if (currentSession?.user?.id) {
+                        const { customerInfo: identifiedInfo } = await Purchases.logIn(currentSession.user.id);
+                        setCustomerInfo(identifiedInfo);
+                    }
+                } catch (identifyErr) {
+                    console.warn("RevenueCat pre-identify failed:", identifyErr);
+                }
+
                 // Fetch initial data
                 const info = await Purchases.getCustomerInfo();
                 setCustomerInfo(info);
@@ -76,7 +96,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             } catch (e) {
                 console.warn("Failed to initialize RevenueCat", e);
             } finally {
-                setIsReady(true);
+                setRcReady(true);
             }
         };
 
@@ -126,6 +146,10 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             Purchases.removeCustomerInfoUpdateListener(purchaseListener);
         };
     }, []);
+
+    // Only report ready once BOTH RevenueCat init and the Supabase session
+    // lookup have settled, so consumers never see a stale "free" state.
+    const isReady = rcReady && sessionResolved;
 
     // Derived Pro Status
     // CRITICAL: We ONLY trust RevenueCat entitlements when the SDK has been

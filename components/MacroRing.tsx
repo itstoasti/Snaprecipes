@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useTheme } from "@/hooks/useTheme";
 
 interface MacroRingProps {
     label: string;
@@ -25,6 +26,7 @@ export default function MacroRing({
     unit = "g",
     hero = false,
 }: MacroRingProps) {
+    const { colors, isDark } = useTheme();
     const effectiveSize = hero ? 160 : size;
     const effectiveStroke = hero ? 10 : strokeWidth;
 
@@ -43,7 +45,7 @@ export default function MacroRing({
                         cx={effectiveSize / 2}
                         cy={effectiveSize / 2}
                         r={radius}
-                        stroke="rgba(255,255,255,0.08)"
+                        stroke={colors.hairline}
                         strokeWidth={effectiveStroke}
                         fill="none"
                     />
@@ -76,7 +78,7 @@ export default function MacroRing({
                 >
                     <Text
                         style={{
-                            color: "#FFFFFF",
+                            color: colors.text,
                             fontFamily: "Inter_700Bold",
                             fontSize: hero ? 28 : 14,
                         }}
@@ -86,7 +88,7 @@ export default function MacroRing({
                     {hero && (
                         <Text
                             style={{
-                                color: "rgba(255,255,255,0.5)",
+                                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(28,25,20,0.5)",
                                 fontFamily: "Inter_400Regular",
                                 fontSize: 11,
                                 marginTop: 2,
@@ -99,7 +101,7 @@ export default function MacroRing({
             </View>
             <Text
                 style={{
-                    color: "rgba(255,255,255,0.6)",
+                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(28,25,20,0.6)",
                     fontFamily: "Inter_500Medium",
                     fontSize: hero ? 13 : 11,
                     marginTop: hero ? 8 : 4,
@@ -112,7 +114,7 @@ export default function MacroRing({
             {!hero && (
                 <Text
                     style={{
-                        color: "rgba(255,255,255,0.35)",
+                        color: isDark ? "rgba(255,255,255,0.35)" : "rgba(28,25,20,0.35)",
                         fontFamily: "Inter_400Regular",
                         fontSize: 10,
                         marginTop: 1,

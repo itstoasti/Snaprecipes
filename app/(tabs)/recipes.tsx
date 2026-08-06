@@ -88,9 +88,9 @@ export default function RecipesScreen() {
                         className="bg-surface-900 border border-white/5 rounded-full px-3 py-1.5 flex-row items-center mb-1"
                         style={{ gap: 6 }}
                     >
-                        <View className="w-2 h-2 rounded-full" style={{ backgroundColor: usageCount >= 5 ? "#EF4444" : "#FF6B35" }} />
+                        <View className="w-2 h-2 rounded-full" style={{ backgroundColor: usageCount >= 10 ? "#EF4444" : "#FF6B35" }} />
                         <Text className="text-surface-300 font-sans-bold text-[10px] uppercase tracking-wider">
-                            Saves: {usageCount}/5 Free
+                            Saves: {usageCount}/10 Free
                         </Text>
                     </Pressable>
                 )}
@@ -129,10 +129,6 @@ export default function RecipesScreen() {
             <ImportModal
                 visible={showImport}
                 onClose={() => setShowImport(false)}
-                onImportSuccess={() => {
-                    setShowImport(false);
-                    loadRecipes();
-                }}
             />
 
             <SavesExplanationModal

@@ -15,6 +15,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useCollections } from "@/hooks/useCollections";
 import { getDatabase } from "@/db/client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function CollectionsScreen() {
     const { collections, loading, loadCollections, createCollection, deleteCollection } =
@@ -25,6 +26,7 @@ export default function CollectionsScreen() {
     const [recipeCounts, setRecipeCounts] = useState<Record<number, number>>({});
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
 
     const filteredCollections = collections.filter(c =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
@@ -85,7 +87,7 @@ export default function CollectionsScreen() {
                         onPress={() => router.back()}
                         className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center mr-3"
                     >
-                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={20} color={colors.text} />
                     </Pressable>
                     <View>
                         <Text className="text-surface-400 font-sans text-xs uppercase tracking-widest">
@@ -111,18 +113,18 @@ export default function CollectionsScreen() {
             {/* Search Bar */}
             <View className="px-5 mb-4">
                 <View className="flex-row items-center bg-surface-900 rounded-2xl px-4 py-1 border border-surface-800">
-                    <Ionicons name="search" size={20} color="#6E6E85" className="mr-2" />
+                    <Ionicons name="search" size={20} color={colors.textFaint} className="mr-2" />
                     <TextInput
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder="Search cookbooks..."
-                        placeholderTextColor="#6E6E85"
+                        placeholderTextColor={colors.placeholder}
                         className="flex-1 text-white font-sans text-base py-3"
                         autoCorrect={false}
                     />
                     {searchQuery.length > 0 && (
                         <Pressable onPress={() => setSearchQuery("")} className="p-2 -mr-2">
-                            <Ionicons name="close-circle" size={18} color="#6E6E85" />
+                            <Ionicons name="close-circle" size={18} color={colors.textFaint} />
                         </Pressable>
                     )}
                 </View>
@@ -138,7 +140,7 @@ export default function CollectionsScreen() {
                         value={newName}
                         onChangeText={setNewName}
                         placeholder="Cookbook name..."
-                        placeholderTextColor="#6E6E85"
+                        placeholderTextColor={colors.placeholder}
                         className="flex-1 text-white font-sans text-base mr-3"
                         autoFocus
                         onSubmitEditing={handleCreate}
@@ -147,7 +149,7 @@ export default function CollectionsScreen() {
                         onPress={handleCreate}
                         className="bg-accent px-4 py-2 rounded-xl"
                     >
-                        <Text className="text-white font-sans-semibold text-sm">Create</Text>
+                        <Text className="text-[#FFFFFF] font-sans-semibold text-sm">Create</Text>
                     </Pressable>
                 </Animated.View>
             )}
@@ -190,7 +192,7 @@ export default function CollectionsScreen() {
                                     {recipeCounts[item.id] || 0} recipes
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={18} color="#6E6E85" />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
                         </Pressable>
                     </Animated.View>
                 )}

@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from "react-nati
 import { BlurView } from "expo-blur";
 import GlassContainer from "./GlassContainer";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/hooks/useTheme";
 
 const MEAL_OPTIONS: {
     key: "breakfast" | "lunch" | "dinner" | "snack";
@@ -49,6 +50,7 @@ export default function MoveMealModal({
 }: MoveMealModalProps) {
     const [servingQtyStr, setServingQtyStr] = useState("1");
     const [selectedMealType, setSelectedMealType] = useState<"breakfast" | "lunch" | "dinner" | "snack">("snack");
+    const { isDark, colors } = useTheme();
 
     useEffect(() => {
         if (visible) {
@@ -91,7 +93,7 @@ export default function MoveMealModal({
                         exiting={FadeOut}
                         className="absolute inset-0"
                     >
-                        <BlurView intensity={20} tint="dark" className="flex-1 bg-black/70" />
+                        <BlurView intensity={20} tint={isDark ? "dark" : "light"} className="flex-1 bg-black/70" />
                     </Animated.View>
 
                     {/* Touch Overlay to Close */}
@@ -153,7 +155,7 @@ export default function MoveMealModal({
                                                     onPress={handleDecrement} 
                                                     className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
                                                 >
-                                                    <Ionicons name="remove" size={20} color="white" />
+                                                    <Ionicons name="remove" size={20} color={colors.text} />
                                                 </Pressable>
                                                 <TextInput
                                                     value={servingQtyStr}
@@ -162,14 +164,14 @@ export default function MoveMealModal({
                                                         setServingQtyStr(sanitized);
                                                     }}
                                                     keyboardType="decimal-pad"
-                                                    keyboardAppearance="dark"
+                                                    keyboardAppearance={isDark ? "dark" : "light"}
                                                     className="text-white font-sans-bold text-lg text-center bg-surface-900 px-3 py-1.5 rounded-lg min-w-[50px] max-w-[80px]"
                                                 />
                                                 <Pressable 
                                                     onPress={handleIncrement} 
                                                     className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center border border-white/5"
                                                 >
-                                                    <Ionicons name="add" size={20} color="white" />
+                                                    <Ionicons name="add" size={20} color={colors.text} />
                                                 </Pressable>
                                             </View>
                                         </View>
@@ -190,8 +192,8 @@ export default function MoveMealModal({
                                                             className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl"
                                                             style={isSelected ? { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" } : undefined}
                                                         >
-                                                            <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : "#6E6E85"} />
-                                                            <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : "#6E6E85" }}>
+                                                            <Ionicons name={t.icon as any} size={14} color={isSelected ? "#EF4444" : colors.textFaint} />
+                                                            <Text className="font-sans-bold text-[10px] ml-1" style={{ color: isSelected ? "#EF4444" : colors.textFaint }}>
                                                                 {t.label}
                                                             </Text>
                                                         </Pressable>
@@ -204,7 +206,7 @@ export default function MoveMealModal({
                                         <View className="flex-row" style={{ gap: 12 }}>
                                             <Pressable
                                                 onPress={onClose}
-                                                style={{ flex: 1, paddingVertical: 14, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 14, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" }}
+                                                style={{ flex: 1, paddingVertical: 14, backgroundColor: colors.hairline, borderRadius: 14, alignItems: "center", borderWidth: 1, borderColor: colors.hairline }}
                                             >
                                                 <Text className="text-white font-sans-semibold text-base">Cancel</Text>
                                             </Pressable>
@@ -219,7 +221,7 @@ export default function MoveMealModal({
                                                 }}
                                                 style={{ flex: 1, paddingVertical: 14, backgroundColor: "#EF4444", borderRadius: 14, alignItems: "center" }}
                                             >
-                                                <Text className="text-white font-sans-semibold text-base">Save Changes</Text>
+                                                <Text className="text-[#FFFFFF] font-sans-semibold text-base">Save Changes</Text>
                                             </Pressable>
                                         </View>
                                     </View>

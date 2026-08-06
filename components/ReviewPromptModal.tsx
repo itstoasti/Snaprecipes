@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, Modal, Pressable, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeIn, SlideInDown, FadeOut } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import GlassContainer from "./GlassContainer";
 
 interface ReviewPromptModalProps {
@@ -12,38 +12,60 @@ interface ReviewPromptModalProps {
 export default function ReviewPromptModal({ visible, onRespond }: ReviewPromptModalProps) {
     const [showFeedback, setShowFeedback] = useState(false);
 
-    if (!visible) return null;
+    useEffect(() => {
+        if (!visible) {
+            setShowFeedback(false);
+        }
+    }, [visible]);
 
     const handleNeedsWork = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setShowFeedback(true);
     };
 
     const handleEmailSupport = () => {
-        Linking.openURL("mailto:singlesourcedigitalmarketing@gmail.com?subject=SnapRecipes Feedback");
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Linking.openURL("mailto:singlesourcedigitalmarketing@gmail.com?subject=SnapRecipes Feedback").catch(() => {});
         setShowFeedback(false);
         onRespond(false);
     };
 
     const handleNoThanks = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setShowFeedback(false);
         onRespond(false);
     };
 
+    const handleYesLoveIt = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setShowFeedback(false);
+        onRespond(true);
+    };
+
+    const handleNotRightNow = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowFeedback(false);
+        onRespond(null);
+    };
+
     return (
-        <Modal visible={visible} transparent animationType="fade">
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            onRequestClose={handleNotRightNow}
+        >
             <View className="flex-1 bg-black/70 justify-center px-6">
-                <Animated.View entering={SlideInDown.springify().damping(24).stiffness(100)} exiting={FadeOut}>
+                <View className="w-full">
                     <GlassContainer style={{ borderRadius: 24 }} className="p-6 overflow-hidden">
                         {/* Decorative Background Elements */}
                         <View className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-accent/20 blur-3xl" />
 
                         {!showFeedback ? (
-                            <>
+                            <View className="w-full">
                                 <View className="items-center mb-6 mt-2">
                                     <View className="w-16 h-16 rounded-full bg-surface-800 items-center justify-center border border-surface-700 shadow-xl mb-4">
-                                        <Animated.View entering={FadeIn.delay(300)}>
-                                            <Ionicons name="heart" size={32} color="#FF6B35" />
-                                        </Animated.View>
+                                        <Ionicons name="heart" size={32} color="#FF6B35" />
                                     </View>
 
                                     <Text className="text-white font-sans-bold text-2xl text-center mb-2">
@@ -56,30 +78,30 @@ export default function ReviewPromptModal({ visible, onRespond }: ReviewPromptMo
 
                                 <View className="space-y-3 gap-3">
                                     <Pressable
-                                        onPress={() => onRespond(true)}
-                                        className="w-full py-4 rounded-xl items-center bg-accent shadow-lg shadow-accent/20 flex-row justify-center"
+                                        onPress={handleYesLoveIt}
+                                        className="w-full py-4 rounded-xl items-center bg-accent shadow-lg shadow-accent/20 flex-row justify-center active:opacity-80"
                                     >
-                                        <Ionicons name="star" size={18} color="white" className="mr-2" style={{ marginRight: 8 }} />
-                                        <Text className="text-white font-sans-bold text-base">Yes, I love it!</Text>
+                                        <Ionicons name="star" size={18} color="white" style={{ marginRight: 8 }} />
+                                        <Text className="text-[#FFFFFF] font-sans-bold text-base">Yes, I love it!</Text>
                                     </Pressable>
 
                                     <Pressable
                                         onPress={handleNeedsWork}
-                                        className="w-full py-4 rounded-xl items-center bg-surface-800 border border-surface-700"
+                                        className="w-full py-4 rounded-xl items-center bg-surface-800 border border-surface-700 active:opacity-80"
                                     >
                                         <Text className="text-surface-300 font-sans-semibold text-base">Needs some work</Text>
                                     </Pressable>
 
                                     <Pressable
-                                        onPress={() => onRespond(null)}
-                                        className="w-full py-3 mt-1 rounded-xl items-center"
+                                        onPress={handleNotRightNow}
+                                        className="w-full py-3 mt-1 rounded-xl items-center active:opacity-80"
                                     >
                                         <Text className="text-surface-500 font-sans text-sm">Not right now</Text>
                                     </Pressable>
                                 </View>
-                            </>
+                            </View>
                         ) : (
-                            <Animated.View entering={FadeIn}>
+                            <View className="w-full">
                                 <View className="items-center mb-6 mt-2">
                                     <View className="w-16 h-16 rounded-full bg-surface-800 items-center justify-center border border-surface-700 shadow-xl mb-4">
                                         <Ionicons name="build" size={32} color="#A78BFA" />
@@ -96,24 +118,24 @@ export default function ReviewPromptModal({ visible, onRespond }: ReviewPromptMo
                                 <View className="space-y-3 gap-3">
                                     <Pressable
                                         onPress={handleEmailSupport}
-                                        className="w-full py-4 rounded-xl items-center bg-accent shadow-lg shadow-accent/20 flex-row justify-center"
+                                        className="w-full py-4 rounded-xl items-center bg-accent shadow-lg shadow-accent/20 flex-row justify-center active:opacity-80"
                                         style={{ backgroundColor: "#A78BFA" }}
                                     >
-                                        <Ionicons name="mail" size={18} color="white" className="mr-2" style={{ marginRight: 8 }} />
-                                        <Text className="text-white font-sans-bold text-base">Email Support</Text>
+                                        <Ionicons name="mail" size={18} color="white" style={{ marginRight: 8 }} />
+                                        <Text className="text-[#FFFFFF] font-sans-bold text-base">Email Support</Text>
                                     </Pressable>
 
                                     <Pressable
                                         onPress={handleNoThanks}
-                                        className="w-full py-4 rounded-xl items-center bg-surface-800 border border-surface-700"
+                                        className="w-full py-4 rounded-xl items-center bg-surface-800 border border-surface-700 active:opacity-80"
                                     >
                                         <Text className="text-surface-300 font-sans-semibold text-base">No thanks</Text>
                                     </Pressable>
                                 </View>
-                            </Animated.View>
+                            </View>
                         )}
                     </GlassContainer>
-                </Animated.View>
+                </View>
             </View>
         </Modal>
     );

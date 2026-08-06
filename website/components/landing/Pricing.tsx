@@ -26,7 +26,7 @@ const I = {
 };
 
 const FREE_FEATURES = [
-    { text: "5 recipe saves every month", ok: true },
+    { text: "10 recipe saves every month", ok: true },
     { text: "Import from links, camera & share sheet", ok: true },
     { text: "Meal planning & smart grocery lists", ok: true },
     { text: "Cook Mode + calorie & macro tracker", ok: true },
@@ -45,7 +45,7 @@ const PRO_FEATURES = [
 ];
 
 const COMPARE: { feature: string; free: string | boolean; pro: string | boolean }[] = [
-    { feature: "Recipe saves per month", free: "5", pro: "Unlimited" },
+    { feature: "Recipe saves per month", free: "10", pro: "Unlimited" },
     { feature: "Import from links, camera & share sheet", free: true, pro: true },
     { feature: "Recipe library & cookbooks", free: true, pro: true },
     { feature: "Weekly meal planning calendar", free: true, pro: true },
@@ -175,7 +175,7 @@ export default function Pricing() {
                                 <span className="text-[11px] font-black uppercase tracking-widest text-surface-500">Free</span>
                                 <div className="flex items-end gap-1 mt-3 mb-1">
                                     <span className="text-5xl font-black text-surface-300 tracking-tight tabular-nums">$0</span>
-                                    <span className="text-surface-500 text-sm font-semibold mb-1.5">/ forever</span>
+                                    <span className="text-surface-500 text-sm font-semibold mb-1.5">/ mo</span>
                                 </div>
                                 <p className="text-surface-500 text-sm mb-7">Everything you need to start cooking smarter.</p>
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { scaleIngredientText } from "@/lib/scaleQuantity";
 
 export default function RecipeDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -16,6 +17,9 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
     const [recipe, setRecipe] = useState<any>(null);
     const [ingredients, setIngredients] = useState<any[]>([]);
     const [steps, setSteps] = useState<any[]>([]);
+    
+    // Serving Scaler state
+    const [servingMultiplier, setServingMultiplier] = useState(1);
     
     // Collections & Tags linking
     const [allCollections, setAllCollections] = useState<any[]>([]);
@@ -666,11 +670,29 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
                                             </div>
                                         )}
                                         {recipe.servings && (
-                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-900 rounded-xl border border-surface-800 text-xs">
-                                                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                </svg>
-                                                <span>Servings: {recipe.servings}</span>
+                                            <div className="flex items-center gap-3 px-3.5 py-1.5 bg-surface-900 rounded-xl border border-surface-800 text-xs shadow-sm">
+                                                <div className="flex items-center gap-1.5 font-semibold text-surface-300">
+                                                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                    <span>Servings: <strong className="text-white font-bold">{Math.round(recipe.servings * servingMultiplier)}</strong></span>
+                                                </div>
+                                                <div className="flex items-center gap-1 pl-2 border-l border-surface-750">
+                                                    {[0.5, 1, 2, 4].map((m) => (
+                                                        <button
+                                                            key={m}
+                                                            type="button"
+                                                            onClick={() => setServingMultiplier(m)}
+                                                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                                                servingMultiplier === m
+                                                                    ? "bg-accent text-white shadow-sm"
+                                                                    : "bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-750"
+                                                            }`}
+                                                        >
+                                                            {m}x
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -887,7 +909,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
                                                 <ul className="space-y-2.5">
                                                     {groupedIngredients[section].map((ing) => (
                                                         <li key={ing.id} className="text-sm text-surface-300 pl-2.5 border-l-2 border-surface-800 leading-relaxed">
-                                                            {ing.text}
+                                                            {scaleIngredientText(ing.text, servingMultiplier)}
                                                         </li>
                                                     ))}
                                                 </ul>

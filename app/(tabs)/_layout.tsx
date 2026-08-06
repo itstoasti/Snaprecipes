@@ -3,22 +3,26 @@ import { Platform, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function TabLayout() {
     const insets = useSafeAreaInsets();
+    const { isDark, colors } = useTheme();
     const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === "ios" ? 28 : 12);
+
+    const hairline = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(28, 25, 20, 0.08)";
 
     return (
         <Tabs
             screenOptions={{
                 headerShown: false,
                 tabBarActiveTintColor: "#FF6B35",
-                tabBarInactiveTintColor: "#6E6E85",
+                tabBarInactiveTintColor: colors.textFaint,
                 tabBarStyle: {
                     position: "absolute",
                     borderTopWidth: 0,
                     elevation: 0,
-                    backgroundColor: Platform.OS === "ios" ? "transparent" : "rgba(10, 10, 15, 0.95)",
+                    backgroundColor: Platform.OS === "ios" ? "transparent" : colors.tabBarBg,
                     height: 60 + bottomPadding,
                     paddingBottom: bottomPadding,
                     paddingTop: 8,
@@ -27,7 +31,7 @@ export default function TabLayout() {
                     Platform.OS === "ios" ? (
                         <BlurView
                             intensity={80}
-                            tint="dark"
+                            tint={isDark ? "dark" : "light"}
                             style={{
                                 position: "absolute",
                                 top: 0,
@@ -35,7 +39,7 @@ export default function TabLayout() {
                                 right: 0,
                                 bottom: 0,
                                 borderTopWidth: 0.5,
-                                borderTopColor: "rgba(255, 255, 255, 0.08)",
+                                borderTopColor: hairline,
                             }}
                         />
                     ) : (
@@ -46,9 +50,9 @@ export default function TabLayout() {
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                backgroundColor: "rgba(10, 10, 15, 0.97)",
+                                backgroundColor: colors.tabBarBg,
                                 borderTopWidth: 0.5,
-                                borderTopColor: "rgba(255, 255, 255, 0.06)",
+                                borderTopColor: hairline,
                             }}
                         />
                     ),
@@ -79,9 +83,9 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="collections"
                 options={{
-                    title: "Library",
+                    title: "Hub",
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="library-outline" size={size} color={color} />
+                        <Ionicons name="grid-outline" size={size} color={color} />
                     ),
                 }}
             />

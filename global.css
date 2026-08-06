@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Light theme (default) — warm cream palette matching the brand */
+:root {
+    --surface-950: 253 251 247;
+    --surface-900: 247 244 235;
+    --surface-800: 239 235 224;
+    --surface-700: 226 221 208;
+    --surface-600: 178 175 161;
+    --surface-500: 142 138 121;
+    --surface-400: 92 88 78;
+    --surface-300: 42 38 32;
+    --surface-200: 28 25 20;
+    --surface-100: 19 17 9;
+    --surface-50: 12 11 7;
+    --color-ink: 28 25 20;
+}
+
+/* Dark theme — original app palette */
+.dark:root {
+    --surface-950: 10 10 15;
+    --surface-900: 15 15 24;
+    --surface-800: 26 26 38;
+    --surface-700: 45 45 61;
+    --surface-600: 74 74 94;
+    --surface-500: 110 110 133;
+    --surface-400: 157 157 176;
+    --surface-300: 200 200 212;
+    --surface-200: 225 225 234;
+    --surface-100: 240 240 245;
+    --surface-50: 248 248 252;
+    --color-ink: 255 255 255;
+}

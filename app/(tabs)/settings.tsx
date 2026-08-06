@@ -17,6 +17,7 @@ import { useRecipes } from "@/hooks/useRecipes";
 import { AI_PROVIDER_STORE, USER_GOALS_STORE } from "@/lib/constants";
 import StatusModal from "@/components/StatusModal";
 import { BlurView } from "expo-blur";
+import { useTheme, type ThemePreference } from "@/hooks/useTheme";
 
 function SettingRow({
     icon,
@@ -29,6 +30,7 @@ function SettingRow({
     value?: string;
     onPress?: () => void;
 }) {
+    const { colors } = useTheme();
     return (
         <Pressable
             onPress={onPress}
@@ -36,14 +38,14 @@ function SettingRow({
             className="flex-row items-center py-4 border-b border-surface-800"
         >
             <View className="w-10 h-10 rounded-xl bg-surface-800 items-center justify-center mr-4">
-                <Ionicons name={icon as any} size={20} color="#9D9DB0" />
+                <Ionicons name={icon as any} size={20} color={colors.textSecondary} />
             </View>
             <Text className="text-white font-sans text-base flex-1">{label}</Text>
             {value && (
                 <Text className="text-surface-400 font-sans text-sm">{value}</Text>
             )}
             {onPress && (
-                <Ionicons name="chevron-forward" size={16} color="#6E6E85" />
+                <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
             )}
         </Pressable>
     );
@@ -55,6 +57,7 @@ export default function SettingsScreen() {
     const router = useRouter();
     const { isPro, hasActiveEntitlements, isReady } = useRevenueCat();
     const { repairBrokenImages } = useRecipes();
+    const { colors, isDark, preference, setPreference } = useTheme();
 
     // Supabase Auth State
     const [session, setSession] = useState<Session | null>(null);
@@ -216,8 +219,8 @@ export default function SettingsScreen() {
             <Stack.Screen options={{ 
                 headerShown: true, 
                 title: "Settings",
-                headerStyle: { backgroundColor: "#0A0A0F" },
-                headerTintColor: "#FFF",
+                headerStyle: { backgroundColor: colors.headerBg },
+                headerTintColor: colors.text,
                 headerTitleStyle: { fontFamily: "Inter_700Bold" }
             }} />
 
@@ -249,7 +252,7 @@ export default function SettingsScreen() {
                             <Text className="text-white font-sans-bold text-lg">SnapRecipes Pro</Text>
                             <Text className="text-surface-400 font-sans text-sm">Unlimited saves & cook mode</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color="#6E6E85" />
+                        <Ionicons name="chevron-forward" size={20} color={colors.textFaint} />
                     </Pressable>
                 )}
 
@@ -262,7 +265,7 @@ export default function SettingsScreen() {
                         {!isPro ? (
                             <View className="items-center py-4">
                                 <View className="w-16 h-16 rounded-full bg-surface-800 items-center justify-center mb-4 border border-surface-700">
-                                    <Ionicons name="lock-closed" size={28} color="#9D9DB0" />
+                                    <Ionicons name="lock-closed" size={28} color={colors.textSecondary} />
                                 </View>
                                 <Text className="text-white font-sans-bold text-lg mb-2">Pro Feature</Text>
                                 <Text className="text-surface-300 font-sans text-sm text-center mb-4 leading-5">
@@ -388,7 +391,7 @@ export default function SettingsScreen() {
                                     onPress={() => router.push("/auth")}
                                     className="w-full py-4 rounded-xl items-center bg-accent shadow-lg shadow-accent/20"
                                 >
-                                    <Text className="text-white font-sans-bold text-base">Log In / Sign Up</Text>
+                                    <Text className="text-[#FFFFFF] font-sans-bold text-base">Log In / Sign Up</Text>
                                 </Pressable>
                             </View>
                         )}
@@ -412,7 +415,7 @@ export default function SettingsScreen() {
                                 onPress={() => setShowGoalModal(true)}
                                 className="bg-accent px-4 py-2 rounded-xl"
                             >
-                                <Text className="text-white font-sans-bold text-xs">Customize</Text>
+                                <Text className="text-[#FFFFFF] font-sans-bold text-xs">Customize</Text>
                             </Pressable>
                         </View>
 
@@ -469,6 +472,40 @@ export default function SettingsScreen() {
 
 
 
+                {/* Appearance */}
+                <Text className="text-white font-sans-semibold text-lg mb-3">Appearance</Text>
+                <GlassContainer style={{ borderRadius: 16, overflow: "hidden", marginBottom: 24, padding: 0 }}>
+                    <View className="px-5">
+                        {([
+                            { id: "system", icon: "phone-portrait", label: "System", value: "Matches your device" },
+                            { id: "light", icon: "sunny", label: "Light" },
+                            { id: "dark", icon: "moon", label: "Dark" },
+                        ] as { id: ThemePreference; icon: string; label: string; value?: string }[]).map((option, index) => (
+                            <Pressable
+                                key={option.id}
+                                onPress={() => {
+                                    if (preference !== option.id) {
+                                        setPreference(option.id);
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    }
+                                }}
+                                className={`flex-row items-center py-4 ${index < 2 ? "border-b border-surface-800" : ""}`}
+                            >
+                                <View className="w-10 h-10 rounded-xl bg-surface-800 items-center justify-center mr-4">
+                                    <Ionicons name={option.icon as any} size={20} color={colors.textSecondary} />
+                                </View>
+                                <Text className="text-white font-sans text-base flex-1">{option.label}</Text>
+                                {option.value && (
+                                    <Text className="text-surface-400 font-sans text-sm mr-2">{option.value}</Text>
+                                )}
+                                {preference === option.id ? (
+                                    <Ionicons name="checkmark" size={20} color="#FF6B35" />
+                                ) : null}
+                            </Pressable>
+                        ))}
+                    </View>
+                </GlassContainer>
+
                 {/* App Info */}
                 <Text className="text-white font-sans-semibold text-lg mb-3">About</Text>
                 <View className="bg-surface-900 rounded-2xl px-5 mb-6">
@@ -517,7 +554,7 @@ export default function SettingsScreen() {
                         exiting={FadeOut}
                         className="absolute inset-0 bg-black/60"
                     />
-                    <BlurView intensity={30} tint="dark" className="flex-1 justify-center px-6">
+                    <BlurView intensity={30} tint={isDark ? "dark" : "light"} className="flex-1 justify-center px-6">
                         <Animated.View 
                             entering={FadeInDown}
                             className="w-full"
@@ -529,7 +566,7 @@ export default function SettingsScreen() {
                                         onPress={() => setShowGoalModal(false)}
                                         className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
                                     >
-                                        <Ionicons name="close" size={20} color="white" />
+                                        <Ionicons name="close" size={20} color={colors.text} />
                                     </Pressable>
                                 </View>
 
@@ -665,7 +702,7 @@ export default function SettingsScreen() {
                                     onPress={calculateGoals}
                                     className="bg-accent py-4 rounded-2xl items-center shadow-lg shadow-accent/20"
                                 >
-                                    <Text className="text-white font-sans-bold text-base">Calculate & Save Goals</Text>
+                                    <Text className="text-[#FFFFFF] font-sans-bold text-base">Calculate & Save Goals</Text>
                                 </Pressable>
                             </GlassContainer>
                         </Animated.View>

@@ -45,3 +45,5 @@ yarn-error.*
 test-*.js
 test-*.ts
 insta-test.html
+
+*.log

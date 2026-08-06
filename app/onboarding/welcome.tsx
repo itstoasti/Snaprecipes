@@ -1,64 +1,165 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, Platform, StatusBar, Image, Pressable } from "react-native";
+import React, { useEffect, useState, useCallback } from "react";
+import { View, Text, Pressable, Image, Platform, StatusBar } from "react-native";
 import { useRouter } from "expo-router";
-import Animated, { FadeIn, FadeOut, SlideInDown, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
+import { WebView } from "react-native-webview";
+
+const videoModule = require("../../assets/recipe_header_video.mp4");
 
 export default function WelcomeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [videoUri, setVideoUri] = useState<string | null>(null);
+    const [webviewKey, setWebviewKey] = useState(0);
 
-    const goNext = () => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        router.replace("/onboarding/demo");
+    useEffect(() => {
+        try {
+            const resolved = Image.resolveAssetSource(videoModule);
+            if (resolved?.uri) {
+                setVideoUri(resolved.uri);
+            }
+        } catch (e) {
+            console.warn("[WelcomeScreen] Error resolving video asset:", e);
+        }
+    }, []);
+
+    const handleWebViewError = useCallback(() => {
+        setWebviewKey((k) => k + 1);
+    }, []);
+
+    const handleGetStarted = () => {
+        router.push("/onboarding/reviews");
     };
 
-    // Automatically transition to the next demo screen after reading time
-    useEffect(() => {
-        timerRef.current = setTimeout(() => {
-            router.replace("/onboarding/demo");
-        }, 4500);
-        return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
-        };
-    }, [router]);
+    const handleLogin = () => {
+        router.push("/auth");
+    };
+
+    // Exactly matches website HeroSection styling: object-fit: contain with #000000 background
+    const buildVideoHtml = (uri: string) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #000000; }
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000000;
+        }
+    </style>
+</head>
+<body>
+    <video src="${uri}" autoplay loop muted playsinline webkit-playsinline></video>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var v = document.querySelector('video');
+            if (v) {
+                v.muted = true;
+                v.play().catch(function() {
+                    setTimeout(function() { v.play(); }, 300);
+                });
+            }
+        });
+    </script>
+</body>
+</html>`;
 
     return (
-        <Pressable
-            onPress={goNext}
-            className="flex-1 bg-surface-950 items-center justify-center px-6"
-            style={{ paddingTop: Math.max(insets.top, Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0) }}
+        <View
+            className="flex-1 bg-[#FAF7F2] justify-between px-6 pb-8"
+            style={{ paddingTop: Math.max(insets.top, Platform.OS === "android" ? StatusBar.currentHeight || 0 : 16) }}
         >
-            <Animated.View entering={FadeIn.duration(1000)} className="items-center mb-12">
-                <View className="mb-6 w-24 h-24 rounded-3xl overflow-hidden self-center border-2 border-surface-800 shadow-xl shadow-black/40">
-                    <Image source={require("../../assets/icon.png")} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            {/* Header Logo */}
+            <Animated.View entering={FadeIn.duration(800)} className="items-center pt-4">
+                <View className="flex-row items-center justify-center space-x-2.5 mb-3">
+                    <View className="w-10 h-10 rounded-2xl overflow-hidden shadow-md border border-gray-200">
+                        <Image
+                            source={require("../../assets/icon.png")}
+                            className="w-full h-full"
+                            resizeMode="cover"
+                        />
+                    </View>
+                    <Text className="text-[#1F2937] font-sans-bold text-3xl tracking-tight">SnapRecipes</Text>
                 </View>
-                <Text className="text-white font-sans-bold text-4xl">SnapRecipes</Text>
+                <Text className="text-[#1F2937] font-sans-bold text-2xl text-center mb-1">
+                    Welcome to SnapRecipes
+                </Text>
+                <Text className="text-[#4B5563] font-sans text-base text-center px-4 leading-6">
+                    Save clean recipes instantly, skip long blog stories, and organize your kitchen like a pro
+                </Text>
             </Animated.View>
 
-            <View className="space-y-8 w-full max-w-sm">
-                <Animated.View entering={SlideInDown.delay(600)} className="flex-row items-center justify-center">
-                    <Ionicons name="sparkles" size={26} color="#FF6B35" className="mr-3" />
-                    <Text className="text-white font-sans-semibold text-xl">Get clean recipes.</Text>
-                </Animated.View>
+            {/* Phone Bezel Mockup matching website aspect ratio (9 / 19.5) */}
+            <Animated.View entering={SlideInDown.delay(200).duration(800)} className="items-center justify-center my-auto">
+                <View className="w-[280px] bg-black rounded-[44px] p-2.5 border-4 border-gray-800 shadow-2xl shadow-black/30 overflow-hidden relative">
+                    {/* Speaker / Camera Notch */}
+                    <View className="absolute top-3.5 self-center w-24 h-4 bg-black rounded-full z-30 flex-row items-center justify-center">
+                        <View className="w-8 h-1 bg-gray-800/80 rounded-full" />
+                    </View>
 
-                <Animated.View entering={SlideInDown.delay(1200)} className="flex-row items-center justify-center">
-                    <Ionicons name="ban" size={26} color="#34D399" className="mr-3" />
-                    <Text className="text-white font-sans-semibold text-xl">No annoying ads.</Text>
-                </Animated.View>
-
-                <Animated.View entering={SlideInDown.delay(1800)} className="flex-row items-center justify-center">
-                    <Ionicons name="reader" size={26} color="#818CF8" className="mr-3" />
-                    <Text className="text-white font-sans-semibold text-xl">No 10-page life stories.</Text>
-                </Animated.View>
-            </View>
-
-            {/* Tap hint */}
-            <Animated.View entering={FadeIn.delay(2500).duration(800)} style={{ position: "absolute", bottom: insets.bottom + 24 }}>
-                <Text className="text-surface-500 font-sans text-xs">Tap anywhere to continue</Text>
+                    {/* Phone Screen with 9:19.5 Aspect Ratio */}
+                    <View
+                        className="w-full bg-black rounded-[34px] overflow-hidden"
+                        style={{ aspectRatio: 9 / 19.5 }}
+                    >
+                        {videoUri ? (
+                            <WebView
+                                key={webviewKey}
+                                originWhitelist={["*"]}
+                                source={{ html: buildVideoHtml(videoUri) }}
+                                style={{ flex: 1, backgroundColor: "#000000" }}
+                                allowsInlineMediaPlayback={true}
+                                mediaPlaybackRequiresUserAction={false}
+                                javaScriptEnabled={true}
+                                domStorageEnabled={true}
+                                mixedContentMode="always"
+                                allowFileAccess={true}
+                                allowFileAccessFromFileURLs={true}
+                                allowUniversalAccessFromFileURLs={true}
+                                scrollEnabled={false}
+                                bounces={false}
+                                overScrollMode="never"
+                                showsHorizontalScrollIndicator={false}
+                                showsVerticalScrollIndicator={false}
+                                onError={handleWebViewError}
+                                onHttpError={handleWebViewError}
+                            />
+                        ) : (
+                            <View className="flex-1 items-center justify-center bg-black">
+                                <Image
+                                    source={require("../../assets/icon.png")}
+                                    className="w-16 h-16 rounded-2xl"
+                                    resizeMode="cover"
+                                />
+                            </View>
+                        )}
+                    </View>
+                </View>
             </Animated.View>
-        </Pressable>
+
+            {/* Bottom Actions */}
+            <Animated.View entering={SlideInDown.delay(400).duration(800)} className="w-full space-y-3">
+                <Pressable
+                    onPress={handleGetStarted}
+                    className="w-full bg-[#FF6B35] active:bg-[#E85A24] py-4 rounded-2xl items-center shadow-lg shadow-orange-500/25"
+                >
+                    <Text className="text-[#FFFFFF] font-sans-bold text-lg">Get started</Text>
+                </Pressable>
+
+                <Pressable onPress={handleLogin} className="py-2 items-center">
+                    <Text className="text-[#4B5563] font-sans text-base">
+                        Already have an account? <Text className="text-[#FF6B35] font-sans-bold">Log in</Text>
+                    </Text>
+                </Pressable>
+            </Animated.View>
+        </View>
     );
 }

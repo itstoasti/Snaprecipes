@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 import GlassContainer from "./GlassContainer";
+import { useTheme } from "@/hooks/useTheme";
 
 interface StatusModalProps {
     visible: boolean;
@@ -22,6 +23,8 @@ export default function StatusModal({
     buttonText = "Got it",
     onClose,
 }: StatusModalProps) {
+    const { isDark, colors } = useTheme();
+
     if (!visible) return null;
 
     const isSuccess = type === "success";
@@ -39,7 +42,7 @@ export default function StatusModal({
                     exiting={FadeOut.duration(200)}
                     className="absolute inset-0"
                 >
-                    <BlurView intensity={30} tint="dark" className="flex-1 bg-black/40" />
+                    <BlurView intensity={30} tint={isDark ? "dark" : "light"} className="flex-1 bg-black/40" />
                 </Animated.View>
 
                 {/* Modal Content */}
@@ -74,7 +77,7 @@ export default function StatusModal({
                                             : 'bg-surface-800 border border-surface-700'
                                 }`}
                             >
-                                <Text className="text-white font-sans-bold text-base">
+                                <Text className="font-sans-bold text-base" style={{ color: isSuccess || isInfo ? "#FFFFFF" : colors.text }}>
                                     {buttonText}
                                 </Text>
                             </Pressable>

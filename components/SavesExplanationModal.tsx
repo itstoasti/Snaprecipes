@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import GlassContainer from "./GlassContainer";
+import { useTheme } from "@/hooks/useTheme";
 
 interface SavesExplanationModalProps {
     visible: boolean;
@@ -18,11 +19,12 @@ export default function SavesExplanationModal({
     onClose,
 }: SavesExplanationModalProps) {
     const router = useRouter();
+    const { isDark } = useTheme();
 
     if (!visible) return null;
 
-    const progressPercent = Math.min((usageCount / 5) * 100, 100);
-    const savesLeft = Math.max(5 - usageCount, 0);
+    const progressPercent = Math.min((usageCount / 10) * 100, 100);
+    const savesLeft = Math.max(10 - usageCount, 0);
 
     const handleUpgrade = () => {
         onClose();
@@ -38,7 +40,7 @@ export default function SavesExplanationModal({
                     exiting={FadeOut.duration(200)}
                     className="absolute inset-0"
                 >
-                    <BlurView intensity={30} tint="dark" className="flex-1 bg-black/40" />
+                    <BlurView intensity={30} tint={isDark ? "dark" : "light"} className="flex-1 bg-black/40" />
                 </Animated.View>
 
                 {/* Modal Container */}
@@ -59,7 +61,7 @@ export default function SavesExplanationModal({
                                 Monthly Free Saves
                             </Text>
                             <Text className="text-surface-300 font-sans text-sm text-center mb-6 px-1 leading-5">
-                                Free users receive 5 recipe saves or web imports every calendar month. This resets on the 1st of each month.
+                                Free users receive 10 recipe saves or web imports every calendar month. This resets on the 1st of each month.
                             </Text>
 
                             {/* Progress Card */}
@@ -69,7 +71,7 @@ export default function SavesExplanationModal({
                                         Usage Tracker
                                     </Text>
                                     <Text className="text-white font-sans-bold text-xs">
-                                        {usageCount} / 5 saves
+                                        {usageCount} / 10 saves
                                     </Text>
                                 </View>
                                 <View className="h-2 bg-white/10 rounded-full overflow-hidden mb-2">
@@ -79,7 +81,7 @@ export default function SavesExplanationModal({
                                     />
                                 </View>
                                 <Text className="text-surface-500 font-sans text-[10px]">
-                                    {usageCount >= 5 
+                                    {usageCount >= 10 
                                         ? "Monthly limit reached" 
                                         : `${savesLeft} free saves left this month`
                                     }
@@ -92,7 +94,7 @@ export default function SavesExplanationModal({
                                     onPress={handleUpgrade}
                                     className="w-full py-4 rounded-2xl bg-accent items-center justify-center shadow-lg shadow-accent/20"
                                 >
-                                    <Text className="text-white font-sans-bold text-base">
+                                    <Text className="text-[#FFFFFF] font-sans-bold text-base">
                                         Go Pro for Unlimited
                                     </Text>
                                 </Pressable>

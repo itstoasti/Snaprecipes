@@ -7,11 +7,13 @@ import { getDatabase } from "@/db/client";
 import RecipeFeed from "@/components/RecipeFeed";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import AddRecipesModal from "@/components/AddRecipesModal";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function CollectionDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
     const [recipes, setRecipes] = useState<any[]>([]);
     const [collectionName, setCollectionName] = useState("");
     const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ export default function CollectionDetailScreen() {
                         onPress={() => router.back()}
                         className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center mr-4"
                     >
-                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={20} color={colors.text} />
                     </Pressable>
                     <View className="flex-1">
                         <Text className="text-surface-500 font-sans text-xs uppercase tracking-widest mb-0.5">Cookbook</Text>

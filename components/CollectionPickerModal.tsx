@@ -18,6 +18,7 @@ import Animated, { FadeIn, SlideInDown, FadeInDown } from "react-native-reanimat
 import GlassContainer from "./GlassContainer";
 import { useCollections } from "@/hooks/useCollections";
 import { getDatabase } from "@/db/client";
+import { useTheme } from "@/hooks/useTheme";
 
 interface CollectionPickerModalProps {
     visible: boolean;
@@ -36,6 +37,7 @@ export default function CollectionPickerModal({
     const [assignedCollectionIds, setAssignedCollectionIds] = useState<Set<number>>(new Set());
     const [showCreate, setShowCreate] = useState(false);
     const [newName, setNewName] = useState("");
+    const { colors } = useTheme();
 
     useEffect(() => {
         if (!visible) return;
@@ -156,7 +158,7 @@ export default function CollectionPickerModal({
                                                 value={newName}
                                                 onChangeText={setNewName}
                                                 placeholder="New cookbook name..."
-                                                placeholderTextColor="#6E6E85"
+                                                placeholderTextColor={colors.placeholder}
                                                 className="flex-1 text-white font-sans text-base mr-3"
                                                 autoFocus
                                                 onSubmitEditing={handleCreate}
@@ -165,7 +167,7 @@ export default function CollectionPickerModal({
                                                 onPress={handleCreate}
                                                 className="bg-accent px-5 py-2.5 rounded-xl"
                                             >
-                                                <Text className="text-white font-sans-bold text-sm">Create</Text>
+                                                <Text className="text-[#FFFFFF] font-sans-bold text-sm">Create</Text>
                                             </Pressable>
                                         </Animated.View>
                                     )}
@@ -178,12 +180,12 @@ export default function CollectionPickerModal({
                                     </View>
                                 ) : collections.length === 0 ? (
                                     <View className="flex-1 items-center justify-center px-4 py-8">
-                                        <Ionicons name="folder-open-outline" size={48} color="#6E6E85" />
+                                        <Ionicons name="folder-open-outline" size={48} color={colors.textFaint} />
                                         <Text className="text-white font-sans-bold text-center mt-4 mb-1 opacity-80">
                                             You haven't created any cookbooks yet.
                                         </Text>
                                         <Text className="text-surface-500 font-sans text-sm text-center">
-                                            Go to the Library tab to create one.
+                                            Go to the Hub tab to create one.
                                         </Text>
                                     </View>
                                 ) : (
@@ -208,7 +210,7 @@ export default function CollectionPickerModal({
                                                     <View
                                                         style={{
                                                             backgroundColor: isSelected ? "#FF6B35" : "transparent",
-                                                            borderColor: isSelected ? "#FF6B35" : "#6E6E85"
+                                                            borderColor: isSelected ? "#FF6B35" : colors.textFaint
                                                         }}
                                                         className="w-6 h-6 rounded-full border items-center justify-center"
                                                     >

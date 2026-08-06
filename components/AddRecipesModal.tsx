@@ -12,6 +12,7 @@ import { useCollections } from "@/hooks/useCollections";
 import { useRecipes } from "@/hooks/useRecipes";
 import { supabase } from "@/lib/supabase";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/hooks/useTheme";
 
 interface AddRecipesModalProps {
     visible: boolean;
@@ -26,6 +27,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
     const { height: windowHeight } = useWindowDimensions();
     const { addRecipeToCollection } = useCollections();
     const { saveCommunityRecipe, searchCommunityRecipes } = useRecipes();
+    const { colors } = useTheme();
 
     const [tab, setTab] = useState<Tab>("mine");
     const [searchQuery, setSearchQuery] = useState("");
@@ -173,21 +175,21 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                         <GlassContainer style={{ borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 1 }}>
                             <View style={{ flex: 1, padding: 20, paddingBottom: 48 }}>
                                 {/* Handle */}
-                                <View style={{ alignSelf: "center", width: 40, height: 4, backgroundColor: "#6E6E85", borderRadius: 2, marginBottom: 16 }} />
+                                <View style={{ alignSelf: "center", width: 40, height: 4, backgroundColor: colors.textFaint, borderRadius: 2, marginBottom: 16 }} />
 
                                 {/* Header */}
                                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                                     <Text className="text-white font-sans-bold text-xl">Add Recipes</Text>
                                     <Pressable
                                         onPress={onClose}
-                                        style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#2A2A3A", alignItems: "center", justifyContent: "center" }}
+                                        style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.elevated, alignItems: "center", justifyContent: "center" }}
                                     >
-                                        <Ionicons name="close" size={20} color="#6E6E85" />
+                                        <Ionicons name="close" size={20} color={colors.textFaint} />
                                     </Pressable>
                                 </View>
 
                                 {/* Tabs */}
-                                <View style={{ flexDirection: "row", backgroundColor: "#1C1C28", borderRadius: 16, padding: 4, marginBottom: 16 }}>
+                                <View style={{ flexDirection: "row", backgroundColor: colors.elevated, borderRadius: 16, padding: 4, marginBottom: 16 }}>
                                     {(["mine", "community"] as Tab[]).map((t) => (
                                         <Pressable
                                             key={t}
@@ -203,7 +205,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                             }}
                                         >
                                             <Text style={{
-                                                color: tab === t ? "#FF6B35" : "#6E6E85",
+                                                color: tab === t ? "#FF6B35" : colors.textFaint,
                                                 fontWeight: "700",
                                                 fontSize: 14,
                                                 textTransform: "capitalize"
@@ -215,19 +217,19 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                 </View>
 
                                 {/* Search */}
-                                <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#1A1A26", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" }}>
-                                    <Ionicons name="search" size={20} color="#6E6E85" style={{ marginRight: 12 }} />
+                                <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.elevated, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.hairline }}>
+                                    <Ionicons name="search" size={20} color={colors.textFaint} style={{ marginRight: 12 }} />
                                     <TextInput
                                         value={searchQuery}
                                         onChangeText={handleSearch}
                                         placeholder={tab === "mine" ? "Search your recipes..." : "Search community recipes..."}
-                                        placeholderTextColor="#6E6E85"
-                                        style={{ flex: 1, color: "#FFF", fontSize: 16 }}
+                                        placeholderTextColor={colors.placeholder}
+                                        style={{ flex: 1, color: colors.text, fontSize: 16 }}
                                         autoCorrect={false}
                                     />
                                     {searchQuery.length > 0 && (
                                         <Pressable onPress={() => handleSearch("")}>
-                                            <Ionicons name="close-circle" size={18} color="#6E6E85" />
+                                            <Ionicons name="close-circle" size={18} color={colors.textFaint} />
                                         </Pressable>
                                     )}
                                 </View>
@@ -243,7 +245,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                             {tab === "mine" ? (
                                                 myRecipes.length === 0 ? (
                                                     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
-                                                        <Text style={{ color: "#6E6E85", fontSize: 14, textAlign: "center" }}>
+                                                        <Text style={{ color: colors.textFaint, fontSize: 14, textAlign: "center" }}>
                                                             No recipes found.
                                                         </Text>
                                                     </View>
@@ -259,13 +261,13 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                                                     alignItems: "center",
                                                                     padding: 12,
                                                                     borderRadius: 16,
-                                                                    backgroundColor: isSelected ? "rgba(255, 107, 53, 0.08)" : "#1C1C28",
+                                                                    backgroundColor: isSelected ? "rgba(255, 107, 53, 0.08)" : colors.elevated,
                                                                     marginBottom: 8,
                                                                     borderWidth: 1,
-                                                                    borderColor: isSelected ? "rgba(255, 107, 53, 0.2)" : "rgba(255,255,255,0.02)",
+                                                                    borderColor: isSelected ? "rgba(255, 107, 53, 0.2)" : colors.hairline,
                                                                 }}
                                                             >
-                                                                <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#2A2A3E", overflow: "hidden", marginRight: 12 }}>
+                                                                <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: colors.card, overflow: "hidden", marginRight: 12 }}>
                                                                     {recipe.image_url ? (
                                                                         <Image source={{ uri: recipe.image_url }} style={{ flex: 1 }} />
                                                                     ) : (
@@ -274,7 +276,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                                                         </View>
                                                                     )}
                                                                 </View>
-                                                                <Text style={{ flex: 1, color: "#FFF", fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
+                                                                <Text style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
                                                                     {recipe.title}
                                                                 </Text>
                                                                 <View style={{
@@ -282,7 +284,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                                                     height: 22,
                                                                     borderRadius: 11,
                                                                     borderWidth: 1.5,
-                                                                    borderColor: isSelected ? "#FF6B35" : "#6E6E85",
+                                                                    borderColor: isSelected ? "#FF6B35" : colors.textFaint,
                                                                     backgroundColor: isSelected ? "#FF6B35" : "transparent",
                                                                     alignItems: "center",
                                                                     justifyContent: "center",
@@ -297,7 +299,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                             ) : (
                                                 communityRecipes.length === 0 ? (
                                                     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
-                                                        <Text style={{ color: "#6E6E85", fontSize: 14, textAlign: "center" }}>
+                                                        <Text style={{ color: colors.textFaint, fontSize: 14, textAlign: "center" }}>
                                                             No community recipes found.
                                                         </Text>
                                                     </View>
@@ -313,13 +315,13 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                                                     alignItems: "center",
                                                                     padding: 12,
                                                                     borderRadius: 16,
-                                                                    backgroundColor: isSelected ? "rgba(255, 107, 53, 0.08)" : "#1C1C28",
+                                                                    backgroundColor: isSelected ? "rgba(255, 107, 53, 0.08)" : colors.elevated,
                                                                     marginBottom: 8,
                                                                     borderWidth: 1,
-                                                                    borderColor: isSelected ? "rgba(255, 107, 53, 0.2)" : "rgba(255,255,255,0.02)",
+                                                                    borderColor: isSelected ? "rgba(255, 107, 53, 0.2)" : colors.hairline,
                                                                 }}
                                                             >
-                                                                <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#2A2A3E", overflow: "hidden", marginRight: 12 }}>
+                                                                <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: colors.card, overflow: "hidden", marginRight: 12 }}>
                                                                     {recipe.image_url ? (
                                                                         <Image source={{ uri: recipe.image_url }} style={{ flex: 1 }} />
                                                                     ) : (
@@ -328,7 +330,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                                                         </View>
                                                                     )}
                                                                 </View>
-                                                                <Text style={{ flex: 1, color: "#FFF", fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
+                                                                <Text style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
                                                                     {recipe.title}
                                                                 </Text>
                                                                 <View style={{
@@ -336,7 +338,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                                                     height: 22,
                                                                     borderRadius: 11,
                                                                     borderWidth: 1.5,
-                                                                    borderColor: isSelected ? "#FF6B35" : "#6E6E85",
+                                                                    borderColor: isSelected ? "#FF6B35" : colors.textFaint,
                                                                     backgroundColor: isSelected ? "#FF6B35" : "transparent",
                                                                     alignItems: "center",
                                                                     justifyContent: "center",
@@ -356,7 +358,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                             onPress={handleSave}
                                             disabled={saving || (selectedMyIds.size === 0 && selectedCommunityIds.size === 0)}
                                             style={{
-                                                backgroundColor: (selectedMyIds.size > 0 || selectedCommunityIds.size > 0) ? "#FF6B35" : "#2A2A3E",
+                                                backgroundColor: (selectedMyIds.size > 0 || selectedCommunityIds.size > 0) ? "#FF6B35" : colors.elevated,
                                                 paddingVertical: 16,
                                                 borderRadius: 16,
                                                 alignItems: "center",
@@ -367,7 +369,7 @@ export default function AddRecipesModal({ visible, collectionId, onClose, onAddS
                                                 <ActivityIndicator size="small" color="#FFF" />
                                             ) : (
                                                 <Text style={{
-                                                    color: totalSelected > 0 ? "#FFF" : "#6E6E85",
+                                                    color: totalSelected > 0 ? "#FFF" : colors.textFaint,
                                                     fontWeight: "700",
                                                     fontSize: 16,
                                                 }}>

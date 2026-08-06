@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator, AppState, AppStateStatus } from "react-native";
-import { ThemeProvider, DarkTheme } from "@react-navigation/native";
+import { ThemeProvider } from "@react-navigation/native";
+import { ThemeProvider as AppThemeProvider, useTheme } from "@/hooks/useTheme";
 import * as SecureStore from "expo-secure-store";
 import { ONBOARDING_COMPLETE_KEY } from "./onboarding/first-save";
 import {
@@ -19,7 +20,63 @@ import { RevenueCatProvider } from "@/hooks/useRevenueCat";
 import { getDatabase } from "@/db/client";
 import { ShareIntentProvider, useShareIntent } from "expo-share-intent";
 import { initAnalytics, trackScreenView } from "@/lib/analytics";
+import { OnboardingProvider } from "@/components/onboarding/onboardingContext";
 import "../global.css";
+
+// Helper component inside ShareIntentProvider
+function ShareIntentHandler() {
+    const router = useRouter();
+    try {
+        const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+        useEffect(() => {
+            if (hasShareIntent && shareIntent?.text) {
+                const urlMatch = shareIntent.text.match(/https?:\/\/[^\s]+/);
+                const sharedUrl = urlMatch ? urlMatch[0] : shareIntent.text.trim();
+                if (sharedUrl) {
+                    resetShareIntent();
+                    router.push({ pathname: "/share", params: { url: sharedUrl } });
+                }
+            }
+        }, [hasShareIntent, shareIntent]);
+    } catch (e) {
+        // Safe fallback in standard Expo Go where native share-intent is omitted
+        console.warn("ShareIntent native module not available in current environment");
+    }
+    return null;
+}
+
+function ThemedRoot() {
+    const { colors, navTheme } = useTheme();
+    return (
+        <ThemeProvider value={navTheme}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <StatusBar style={colors.statusBar} />
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: colors.bg },
+                        animation: "slide_from_right",
+                    }}
+                >
+                    <Stack.Screen
+                        name="paywall"
+                        options={{
+                            presentation: "modal",
+                            animation: "slide_from_bottom"
+                        }}
+                    />
+                    <Stack.Screen
+                        name="auth"
+                        options={{
+                            presentation: "modal",
+                            animation: "slide_from_bottom"
+                        }}
+                    />
+                </Stack>
+            </GestureHandlerRootView>
+        </ThemeProvider>
+    );
+}
 
 export default function RootLayout() {
     const [fontsLoaded] = useFonts({
@@ -57,8 +114,6 @@ export default function RootLayout() {
         console.log("[Router Details] isReady:", isReady, "hasOnboarded:", hasOnboarded, "segments:", segments, "inOnboardingGroup:", inOnboardingGroup);
 
         if (!hasOnboarded && !inOnboardingGroup) {
-            // Re-check secure store just in case they just finished onboarding
-            // and the state hasn't updated in this component yet
             SecureStore.getItemAsync(ONBOARDING_COMPLETE_KEY).then(val => {
                 if (val === "true") {
                     setHasOnboarded(true);
@@ -68,7 +123,6 @@ export default function RootLayout() {
                 }
             });
         } else if (hasOnboarded && inOnboardingGroup) {
-            // Push out of onboarding if they have already done it
             console.log("[Router action] replacing with /");
             router.replace("/");
         }
@@ -78,7 +132,6 @@ export default function RootLayout() {
     useEffect(() => {
         const handleAppStateChange = async (nextAppState: AppStateStatus) => {
             if (nextAppState === "active") {
-                // Background sync trigger when app comes to foreground
                 try {
                     await pushPendingChanges();
                     await pullRemoteChanges();
@@ -91,21 +144,6 @@ export default function RootLayout() {
         const subscription = AppState.addEventListener("change", handleAppStateChange);
         return () => subscription.remove();
     }, []);
-
-    // Handle incoming share intents
-    const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
-
-    useEffect(() => {
-        if (hasShareIntent && shareIntent?.text) {
-            // Extract URL from shared text
-            const urlMatch = shareIntent.text.match(/https?:\/\/[^\s]+/);
-            const sharedUrl = urlMatch ? urlMatch[0] : shareIntent.text.trim();
-            if (sharedUrl) {
-                resetShareIntent();
-                router.push({ pathname: "/share", params: { url: sharedUrl } });
-            }
-        }
-    }, [hasShareIntent, shareIntent]);
 
     // Initialize the database once on mount
     useEffect(() => {
@@ -144,35 +182,14 @@ export default function RootLayout() {
 
     return (
         <ShareIntentProvider>
+            <ShareIntentHandler />
             <SafeAreaProvider>
                 <RevenueCatProvider>
-                    <ThemeProvider value={DarkTheme}>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
-                            <StatusBar style="light" />
-                            <Stack
-                                screenOptions={{
-                                    headerShown: false,
-                                    contentStyle: { backgroundColor: "#0A0A0F" },
-                                    animation: "slide_from_right",
-                                }}
-                            >
-                                <Stack.Screen
-                                    name="paywall"
-                                    options={{
-                                        presentation: "modal",
-                                        animation: "slide_from_bottom"
-                                    }}
-                                />
-                                <Stack.Screen
-                                    name="auth"
-                                    options={{
-                                        presentation: "modal",
-                                        animation: "slide_from_bottom"
-                                    }}
-                                />
-                            </Stack>
-                        </GestureHandlerRootView>
-                    </ThemeProvider>
+                    <OnboardingProvider>
+                        <AppThemeProvider>
+                            <ThemedRoot />
+                        </AppThemeProvider>
+                    </OnboardingProvider>
                 </RevenueCatProvider>
             </SafeAreaProvider>
         </ShareIntentProvider>

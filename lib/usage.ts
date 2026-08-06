@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
-const FREE_TIER_LIMIT = 5;
+const FREE_TIER_LIMIT = 10;
 const USAGE_COUNT_KEY = "snapshot_usage_count";
 const USAGE_MONTH_KEY = "snapshot_usage_month"; // Tracks the month integer (0-11)
 

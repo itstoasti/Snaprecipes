@@ -32,6 +32,7 @@ import StatusModal from "@/components/StatusModal";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { useAppReview } from "@/hooks/useAppReview";
 import ReviewPromptModal from "@/components/ReviewPromptModal";
+import { useTheme } from "@/hooks/useTheme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -75,6 +76,7 @@ export default function RecipeDetailScreen() {
     }>({ visible: false, type: "success", title: "", message: "" });
     const insets = useSafeAreaInsets();
     const { showPrePrompt, recordSuccessfulSave, handlePrePromptResponse } = useAppReview();
+    const { colors, isDark } = useTheme();
 
     const isVideo = recipe ? isVideoUrl(recipe.source_url) : false;
     const headerHeight = SCREEN_WIDTH * 0.9; // Slightly taller for better framing
@@ -257,7 +259,7 @@ export default function RecipeDetailScreen() {
                 contentContainerStyle={{ paddingBottom: 120 }}
             >
                 {/* Hero Image or Video */}
-                <View style={{ width: SCREEN_WIDTH, height: headerHeight, backgroundColor: "#111" }}>
+                <View style={{ width: SCREEN_WIDTH, height: headerHeight, backgroundColor: colors.elevated }}>
                     <Pressable onPress={handlePlayVideo} className="flex-1 w-full h-full bg-surface-800 items-center justify-center">
                         {/* Fallback emoji - Only show if no image_url OR if there's an error */}
                         {(!recipe.image_url || imageError) && (
@@ -364,7 +366,7 @@ export default function RecipeDetailScreen() {
                     <Animated.View entering={FadeIn.delay(200)} className="flex-row flex-wrap gap-2 mb-5">
                         {recipe.prep_time && (
                             <View className="flex-row items-center bg-surface-800 px-3 py-1.5 rounded-full">
-                                <Ionicons name="time-outline" size={14} color="#9D9DB0" />
+                                <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
                                 <Text className="text-surface-300 font-sans text-xs ml-1.5">
                                     Prep {recipe.prep_time}
                                 </Text>
@@ -530,7 +532,9 @@ export default function RecipeDetailScreen() {
             {/* Start Cooking Button */}
             <View className="absolute bottom-0 left-0 right-0">
                 <LinearGradient
-                    colors={["transparent", "rgba(10,10,15,0.8)", "rgba(10,10,15,1)"]}
+                    colors={isDark
+                        ? ["transparent", "rgba(10,10,15,0.8)", "rgba(10,10,15,1)"]
+                        : ["rgba(253,251,247,0)", "rgba(253,251,247,0.8)", "rgba(253,251,247,1)"]}
                     className="pt-12 pb-8 px-5"
                 >
                     <GlassContainer style={{ borderRadius: 20, overflow: "hidden" }}>
