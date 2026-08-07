@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.deanfieldz.yummy";
@@ -13,6 +13,8 @@ export default function Navbar() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
+    const pathname = usePathname();
+    const isDashboard = pathname?.startsWith('/dashboard');
 
     useEffect(() => {
         // Get initial session
@@ -37,7 +39,7 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-surface-800/50">
+            <nav className={`fixed top-0 left-0 right-0 z-50 glass border-b border-surface-800/50 ${isDashboard ? 'hidden md:block' : ''}`}>
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <Link href="/" className="flex items-center gap-3">
@@ -91,7 +93,7 @@ export default function Navbar() {
             </nav>
 
             {/* Mobile Menu */}
-            {mobileOpen && (
+            {mobileOpen && !isDashboard && (
                 <div className="fixed inset-0 z-40 glass flex flex-col items-center justify-center gap-8 text-2xl" onClick={() => setMobileOpen(false)}>
                     <Link href="/#features" className="text-surface-300 hover:text-accent transition-colors">Features</Link>
                     <Link href="/#how-it-works" className="text-surface-300 hover:text-accent transition-colors">How It Works</Link>

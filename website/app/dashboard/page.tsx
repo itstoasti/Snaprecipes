@@ -425,51 +425,23 @@ export default function DashboardPage() {
 
         setImporting(true);
         try {
-            let contentForAI = "";
-            let scrapeFailed = true;
-
-            try {
-                const jinaRes = await fetch(`https://r.jina.ai/${trimmedUrl}`, {
-                    headers: {
-                        "Accept": "text/plain"
-                    }
-                });
-                if (jinaRes.ok) {
-                    const markdown = await jinaRes.text();
-                    if (markdown && markdown.length > 200 && !markdown.includes("Just a moment") && !markdown.includes("challenge-platform")) {
-                        contentForAI = `Target URL: ${trimmedUrl}\n\nRendered webpage content:\n\n${extractRecipeSection(markdown)}`;
-                        scrapeFailed = false;
-                    }
-                }
-            } catch (e) {
-                console.warn("Client-side Jina scrape failed, falling back to server-side:", e);
-            }
-
-            const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
             const currentSession = (await supabase.auth.getSession()).data.session;
-            const token = currentSession?.access_token || anonKey;
+            const token = currentSession?.access_token || "";
 
-            // Call Edge Function
-            const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/extract-recipe`, {
+            const response = await fetch("/api/extract", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "apikey": anonKey,
-                    "Authorization": `Bearer ${token}`
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
                 },
-                body: JSON.stringify({
-                    url: trimmedUrl,
-                    contentForAI,
-                    scrapeFailed
-                })
+                body: JSON.stringify({ url: trimmedUrl }),
             });
 
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(text || `Failed to extract recipe content (Status: ${response.status})`);
-            }
-
             const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data?.error || `Failed to extract recipe (Status: ${response.status})`);
+            }
             
             let recipe = data;
             if (data.recipes && Array.isArray(data.recipes)) {
@@ -582,7 +554,11 @@ export default function DashboardPage() {
             router.push(`/dashboard/recipes/${recipeRow.id}?isNew=true`);
         } catch (err: any) {
             console.error("Direct import error:", err);
-            setImportError(err.message || "Failed to extract recipe.");
+            if (err?.name === "AbortError") {
+                setImportError("Extraction timed out. The recipe site may be slow or unresponsive. Please try again.");
+            } else {
+                setImportError(err.message || "Failed to extract recipe.");
+            }
         } finally {
             setImporting(false);
         }
@@ -621,7 +597,7 @@ export default function DashboardPage() {
         <>
             {importing && <ExtractionLoader />}
             <Navbar />
-            <main className="pt-24 pb-20 min-h-screen bg-surface-950 text-surface-300">
+            <main className="pt-4 md:pt-24 pb-32 md:pb-20 min-h-screen bg-surface-950 text-surface-300">
                 <div className="max-w-7xl mx-auto px-6">
                     {/* Header */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -1123,7 +1099,7 @@ export default function DashboardPage() {
 
                 return (
                     <div
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 pb-20 md:pb-4"
                         onClick={(e) => {
                             if (e.target === e.currentTarget) {
                                 setShowAddRecipesModal(false);
@@ -1134,7 +1110,7 @@ export default function DashboardPage() {
                             }
                         }}
                     >
-                        <div className="bg-surface-950 border border-surface-800/80 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                        <div className="bg-surface-950 border border-surface-800/80 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[82vh] md:max-h-[90vh] overflow-hidden">
                             {/* Header */}
                             <div className="px-6 pt-6 pb-4 border-b border-surface-800/50">
                                 <div className="flex justify-between items-start mb-4">
@@ -1177,7 +1153,6 @@ export default function DashboardPage() {
                                         onChange={(e) => addRecipeTab === "community" ? handleCommunitySearch(e.target.value) : setAddRecipeSearch(e.target.value)}
                                         placeholder={addRecipeTab === "community" ? "Search community recipes..." : "Search your recipes..."}
                                         className="w-full bg-surface-900 border border-surface-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-surface-300 placeholder-surface-500 focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all"
-                                        autoFocus
                                     />
                                     {addRecipeSearch && (
                                         <button

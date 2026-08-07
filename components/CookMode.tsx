@@ -164,14 +164,14 @@ export default function CookMode({
                     onPress={onExit}
                     className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center"
                 >
-                    <Ionicons name="arrow-back" size={22} color={colors.text} />
+                    <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
                 </Pressable>
                 <Text className="text-white font-sans-bold text-lg">Cook Mode</Text>
                 <Pressable
                     onPress={onExit}
                     className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center"
                 >
-                    <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+                    <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
                 </Pressable>
             </View>
 
@@ -300,7 +300,7 @@ export default function CookMode({
                                     <Ionicons
                                         name={isExpanded ? "chevron-up" : "chevron-forward"}
                                         size={18}
-                                        color={isExpanded ? "#34D399" : colors.textFaint}
+                                        color={isExpanded ? "#34D399" : "#6E6E85"}
                                     />
                                 </Pressable>
 

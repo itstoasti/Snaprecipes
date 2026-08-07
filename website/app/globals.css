@@ -162,3 +162,21 @@ h1, h2, h3, h4, h5, h6 {
 .animate-fadeIn {
   animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Safe area support for PWA / notched devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Bottom tab bar content offset */
+.has-tab-bar {
+  padding-bottom: 5rem;
+}
+
+@media (min-width: 768px) {
+  .has-tab-bar {
+    padding-bottom: 0;
+  }
+}

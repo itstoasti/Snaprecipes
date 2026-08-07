@@ -4,6 +4,7 @@ import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["localhost:3000", "192.168.1.168:3000", "192.168.1.*"],
   outputFileTracingRoot: process.cwd(),
   images: {
     unoptimized: true,

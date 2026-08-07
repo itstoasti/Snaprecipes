@@ -237,46 +237,20 @@ function RecipePreviewClient() {
                 }
                 const token = currentSession.access_token;
 
-                let contentForAI = "";
-                let scrapeFailed = true;
-
-                try {
-                    const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
-                        headers: {
-                            "Accept": "text/plain"
-                        }
-                    });
-                    if (jinaRes.ok) {
-                        const markdown = await jinaRes.text();
-                        if (markdown && markdown.length > 200 && !markdown.includes("Just a moment") && !markdown.includes("challenge-platform")) {
-                            contentForAI = `Target URL: ${url}\n\nRendered webpage content:\n\n${extractRecipeSection(markdown)}`;
-                            scrapeFailed = false;
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Client-side Jina scrape failed, falling back to server-side:", e);
-                }
-
-                const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/extract-recipe`, {
+                const response = await fetch("/api/extract", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "apikey": anonKey,
-                        "Authorization": `Bearer ${token}`
+                        ...(token ? { "Authorization": `Bearer ${token}` } : {})
                     },
-                    body: JSON.stringify({
-                        url,
-                        contentForAI,
-                        scrapeFailed
-                    })
+                    body: JSON.stringify({ url }),
                 });
 
-                if (!response.ok) {
-                    const text = await response.text();
-                    throw new Error(text || `Extraction failed with status ${response.status}`);
-                }
-
                 const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data?.error || `Extraction failed with status ${response.status}`);
+                }
                 
                 // Handle response layout (Edge Function returns validated single recipe or list)
                 let extracted = data;

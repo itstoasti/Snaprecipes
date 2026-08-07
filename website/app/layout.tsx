@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -54,6 +54,21 @@ export const metadata: Metadata = {
     ],
     shortcut: "/icon.png",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Snap Recipes',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#FDFBF7',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 function GlobalSchema() {

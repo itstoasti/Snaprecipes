@@ -402,7 +402,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
     return (
         <>
             <Navbar />
-            <main className="pt-24 pb-20 min-h-screen bg-surface-950 text-surface-300">
+            <main className="pt-4 md:pt-24 pb-36 md:pb-20 min-h-screen bg-surface-950 text-surface-300">
                 <div className="max-w-5xl mx-auto px-6">
                     {/* Navigation */}
                     <div className="flex items-center justify-between gap-4 mb-8 pb-4 border-b border-surface-900">
@@ -416,8 +416,11 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowDeletePrompt(true)}
-                                className="px-5 py-2 rounded-xl text-xs font-semibold bg-red-950/40 border border-red-900/60 text-red-400 hover:bg-red-900 hover:text-white transition-colors cursor-pointer"
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                             >
+                                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
                                 Delete
                             </button>
                         </div>
@@ -943,7 +946,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
 
             {/* DELETE CONFIRMATION MODAL */}
             {showDeletePrompt && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-20 md:pb-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-surface-900 border border-surface-800 p-6 rounded-3xl max-w-sm w-full mx-4 shadow-xl text-center glass">
                         <div className="w-12 h-12 rounded-full bg-red-950/40 border border-red-900 flex items-center justify-center mx-auto mb-4 text-red-500 text-2xl">
                             ⚠️
