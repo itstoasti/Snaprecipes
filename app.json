@@ -2,7 +2,7 @@
   "expo": {
     "name": "SnapRecipes",
     "slug": "snaprecipe",
-    "version": "5.4.1",
+    "version": "5.4.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
         "userInterfaceStyle": "automatic",
@@ -25,10 +25,11 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.deanfieldz.yummy",
-      "versionCode": 18,
+      "versionCode": 19,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -39,6 +40,7 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
+      "expo-notifications",
       [
         "expo-camera",
         {

@@ -50,7 +50,7 @@ export default function GlassContainer({
                 {
                     backgroundColor: isDark
                         ? "rgba(26, 26, 38, 0.92)"
-                        : "rgba(255, 255, 255, 0.92)",
+                        : "rgba(247, 244, 235, 0.92)",
                     overflow: "hidden",
                     borderWidth: 0.5,
                     borderColor: isDark

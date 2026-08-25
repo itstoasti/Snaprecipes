@@ -262,7 +262,7 @@ export const RAW_FOODS: RawFood[] = [
         sugar: 0.2,
         fiber: 0,
         sodium: 71,
-        aliases: ["egg", "eggs", "whole egg", "raw egg"]
+        aliases: ["egg", "eggs", "whole egg", "raw egg", "whole eggs"]
     },
     {
         food_name: "Egg White",
@@ -274,10 +274,22 @@ export const RAW_FOODS: RawFood[] = [
         sugar: 0.2,
         fiber: 0,
         sodium: 55,
-        aliases: ["egg whites", "liquid egg white"]
+        aliases: ["egg whites", "liquid egg white", "egg white"]
     },
     {
-        food_name: "Egg (Boiled)",
+        food_name: "Scrambled Eggs",
+        serving_size: "2 large eggs (100g)",
+        calories: 148,
+        protein: 12.0,
+        fat: 10.0,
+        carbs: 1.5,
+        sugar: 1.0,
+        fiber: 0,
+        sodium: 160,
+        aliases: ["scrambled eggs", "2 scrambled eggs", "scrambled egg", "plain scrambled eggs", "egg scrambled"]
+    },
+    {
+        food_name: "Boiled Eggs",
         serving_size: "1 large (50g)",
         calories: 78,
         protein: 6.3,
@@ -286,10 +298,10 @@ export const RAW_FOODS: RawFood[] = [
         sugar: 0.6,
         fiber: 0,
         sodium: 62,
-        aliases: ["boiled egg", "boiled eggs", "hard boiled egg", "soft boiled egg"]
+        aliases: ["boiled egg", "boiled eggs", "hard boiled egg", "hard boiled eggs", "soft boiled egg", "egg boiled"]
     },
     {
-        food_name: "Egg (Fried)",
+        food_name: "Fried Egg",
         serving_size: "1 large (46g)",
         calories: 90,
         protein: 6.3,
@@ -298,7 +310,7 @@ export const RAW_FOODS: RawFood[] = [
         sugar: 0.4,
         fiber: 0,
         sodium: 95,
-        aliases: ["fried egg", "fried eggs", "sunny side up egg"]
+        aliases: ["fried egg", "fried eggs", "sunny side up egg", "egg fried"]
     },
     {
         food_name: "Chicken Breast (Raw)",
@@ -529,7 +541,7 @@ export const RAW_FOODS: RawFood[] = [
         aliases: ["skim milk", "fat free milk", "nonfat milk"]
     },
     {
-        food_name: "Yogurt (Greek Nonfat Plain)",
+        food_name: "Greek Yogurt (Plain Nonfat)",
         serving_size: "1 container (150g)",
         calories: 90,
         protein: 15.0,
@@ -538,7 +550,31 @@ export const RAW_FOODS: RawFood[] = [
         sugar: 5.0,
         fiber: 0,
         sodium: 55,
-        aliases: ["greek yogurt", "nonfat greek yogurt", "plain greek yogurt"]
+        aliases: ["greek yogurt", "nonfat greek yogurt", "plain greek yogurt", "0% greek yogurt", "chobani plain"]
+    },
+    {
+        food_name: "Greek Yogurt (Vanilla)",
+        serving_size: "1 container (150g)",
+        calories: 120,
+        protein: 12.0,
+        fat: 0,
+        carbs: 14.0,
+        sugar: 13.0,
+        fiber: 0,
+        sodium: 60,
+        aliases: ["vanilla greek yogurt", "greek yogurt vanilla"]
+    },
+    {
+        food_name: "Greek Yogurt (Whole Milk Plain)",
+        serving_size: "1 container (150g)",
+        calories: 140,
+        protein: 13.0,
+        fat: 6.0,
+        carbs: 6.0,
+        sugar: 6.0,
+        fiber: 0,
+        sodium: 50,
+        aliases: ["whole milk greek yogurt", "full fat greek yogurt"]
     },
     {
         food_name: "Cheese (Cheddar)",
@@ -973,30 +1009,364 @@ export const RAW_FOODS: RawFood[] = [
         aliases: ["espresso", "americano", "black coffee", "brewed coffee"]
     },
     {
-        food_name: "Green Tea",
-        serving_size: "1 cup (240ml)",
-        calories: 2,
-        protein: 0,
-        fat: 0,
+        food_name: "Apple (Honeycrisp)",
+        serving_size: "1 medium (182g)",
+        calories: 95,
+        protein: 0.5,
+        fat: 0.3,
+        carbs: 25,
+        sugar: 19,
+        fiber: 4.4,
+        sodium: 2,
+        aliases: ["honeycrisp apple", "honey crisp apple"]
+    },
+    {
+        food_name: "Apple (Granny Smith)",
+        serving_size: "1 medium (182g)",
+        calories: 97,
+        protein: 0.8,
+        fat: 0.3,
+        carbs: 24,
+        sugar: 17,
+        fiber: 5.0,
+        sodium: 2,
+        aliases: ["granny smith apple", "green apple"]
+    },
+    {
+        food_name: "Apple (Gala)",
+        serving_size: "1 medium (182g)",
+        calories: 95,
+        protein: 0.5,
+        fat: 0.3,
+        carbs: 25,
+        sugar: 19,
+        fiber: 4.0,
+        sodium: 2,
+        aliases: ["gala apple"]
+    },
+    {
+        food_name: "Apple (Fuji)",
+        serving_size: "1 medium (182g)",
+        calories: 100,
+        protein: 0.5,
+        fat: 0.3,
+        carbs: 26,
+        sugar: 20,
+        fiber: 4.0,
+        sodium: 2,
+        aliases: ["fuji apple"]
+    },
+    {
+        food_name: "Applesauce (Unsweetened)",
+        serving_size: "1/2 cup (122g)",
+        calories: 50,
+        protein: 0.2,
+        fat: 0.1,
+        carbs: 13.8,
+        sugar: 11.5,
+        fiber: 1.5,
+        sodium: 2,
+        aliases: ["unsweetened applesauce", "plain applesauce", "applesauce"]
+    },
+    {
+        food_name: "Applesauce (Sweetened)",
+        serving_size: "1/2 cup (128g)",
+        calories: 83,
+        protein: 0.2,
+        fat: 0.1,
+        carbs: 22.4,
+        sugar: 20.0,
+        fiber: 1.4,
+        sodium: 3,
+        aliases: ["sweetened applesauce"]
+    },
+    {
+        food_name: "Apple Juice (100%)",
+        serving_size: "1 cup (248ml)",
+        calories: 114,
+        protein: 0.2,
+        fat: 0.3,
+        carbs: 28,
+        sugar: 24,
+        fiber: 0.5,
+        sodium: 10,
+        aliases: ["apple juice", "100% apple juice", "pure apple juice"]
+    },
+    {
+        food_name: "Apple Cider",
+        serving_size: "1 cup (248ml)",
+        calories: 117,
+        protein: 0.1,
+        fat: 0.3,
+        carbs: 29,
+        sugar: 24,
+        fiber: 0.5,
+        sodium: 7,
+        aliases: ["cider", "apple cider", "fresh apple cider"]
+    },
+    {
+        food_name: "Apple Pie",
+        serving_size: "1 slice (125g)",
+        calories: 296,
+        protein: 2.4,
+        fat: 13.8,
+        carbs: 42.5,
+        sugar: 20.0,
+        fiber: 2.0,
+        sodium: 208,
+        aliases: ["slice of apple pie", "apple pie slice"]
+    },
+    {
+        food_name: "Saffron Rice (Cooked)",
+        serving_size: "1 cup (158g)",
+        calories: 210,
+        protein: 4.2,
+        fat: 2.5,
+        carbs: 43.0,
+        sugar: 0.2,
+        fiber: 0.8,
+        sodium: 210,
+        aliases: ["saffron rice", "cooked saffron rice", "yellow saffron rice", "yellow rice"]
+    },
+    {
+        food_name: "Jasmine Rice (Cooked)",
+        serving_size: "1 cup (158g)",
+        calories: 205,
+        protein: 4.2,
+        fat: 0.4,
+        carbs: 44.5,
+        sugar: 0.1,
+        fiber: 0.6,
+        sodium: 0,
+        aliases: ["jasmine rice", "cooked jasmine rice", "thai jasmine rice"]
+    },
+    {
+        food_name: "Basmati Rice (Cooked)",
+        serving_size: "1 cup (158g)",
+        calories: 205,
+        protein: 4.3,
+        fat: 0.5,
+        carbs: 44.0,
+        sugar: 0.1,
+        fiber: 0.7,
+        sodium: 0,
+        aliases: ["basmati rice", "cooked basmati rice"]
+    },
+    {
+        food_name: "Wild Rice (Cooked)",
+        serving_size: "1 cup (164g)",
+        calories: 166,
+        protein: 6.5,
+        fat: 0.6,
+        carbs: 35.0,
+        sugar: 1.2,
+        fiber: 3.0,
+        sodium: 5,
+        aliases: ["wild rice", "cooked wild rice"]
+    },
+    {
+        food_name: "Quinoa (Cooked)",
+        serving_size: "1 cup (185g)",
+        calories: 222,
+        protein: 8.1,
+        fat: 3.6,
+        carbs: 39.4,
+        sugar: 1.6,
+        fiber: 5.2,
+        sodium: 13,
+        aliases: ["quinoa", "cooked quinoa"]
+    },
+    {
+        food_name: "Egg (Scrambled, 2 large)",
+        serving_size: "2 large eggs (100g)",
+        calories: 148,
+        protein: 12.0,
+        fat: 10.0,
+        carbs: 1.5,
+        sugar: 1.0,
+        fiber: 0,
+        sodium: 160,
+        aliases: ["scrambled eggs", "2 scrambled eggs", "scrambled egg", "plain scrambled eggs"]
+    },
+    {
+        food_name: "Egg (Poached)",
+        serving_size: "1 large (50g)",
+        calories: 72,
+        protein: 6.3,
+        fat: 4.7,
+        carbs: 0.4,
+        sugar: 0.2,
+        fiber: 0,
+        sodium: 71,
+        aliases: ["poached egg", "poached eggs"]
+    },
+    {
+        food_name: "Peanut Butter (Creamy)",
+        serving_size: "2 tbsp (32g)",
+        calories: 188,
+        protein: 8.0,
+        fat: 16.0,
+        carbs: 7.0,
+        sugar: 3.0,
+        fiber: 2.0,
+        sodium: 140,
+        aliases: ["peanut butter", "creamy peanut butter", "smooth peanut butter", "pb"]
+    },
+    {
+        food_name: "Peanut Butter (Crunchy)",
+        serving_size: "2 tbsp (32g)",
+        calories: 188,
+        protein: 8.0,
+        fat: 16.0,
+        carbs: 7.0,
+        sugar: 3.0,
+        fiber: 2.0,
+        sodium: 140,
+        aliases: ["crunchy peanut butter", "chunky peanut butter"]
+    },
+    {
+        food_name: "Almond Butter",
+        serving_size: "2 tbsp (32g)",
+        calories: 196,
+        protein: 6.7,
+        fat: 17.8,
+        carbs: 6.0,
+        sugar: 1.7,
+        fiber: 3.3,
+        sodium: 0,
+        aliases: ["almond butter", "plain almond butter"]
+    },
+    {
+        food_name: "Ground Turkey (93% Lean, Raw)",
+        serving_size: "100g",
+        calories: 150,
+        protein: 19.5,
+        fat: 8.0,
         carbs: 0,
         sugar: 0,
         fiber: 0,
-        sodium: 0,
-        aliases: ["matcha tea", "brewed green tea"]
+        sodium: 75,
+        aliases: ["ground turkey", "raw ground turkey", "lean ground turkey"]
+    },
+    {
+        food_name: "Ground Turkey (93% Lean, Cooked)",
+        serving_size: "100g",
+        calories: 195,
+        protein: 27.0,
+        fat: 9.5,
+        carbs: 0,
+        sugar: 0,
+        fiber: 0,
+        sodium: 85,
+        aliases: ["cooked ground turkey", "ground turkey cooked"]
+    },
+    {
+        food_name: "Tilapia (Cooked)",
+        serving_size: "100g",
+        calories: 128,
+        protein: 26.0,
+        fat: 2.7,
+        carbs: 0,
+        sugar: 0,
+        fiber: 0,
+        sodium: 56,
+        aliases: ["tilapia", "cooked tilapia", "tilapia fillet"]
+    },
+    {
+        food_name: "Oatmeal (Cooked with Water)",
+        serving_size: "1 cup (234g)",
+        calories: 158,
+        protein: 5.5,
+        fat: 3.2,
+        carbs: 27.4,
+        sugar: 1.1,
+        fiber: 4.0,
+        sodium: 115,
+        aliases: ["cooked oatmeal", "oatmeal", "porridge", "hot oatmeal"]
+    },
+    {
+        food_name: "White Bread",
+        serving_size: "1 slice (25g)",
+        calories: 67,
+        protein: 2.0,
+        fat: 0.8,
+        carbs: 12.7,
+        sugar: 1.2,
+        fiber: 0.6,
+        sodium: 130,
+        aliases: ["white bread", "slice of white bread", "plain white bread"]
     }
 ];
+
+function wordMatches(targetText: string, token: string): boolean {
+    if (targetText.includes(token)) return true;
+    
+    // Plural to singular normalization
+    if (token.endsWith("ies") && token.length > 4) {
+        const singular = token.slice(0, -3) + "y";
+        if (targetText.includes(singular)) return true;
+    }
+    if (token.endsWith("es") && token.length > 3) {
+        const singular = token.slice(0, -2);
+        if (targetText.includes(singular)) return true;
+    }
+    if (token.endsWith("s") && token.length > 2) {
+        const singular = token.slice(0, -1);
+        if (targetText.includes(singular)) return true;
+    }
+
+    // Singular to plural normalization
+    const plural = token + "s";
+    if (targetText.includes(plural)) return true;
+
+    return false;
+}
 
 export function searchRawFoods(query: string): RawFood[] {
     const qLower = query.toLowerCase().trim();
     if (!qLower) return [];
 
-    // Filter by name match or alias match
-    return RAW_FOODS.filter(food => {
+    // Significant tokens (ignoring whitespace and 1-char noise)
+    const tokens = qLower.split(/\s+/).filter(t => t.length > 0);
+    if (tokens.length === 0) return [];
+
+    const scored: { food: RawFood; score: number }[] = [];
+
+    for (const food of RAW_FOODS) {
         const nameLower = food.food_name.toLowerCase();
-        if (nameLower.includes(qLower)) return true;
-        if (food.aliases && food.aliases.some(alias => alias.toLowerCase().includes(qLower))) {
-            return true;
+        const aliasesLower = (food.aliases || []).map(a => a.toLowerCase());
+        const fullSearchable = `${nameLower} ${aliasesLower.join(" ")}`;
+
+        // Hard gate with word/stem matching: every query token must match in name or aliases
+        const allTokensPresent = tokens.every(token => wordMatches(fullSearchable, token));
+        if (!allTokensPresent) continue;
+
+        // Clean name (strip parentheticals for matching)
+        const cleanName = nameLower.replace(/\s*\([^)]*\)/g, "").trim();
+
+        let score = 50; // Base score for matching all tokens
+
+        // Tier 0: Exact match to name or alias
+        if (nameLower === qLower || cleanName === qLower || aliasesLower.includes(qLower)) {
+            score = 100;
+        } else if (nameLower.startsWith(qLower) || cleanName.startsWith(qLower)) {
+            // Tier 1: Starts with query
+            score = 90;
+        } else if (nameLower.includes(qLower)) {
+            // Tier 2: Name contains full query substring
+            score = 80;
+        } else if (aliasesLower.some(a => a.startsWith(qLower))) {
+            score = 75;
+        } else if (aliasesLower.some(a => a.includes(qLower))) {
+            score = 70;
         }
-        return false;
-    });
+
+        // Slight penalty for very long names
+        score -= Math.min(5, food.food_name.length * 0.05);
+
+        scored.push({ food, score });
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map(s => s.food);
 }

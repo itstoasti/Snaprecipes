@@ -416,7 +416,6 @@ export function useRecipes() {
             const { data, error } = await supabase
                 .from("public_recipes")
                 .select("*")
-                .not("calories", "is", null)
                 .order("created_at", { ascending: false })
                 .limit(20);
             if (error) throw error;
@@ -461,7 +460,6 @@ export function useRecipes() {
         const { data, error } = await supabase
             .from("public_recipes")
             .select("*")
-            .not("calories", "is", null)
             .or(orFilter)
             .limit(100);
 

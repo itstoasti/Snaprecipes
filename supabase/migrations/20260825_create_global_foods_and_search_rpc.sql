@@ -1,219 +1,7 @@
--- SnapRecipes Cloud Database Schema (Supabase Postgres)
--- Run this entire script in the Supabase SQL Editor to create tables and RLS policies
-
--- Enable UUID extension just in case (already enabled by default on Supabase)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- ==========================================
--- 1. Tables Creation
--- ==========================================
-
-CREATE TABLE recipes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_id UUID REFERENCES auth.users NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT,
-  image_url TEXT,
-  source_url TEXT,
-  source_type TEXT NOT NULL DEFAULT 'manual',
-  servings INTEGER NOT NULL DEFAULT 4,
-  prep_time TEXT,
-  cook_time TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE TABLE ingredients (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_id UUID REFERENCES auth.users NOT NULL,
-  recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE NOT NULL,
-  text TEXT NOT NULL,
-  quantity TEXT,
-  unit TEXT,
-  name TEXT NOT NULL,
-  order_index INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE TABLE steps (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_id UUID REFERENCES auth.users NOT NULL,
-  recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE NOT NULL,
-  text TEXT NOT NULL,
-  step_number INTEGER NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE TABLE collections (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_id UUID REFERENCES auth.users NOT NULL,
-  name TEXT NOT NULL,
-  color TEXT NOT NULL DEFAULT '#FF6B35',
-  icon_name TEXT NOT NULL DEFAULT 'folder',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE TABLE recipe_collections (
-  owner_id UUID REFERENCES auth.users NOT NULL,
-  recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE NOT NULL,
-  collection_id UUID REFERENCES collections(id) ON DELETE CASCADE NOT NULL,
-  PRIMARY KEY (recipe_id, collection_id)
-);
-
-CREATE TABLE tags (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_id UUID REFERENCES auth.users NOT NULL,
-  name TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE TABLE recipe_tags (
-  owner_id UUID REFERENCES auth.users NOT NULL,
-  recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE NOT NULL,
-  tag_id UUID REFERENCES tags(id) ON DELETE CASCADE NOT NULL,
-  PRIMARY KEY (recipe_id, tag_id)
-);
-
--- ==========================================
--- 2. Row Level Security (RLS) Policies
--- ==========================================
-
--- Enable RLS on all tables
-ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ingredients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE steps ENABLE ROW LEVEL SECURITY;
-ALTER TABLE collections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE recipe_collections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE recipe_tags ENABLE ROW LEVEL SECURITY;
-
--- Recipes Policies
-CREATE POLICY "Users can fully manage their own recipes"
-ON recipes FOR ALL
-TO authenticated
-USING (auth.uid() = owner_id)
-WITH CHECK (auth.uid() = owner_id);
-
--- Ingredients Policies
-CREATE POLICY "Users can fully manage their own ingredients"
-ON ingredients FOR ALL
-TO authenticated
-USING (auth.uid() = owner_id)
-WITH CHECK (auth.uid() = owner_id);
-
--- Steps Policies
-CREATE POLICY "Users can fully manage their own steps"
-ON steps FOR ALL
-TO authenticated
-USING (auth.uid() = owner_id)
-WITH CHECK (auth.uid() = owner_id);
-
--- Collections Policies
-CREATE POLICY "Users can fully manage their own collections"
-ON collections FOR ALL
-TO authenticated
-USING (auth.uid() = owner_id)
-WITH CHECK (auth.uid() = owner_id);
-
--- Recipe Collections Junction Policies
-CREATE POLICY "Users can fully manage their own recipe_collections"
-ON recipe_collections FOR ALL
-TO authenticated
-USING (auth.uid() = owner_id)
-WITH CHECK (auth.uid() = owner_id);
-
--- Tags Policies
-CREATE POLICY "Users can fully manage their own tags"
-ON tags FOR ALL
-TO authenticated
-USING (auth.uid() = owner_id)
-WITH CHECK (auth.uid() = owner_id);
-
--- Recipe Tags Junction Policies
-CREATE POLICY "Users can fully manage their own recipe_tags"
-ON recipe_tags FOR ALL
-TO authenticated
-USING (auth.uid() = owner_id)
-WITH CHECK (auth.uid() = owner_id);
-
--- ==========================================
--- 3. Automatic updated_at trigger for recipes
--- ==========================================
-
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-CREATE TRIGGER update_recipes_updated_at
-    BEFORE UPDATE ON recipes
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- ==========================================
--- 4. Community Recipe Library (public_recipes)
--- ==========================================
--- Anonymized, shared recipe data contributed by free-tier users.
--- No owner_id — fully decoupled from user accounts.
-
-CREATE TABLE public_recipes (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    slug TEXT UNIQUE,
-    title TEXT NOT NULL,
-    description TEXT,
-    image_url TEXT,
-    servings INT,
-    prep_time TEXT,
-    cook_time TEXT,
-    ingredients JSONB NOT NULL DEFAULT '[]',
-    steps JSONB NOT NULL DEFAULT '[]',
-    tags TEXT[] DEFAULT '{}',
-    source_url TEXT,
-    source_domain TEXT,
-    quality_score FLOAT DEFAULT 0,
-    save_count INT DEFAULT 1,
-    content_hash TEXT UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE INDEX idx_public_recipes_tags ON public_recipes USING GIN (tags);
-CREATE INDEX idx_public_recipes_domain ON public_recipes (source_domain);
-CREATE INDEX idx_public_recipes_score ON public_recipes (quality_score DESC);
-CREATE INDEX idx_public_recipes_hash ON public_recipes (content_hash);
-CREATE INDEX idx_public_recipes_slug ON public_recipes (slug);
-
-ALTER TABLE public_recipes ENABLE ROW LEVEL SECURITY;
-
--- Anyone can read community recipes (for future Discover tab)
-CREATE POLICY "Anyone can read public recipes"
-ON public_recipes FOR SELECT
-TO anon, authenticated
-USING (true);
-
--- Only the service role (Edge Functions / server) can insert/update
-CREATE POLICY "Service role can manage public recipes"
-ON public_recipes FOR ALL
-TO service_role
-USING (true)
-WITH CHECK (true);
-
--- RPC to increment save_count when a duplicate recipe is extracted
-CREATE OR REPLACE FUNCTION increment_save_count(hash TEXT)
-RETURNS void AS $$
-BEGIN
-    UPDATE public_recipes SET save_count = save_count + 1 WHERE content_hash = hash;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ==========================================
--- 5. Global Foods Community Database & Trigram Search
--- ==========================================
-
+-- Enable pg_trgm extension for fast trigram and typo-tolerant search
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+-- Create global_foods community database table
 CREATE TABLE IF NOT EXISTS global_foods (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     food_name TEXT NOT NULL,
@@ -235,14 +23,17 @@ CREATE TABLE IF NOT EXISTS global_foods (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Trigram GIN indexes for fast fuzzy searching
 CREATE INDEX IF NOT EXISTS idx_global_foods_name_trgm ON global_foods USING gin (food_name_lower gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_global_foods_brand_trgm ON global_foods USING gin (brand_lower gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_global_foods_combined_trgm ON global_foods USING gin ((food_name_lower || ' ' || coalesce(brand_lower, '')) gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_global_foods_barcode ON global_foods (barcode);
 CREATE INDEX IF NOT EXISTS idx_global_foods_lookup_count ON global_foods (lookup_count DESC);
 
+-- Enable RLS
 ALTER TABLE global_foods ENABLE ROW LEVEL SECURITY;
 
+-- Read policy: Anyone can read global_foods
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -255,6 +46,7 @@ BEGIN
     END IF;
 END $$;
 
+-- Service role policy: Service role has full access
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -268,6 +60,7 @@ BEGIN
     END IF;
 END $$;
 
+-- RPC: Fast Trigram & Word-Similarity Ranked Search for Global Foods
 CREATE OR REPLACE FUNCTION search_global_foods(query_text text, max_results int DEFAULT 15)
 RETURNS TABLE (
     id UUID,
@@ -306,6 +99,7 @@ BEGIN
         gf.source,
         gf.lookup_count,
         (
+            -- Exact match boost
             CASE 
                 WHEN gf.food_name_lower = clean_q THEN 2.0
                 WHEN gf.food_name_lower LIKE (clean_q || '%') THEN 1.5
@@ -313,12 +107,14 @@ BEGIN
                 ELSE 0.5
             END
             * 
+            -- Trigram similarity
             greatest(
                 similarity(gf.food_name_lower, clean_q),
                 similarity(gf.food_name_lower || ' ' || coalesce(gf.brand_lower, ''), clean_q),
                 word_similarity(clean_q, gf.food_name_lower || ' ' || coalesce(gf.brand_lower, ''))
             )
             *
+            -- Popularity multiplier
             (1.0 + (ln(greatest(gf.lookup_count, 1) + 1.0) * 0.1))
         )::REAL AS rank_score
     FROM global_foods gf
@@ -332,6 +128,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- RPC: Upsert food from barcode/scan/AI into global_foods
 CREATE OR REPLACE FUNCTION upsert_global_food(
     p_food_name text,
     p_brand text DEFAULT NULL,
@@ -356,6 +153,7 @@ BEGIN
         RETURN NULL;
     END IF;
 
+    -- Look for existing record by food_name_lower + brand_lower OR by barcode
     SELECT id INTO v_id FROM global_foods 
     WHERE (barcode IS NOT NULL AND p_barcode IS NOT NULL AND barcode = trim(p_barcode))
        OR (food_name_lower = v_food_name_lower AND coalesce(brand_lower, '') = v_brand_lower)
@@ -422,6 +220,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- RPC: Increment lookup count for a global food item
 CREATE OR REPLACE FUNCTION increment_food_lookup_count(food_id UUID)
 RETURNS void AS $$
 BEGIN

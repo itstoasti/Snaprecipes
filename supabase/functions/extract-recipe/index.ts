@@ -5,6 +5,33 @@ import { jsonrepair } from "https://esm.sh/jsonrepair";
 const DEFAULT_GEMINI_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const DEFAULT_OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
+function normalizeExtractionUrl(value: string): string {
+    let url = value.trim();
+    try {
+        const parsed = new URL(url);
+        parsed.hash = "";
+        parsed.search = "";
+        url = parsed.toString();
+    } catch {
+        // keep raw value
+    }
+    return url.replace(/\/+$/, "").toLowerCase();
+}
+
+function urlCacheHash(value: string): string {
+    const normalized = normalizeExtractionUrl(value);
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < normalized.length; i++) {
+        hash ^= normalized.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    // Cache schema version — bump when extraction logic changes so stale
+    // rows written by older builds are bypassed instead of served back.
+    return `${CACHE_SCHEMA_VERSION}-${hash.toString(16)}`;
+}
+
+const CACHE_SCHEMA_VERSION = 2;
+
 const RECIPE_PROMPT = `You are a world-class recipe extraction expert. Critically analyze the provided content and meticulously extract every piece of recipe information.
 Return exactly ONE valid JSON object matching this schema structure. Do not omit any keys.
 {
@@ -1124,6 +1151,110 @@ Deno.serve(async (req: Request) => {
             });
         }
 
+        // ── ACTION: CACHE SAVE (fast-path assist) ──────────────────
+        // The client's deterministic JSON-LD fast path extracts on-device
+        // (never calls this function), so it pushes its results here to be
+        // persisted server-side for sub-second re-imports of the same URL.
+        if (body.mode === "cache-save" && body.url && body.payload) {
+            try {
+                const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+                const serviceClient = createClient(
+                    Deno.env.get("SUPABASE_URL")!,
+                    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+                );
+
+                const normalizedUrl = normalizeExtractionUrl(body.url);
+                const urlHash = urlCacheHash(body.url);
+
+                await serviceClient
+                    .from("extraction_cache")
+                    .upsert({
+                        url_hash: urlHash,
+                        normalized_url: normalizedUrl,
+                        payload: Array.isArray(body.payload) ? body.payload : [body.payload],
+                        updated_at: new Date().toISOString(),
+                    }, { onConflict: "url_hash" });
+
+                return new Response(JSON.stringify({ ok: true }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            } catch (e) {
+                console.error("[Cache] Save failed:", e);
+                return new Response(JSON.stringify({ ok: false }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+        }
+
+        // ── ACTION: INGREDIENT SECTIONS (fast-path assist) ─────────
+        // Small, scoped call used by the client's deterministic JSON-LD
+        // fast path. It only assigns section labels to an existing
+        // ingredient list — tiny input, tiny output, very fast.
+        if (body.mode === "ingredient-sections") {
+            const sectionIngredients = Array.isArray(body.ingredients) ? body.ingredients : [];
+            const sectionWindow = typeof body.contentForAI === "string" ? body.contentForAI.substring(0, 4000) : "";
+
+            if (sectionIngredients.length === 0 || !DEFAULT_GEMINI_KEY) {
+                return new Response(JSON.stringify({ sections: null }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+
+            try {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${DEFAULT_GEMINI_KEY}`;
+                const sectionPrompt = `You are given a numbered ingredient list and the ingredients section of a recipe webpage.
+Assign each ingredient to the section sub-heading it belongs to.
+Rules:
+- Respond with a JSON object: {"sections": [...]} containing exactly ${sectionIngredients.length} entries, one per ingredient in order.
+- Each entry is either the cleaned section heading name (string) or null if the ingredient is not under any sub-heading.
+- Clean heading names: remove "#", colons, and the "For the" prefix (e.g. "#### Sauce:" becomes "Sauce").
+- Ingredients listed before any sub-heading get null.
+
+Ingredient list:
+${sectionIngredients.map((i: any, idx: number) => `${idx + 1}. ${i.text}`).join("\n")}
+
+Webpage ingredients section:
+${sectionWindow}`;
+
+                const sectionResp = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        generationConfig: {
+                            temperature: 0,
+                            maxOutputTokens: 2048,
+                            responseMimeType: "application/json",
+                        },
+                        contents: [{ parts: [{ text: sectionPrompt }] }],
+                    }),
+                });
+
+                let sections: any = null;
+                if (sectionResp.ok) {
+                    const sectionData = await sectionResp.json();
+                    const rawText = sectionData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    try {
+                        const parsed = JSON.parse(jsonrepair(rawText.trim()));
+                        if (Array.isArray(parsed.sections)) sections = parsed.sections;
+                    } catch {
+                        console.error("[Sections] Failed to parse sections response");
+                    }
+                } else {
+                    const errText = await sectionResp.text();
+                    console.error(`[Sections] Gemini error ${sectionResp.status}: ${errText}`);
+                }
+
+                return new Response(JSON.stringify({ sections }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            } catch (e) {
+                console.error("[Sections] Pipeline error:", e);
+                return new Response(JSON.stringify({ sections: null }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+        }
+
         const { 
             url, 
             contentForAI: clientContent, 
@@ -1825,7 +1956,33 @@ Deno.serve(async (req: Request) => {
                 console.log(`[Community] Pipeline error (non-blocking):`, e);
             }
         }
-        // ── END COMMUNITY PIPELINE ─────────────────────────────────
+        // ── EXTRACTION CACHE ──────────────────────────────────────
+        // Persist the AI-path result server-side so repeat imports of the
+        // same URL are sub-second. Fire-and-forget — never blocks the user.
+        if (url && parsedData?.title) {
+            try {
+                const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+                const cacheClient = createClient(
+                    Deno.env.get("SUPABASE_URL")!,
+                    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+                );
+                await cacheClient
+                    .from("extraction_cache")
+                    .upsert({
+                        url_hash: urlCacheHash(url),
+                        normalized_url: normalizeExtractionUrl(url),
+                        payload: parsedData.slideshow && Array.isArray(parsedData.recipes)
+                            ? parsedData.recipes
+                            : [parsedData],
+                        updated_at: new Date().toISOString(),
+                    }, { onConflict: "url_hash" })
+                    .then(() => console.log(`[Cache] Saved extraction for ${url}`))
+                    .catch((err: any) => console.error("[Cache] Save failed (non-blocking):", err));
+            } catch (e) {
+                console.log("[Cache] Save skipped (non-blocking):", e);
+            }
+        }
+        // ── END EXTRACTION CACHE ──────────────────────────────────
 
         return parsedData;
         };

@@ -1,28 +1,89 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet, Modal } from "react-native";
+import { View, Text, Pressable, StyleSheet, Modal, Linking, AppState } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, { FadeIn, SlideInDown, ZoomIn } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import * as Notifications from "@/lib/notifications";
+import Constants from "expo-constants";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
 import { useOnboarding } from "@/components/onboarding/onboardingContext";
 
 export default function NotificationsScreen() {
     const router = useRouter();
     const { setNotificationAllowed } = useOnboarding();
-    const [simulatedChoice, setSimulatedChoice] = useState<boolean>(true);
-    const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
+    const [requesting, setRequesting] = useState<boolean>(false);
+    const [showPreAsk, setShowPreAsk] = useState<boolean>(false);
+    const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
-    const handleCardChoice = () => {
-        handleHelpStayOnTrack();
+    const handlePreAsk = () => {
+        if (requesting) return;
+        setShowPreAsk(true);
     };
 
-    const handleHelpStayOnTrack = () => {
-        setShowCustomModal(true);
+    // Fires the real OS permission prompt (Android 13+ POST_NOTIFICATIONS /
+    // iOS UNUserNotificationCenter). The system dialog owns the decision —
+    // whatever the OS returns is stored, so Android app-settings reflect it.
+    const handleAllow = async () => {
+        if (requesting) return;
+        setRequesting(true);
+        setShowPreAsk(false);
+
+        if (Constants.appOwnership === "expo" || !Notifications.isNotificationsAvailable) {
+            // Expo Go / clients without the native notifications module can't
+            // run the OS prompt, so just remember the user's intent.
+            setNotificationAllowed(true);
+            router.push("/onboarding/attribution");
+            return;
+        }
+
+        try {
+            const { status } = await Notifications.requestPermissionsAsync();
+            const granted = status === "granted";
+            setNotificationAllowed(granted);
+
+            if (!granted) {
+                // Denied — the OS dialog won't fire again on its own, so
+                // surface the branded modal with the settings deep-link.
+                setShowSettingsModal(true);
+                return;
+            }
+        } catch (e) {
+            console.warn("Notification permission request failed:", e);
+            setNotificationAllowed(false);
+            setShowSettingsModal(true);
+            return;
+        }
+
+        router.push("/onboarding/attribution");
     };
 
-    const handleModalPermission = (allowed: boolean) => {
-        setShowCustomModal(false);
-        setNotificationAllowed(allowed);
+    const handleDeny = () => {
+        if (requesting) return;
+        setShowPreAsk(false);
+        setNotificationAllowed(false);
+        router.push("/onboarding/attribution");
+    };
+
+    // Deep-links to the system settings page, then re-checks the OS permission
+    // once the user comes back so the stored flag matches reality.
+    const handleOpenSettings = () => {
+        const subscription = AppState.addEventListener("change", (next) => {
+            if (next !== "active") return;
+            subscription.remove();
+            (async () => {
+                const { status } = await Notifications.getPermissionsAsync();
+                setNotificationAllowed(status === "granted");
+                setShowSettingsModal(false);
+                setRequesting(false);
+                router.push("/onboarding/attribution");
+            })();
+        });
+        Linking.openSettings();
+    };
+
+    const handleSkipSettings = () => {
+        setShowSettingsModal(false);
+        setRequesting(false);
         router.push("/onboarding/attribution");
     };
 
@@ -56,8 +117,9 @@ export default function NotificationsScreen() {
 
                     <View className="w-full space-y-3 pt-2">
                         <Pressable
-                            onPress={handleHelpStayOnTrack}
-                            style={[styles.optionBtn, styles.optionActive]}
+                            onPress={handlePreAsk}
+                            disabled={requesting}
+                            style={[styles.optionBtn, styles.optionActive, requesting && { opacity: 0.6 }]}
                         >
                             <Text style={[styles.optionText, styles.optionTextActive]}>
                                 Allow
@@ -65,7 +127,8 @@ export default function NotificationsScreen() {
                         </Pressable>
 
                         <Pressable
-                            onPress={handleHelpStayOnTrack}
+                            onPress={handleDeny}
+                            disabled={requesting}
                             style={[styles.optionBtn, styles.optionInactive]}
                         >
                             <Text style={[styles.optionText, styles.optionTextInactive]}>
@@ -82,24 +145,23 @@ export default function NotificationsScreen() {
                     </Text>
 
                     <Pressable
-                        onPress={handleHelpStayOnTrack}
-                        style={styles.button}
+                        onPress={handlePreAsk}
+                        disabled={requesting}
+                        style={[styles.button, requesting && { opacity: 0.6 }]}
                     >
                         <Text style={styles.buttonText}>Help me stay on track</Text>
                     </Pressable>
                 </Animated.View>
             </View>
 
-            {/* Custom Styled Permission Modal matching SnapRecipes branding */}
             <Modal
                 transparent
-                visible={showCustomModal}
+                visible={showPreAsk}
                 animationType="fade"
-                onRequestClose={() => setShowCustomModal(false)}
+                onRequestClose={() => setShowPreAsk(false)}
             >
                 <View style={styles.modalOverlay}>
                     <Animated.View entering={ZoomIn.duration(300)} style={styles.modalCard}>
-                        {/* Icon Badge */}
                         <View style={styles.modalIconBadge}>
                             <Ionicons name="notifications" size={32} color="#FF6B35" />
                         </View>
@@ -112,20 +174,46 @@ export default function NotificationsScreen() {
                             Notifications may include recipe reminders, meal ideas, and personalized cooking alerts.
                         </Text>
 
-                        {/* Action Buttons */}
                         <View style={styles.modalActions}>
-                            <Pressable
-                                onPress={() => handleModalPermission(true)}
-                                style={styles.modalPrimaryBtn}
-                            >
+                            <Pressable onPress={handleAllow} disabled={requesting} style={[styles.modalPrimaryBtn, requesting && { opacity: 0.6 }]}>
                                 <Text style={styles.modalPrimaryText}>Allow</Text>
                             </Pressable>
 
-                            <Pressable
-                                onPress={() => handleModalPermission(false)}
-                                style={styles.modalSecondaryBtn}
-                            >
+                            <Pressable onPress={handleDeny} disabled={requesting} style={styles.modalSecondaryBtn}>
                                 <Text style={styles.modalSecondaryText}>Don't Allow</Text>
+                            </Pressable>
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
+
+            <Modal
+                transparent
+                visible={showSettingsModal}
+                animationType="fade"
+                onRequestClose={handleSkipSettings}
+            >
+                <View style={styles.modalOverlay}>
+                    <Animated.View entering={ZoomIn.duration(300)} style={styles.modalCard}>
+                        <View style={styles.modalIconBadge}>
+                            <Ionicons name="notifications-off" size={32} color="#FF6B35" />
+                        </View>
+
+                        <Text style={styles.modalTitle}>
+                            Notifications are turned off
+                        </Text>
+
+                        <Text style={styles.modalBody}>
+                            Notifications are currently off for SnapRecipes. Turn them on in your phone settings to get recipe ideas at the right time.
+                        </Text>
+
+                        <View style={styles.modalActions}>
+                            <Pressable onPress={handleOpenSettings} style={styles.modalPrimaryBtn}>
+                                <Text style={styles.modalPrimaryText}>Open Settings</Text>
+                            </Pressable>
+
+                            <Pressable onPress={handleSkipSettings} style={styles.modalSecondaryBtn}>
+                                <Text style={styles.modalSecondaryText}>Not now</Text>
                             </Pressable>
                         </View>
                     </Animated.View>

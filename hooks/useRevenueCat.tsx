@@ -14,6 +14,7 @@ interface RevenueCatContextState {
     customerInfo: CustomerInfo | null;
     currentOffering: PurchasesOffering | null;
     isReady: boolean;
+    entitlementsReady: boolean;
 }
 
 const RevenueCatContext = createContext<RevenueCatContextState>({
@@ -22,6 +23,7 @@ const RevenueCatContext = createContext<RevenueCatContextState>({
     customerInfo: null,
     currentOffering: null,
     isReady: false,
+    entitlementsReady: false,
 });
 
 export const useRevenueCat = () => useContext(RevenueCatContext);
@@ -32,7 +34,8 @@ let isConfigured = false;
 export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
     const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
-    const [rcReady, setRcReady] = useState(false);
+    const [rcEntitlementsResolved, setRcEntitlementsResolved] = useState(false);
+    const [rcOfferingsResolved, setRcOfferingsResolved] = useState(false);
     const [sessionResolved, setSessionResolved] = useState(false);
     const [session, setSession] = useState<any>(null);
 
@@ -56,7 +59,8 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 console.log("Expo Go app detected. RevenueCat native features unavailable.");
                 // We do NOT provide mock offerings here to preserve production integrity.
                 // The paywall will correctly show its "Loading..." state.
-                setRcReady(true);
+                setRcEntitlementsResolved(true);
+                setRcOfferingsResolved(true);
                 return;
             }
 
@@ -88,15 +92,23 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 // Fetch initial data
                 const info = await Purchases.getCustomerInfo();
                 setCustomerInfo(info);
+            } catch (e) {
+                console.warn("Failed to initialize RevenueCat", e);
+            } finally {
+                // Entitlements (Pro status) are usable as soon as customer info
+                // resolves — don't block them on the slower offerings fetch.
+                setRcEntitlementsResolved(true);
+            }
 
+            try {
                 const offerings = await Purchases.getOfferings();
                 if (offerings.current !== null) {
                     setCurrentOffering(offerings.current);
                 }
             } catch (e) {
-                console.warn("Failed to initialize RevenueCat", e);
+                console.warn("Failed to load RevenueCat offerings", e);
             } finally {
-                setRcReady(true);
+                setRcOfferingsResolved(true);
             }
         };
 
@@ -147,9 +159,11 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
     }, []);
 
-    // Only report ready once BOTH RevenueCat init and the Supabase session
-    // lookup have settled, so consumers never see a stale "free" state.
-    const isReady = rcReady && sessionResolved;
+    // Only report entitlements ready once BOTH RevenueCat customer info and the
+    // Supabase session lookup have settled, so consumers never see a stale
+    // "free" state. Full readiness additionally waits for offerings (paywall).
+    const entitlementsReady = rcEntitlementsResolved && sessionResolved;
+    const isReady = entitlementsReady && rcOfferingsResolved;
 
     // Derived Pro Status
     // CRITICAL: We ONLY trust RevenueCat entitlements when the SDK has been
@@ -166,13 +180,15 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const isIdentified = !!session?.user?.id;
     const isActuallyPro = isIdentified && hasActiveEntitlements;
 
-    // Gate on isReady: default to NOT Pro until RevenueCat has fully loaded and confirmed.
-    const isPro = isReady
+    // Gate on entitlementsReady: default to NOT Pro until RevenueCat customer
+    // info has fully loaded and confirmed. Pro status must not wait on the
+    // slower offerings fetch, or shared-link extraction stalls on cold start.
+    const isPro = entitlementsReady
         ? (Constants.appOwnership === 'expo' ? isIdentified : isActuallyPro)
         : false;
 
     // Log what RevenueCat is reporting (console.warn visible in logcat for production debugging)
-    if (isReady) {
+    if (entitlementsReady) {
         console.warn('[RevenueCat] customerInfo exists:', !!customerInfo);
         console.warn('[RevenueCat] active entitlements:', JSON.stringify(activeKeys));
         console.warn('[RevenueCat] isIdentified (Supabase):', isIdentified);
@@ -182,7 +198,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Sign out of Supabase when Pro lapses; trigger initial sync when user becomes Pro
     const wasProRef = useRef<boolean | null>(null);
     useEffect(() => {
-        if (!isReady) return;
+        if (!entitlementsReady) return;
 
         // Only trigger wipe logic on native devices where we have real subscriber info
         const isNative = Constants.appOwnership !== 'expo';
@@ -199,10 +215,10 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             initialSync().catch(console.error);
         }
         wasProRef.current = isPro;
-    }, [isPro, isReady]);
+    }, [isPro, entitlementsReady]);
 
     return (
-        <RevenueCatContext.Provider value={{ isPro, hasActiveEntitlements, customerInfo, currentOffering, isReady }}>
+        <RevenueCatContext.Provider value={{ isPro, hasActiveEntitlements, customerInfo, currentOffering, isReady, entitlementsReady }}>
             {children}
         </RevenueCatContext.Provider>
     );

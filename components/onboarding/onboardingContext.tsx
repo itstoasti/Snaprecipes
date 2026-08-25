@@ -1,4 +1,8 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+
+export const REMINDER_ENABLED_KEY = "snap_recipe_reminder_enabled";
+export const TRIAL_PLAN_KEY = "snap_recipe_trial_plan";
 
 export interface OnboardingState {
     goals: string[];
@@ -48,6 +52,28 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(undef
 export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [state, setState] = useState<OnboardingState>(defaultState);
 
+    // Hydrate persisted trial/reminder preferences so the reminder controller
+    // has them on cold start, even after onboarding has already completed.
+    useEffect(() => {
+        (async () => {
+            try {
+                const [reminderVal, planVal] = await Promise.all([
+                    SecureStore.getItemAsync(REMINDER_ENABLED_KEY),
+                    SecureStore.getItemAsync(TRIAL_PLAN_KEY),
+                ]);
+                setState((prev) => ({
+                    ...prev,
+                    ...(reminderVal !== null ? { reminderEnabled: reminderVal === "true" } : {}),
+                    ...(planVal === "free_7day" || planVal === "trial_30day_199"
+                        ? { trialPlan: planVal }
+                        : {}),
+                }));
+            } catch (e) {
+                console.warn("Failed to hydrate onboarding prefs:", e);
+            }
+        })();
+    }, []);
+
     const setGoals = (goals: string[]) => setState((prev) => ({ ...prev, goals }));
     const setCookingThoughtTime = (time: string) => setState((prev) => ({ ...prev, cookingThoughtTime: time }));
     const setNotificationAllowed = (allowed: boolean) => setState((prev) => ({ ...prev, notificationAllowed: allowed }));
@@ -57,8 +83,14 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const setRecipeSources = (sources: string[]) => setState((prev) => ({ ...prev, recipeSources: sources }));
     const setAgeGroup = (age: string) => setState((prev) => ({ ...prev, ageGroup: age }));
     const setReferralCode = (code: string) => setState((prev) => ({ ...prev, referralCode: code }));
-    const setTrialPlan = (plan: "free_7day" | "trial_30day_199") => setState((prev) => ({ ...prev, trialPlan: plan }));
-    const setReminderEnabled = (enabled: boolean) => setState((prev) => ({ ...prev, reminderEnabled: enabled }));
+    const setTrialPlan = (plan: "free_7day" | "trial_30day_199") => {
+        SecureStore.setItemAsync(TRIAL_PLAN_KEY, plan).catch(() => {});
+        setState((prev) => ({ ...prev, trialPlan: plan }));
+    };
+    const setReminderEnabled = (enabled: boolean) => {
+        SecureStore.setItemAsync(REMINDER_ENABLED_KEY, enabled ? "true" : "false").catch(() => {});
+        setState((prev) => ({ ...prev, reminderEnabled: enabled }));
+    };
 
     return (
         <OnboardingContext.Provider

@@ -537,17 +537,15 @@ export default function RecipeDetailScreen() {
                         : ["rgba(253,251,247,0)", "rgba(253,251,247,0.8)", "rgba(253,251,247,1)"]}
                     className="pt-12 pb-8 px-5"
                 >
-                    <GlassContainer style={{ borderRadius: 20, overflow: "hidden" }}>
-                        <Pressable
-                            onPress={handleStartCooking}
-                            className="flex-row items-center justify-center py-4"
-                        >
-                            <Ionicons name="restaurant" size={20} color="#FF6B35" />
-                            <Text className="text-accent font-sans-bold text-base ml-2">
-                                Start Cooking
-                            </Text>
-                        </Pressable>
-                    </GlassContainer>
+                    <Pressable
+                        onPress={handleStartCooking}
+                        className="bg-accent rounded-2xl py-4 flex-row items-center justify-center shadow-lg shadow-accent/25"
+                    >
+                        <Ionicons name="restaurant" size={20} color="#FFFFFF" />
+                        <Text className="text-[#FFFFFF] font-sans-bold text-base ml-2">
+                            Start Cooking
+                        </Text>
+                    </Pressable>
                 </LinearGradient>
             </View>
 

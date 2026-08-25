@@ -3,6 +3,79 @@ import type { ExtractedRecipe } from "@/db/schema";
 import * as SecureStore from "expo-secure-store";
 import { getLinkPreview } from "link-preview-js";
 import { AI_PROVIDER_STORE } from "./constants";
+import {
+    mapJsonLdToExtractedRecipe,
+    findIngredientsWindow,
+    groupIngredientsFromWindow,
+} from "./jsonLdRecipe";
+
+function normalizeExtractionUrl(value: string): string {
+    let url = value.trim();
+    try {
+        const parsed = new URL(url);
+        parsed.hash = "";
+        parsed.search = "";
+        url = parsed.toString();
+    } catch {
+        // keep raw value
+    }
+    return url.replace(/\/+$/, "").toLowerCase();
+}
+
+function urlCacheHash(value: string): string {
+    const normalized = normalizeExtractionUrl(value);
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < normalized.length; i++) {
+        hash ^= normalized.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    // Cache schema version — bump when extraction logic changes so stale
+    // rows written by older builds are bypassed instead of served back.
+    return `${CACHE_SCHEMA_VERSION}-${hash.toString(16)}`;
+}
+
+const CACHE_SCHEMA_VERSION = 2;
+
+/**
+ * Look up a previously-extracted recipe for this URL. RLS allows anyone
+ * to read the cache, so this is a direct, sub-second client query.
+ */
+async function readExtractionCache(url: string): Promise<ExtractedRecipe[] | null> {
+    try {
+        const { data, error } = await supabase
+            .from("extraction_cache")
+            .select("payload")
+            .eq("url_hash", urlCacheHash(url))
+            .maybeSingle();
+        if (error || !data?.payload) return null;
+        const payload = Array.isArray(data.payload) ? data.payload : [data.payload];
+        return payload.map((r: any) => validateRecipe(r));
+    } catch (e) {
+        if (__DEV__) console.log("[Cache] Read failed (non-blocking):", e);
+        return null;
+    }
+}
+
+/**
+ * Persist a successful fast-path extraction server-side so the next
+ * import of the same URL is sub-second. Fire-and-forget.
+ */
+async function writeExtractionCache(url: string, recipes: ExtractedRecipe[]): Promise<void> {
+    try {
+        const { supabaseUrl, supabaseKey, authToken } = await getEdgeAuth();
+        void fetch(`${supabaseUrl}/functions/v1/extract-recipe`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`,
+                "apikey": supabaseKey,
+            },
+            body: JSON.stringify({ mode: "cache-save", url, payload: recipes }),
+        }).catch(() => {});
+    } catch {
+        // non-blocking
+    }
+}
 
 const RECIPE_EXTRACTION_PROMPT = `You are an expert recipe extractor. Your task is to extract recipe information from the provided webpage content or social media metadata.
 You MUST respond with a JSON object matching the following TypeScript interface:
@@ -49,12 +122,17 @@ Here are the rules you MUST follow:
 Here is the content to extract the recipe from:
 `;
 
+interface DirectFetchResult {
+    jsonLd: any | null;
+    htmlText: string;
+}
+
 /**
- * Attempt a direct fetch of the URL with browser-like headers as a fallback
- * when Jina Reader is blocked (403/CAPTCHA).
- * Prioritizes JSON-LD structured recipe data if available.
+ * Direct fetch of the URL with browser-like headers.
+ * Returns the parsed JSON-LD Recipe object (when present) plus a plain-text
+ * rendering of the HTML used for deterministic section detection.
  */
-async function directFetchFallback(url: string): Promise<string> {
+async function directFetchRecipeData(url: string): Promise<DirectFetchResult> {
     try {
         const response = await fetch(url, {
             headers: {
@@ -67,7 +145,7 @@ async function directFetchFallback(url: string): Promise<string> {
 
         if (!response.ok) {
             console.warn(`Direct fetch failed with status ${response.status}`);
-            return "";
+            return { jsonLd: null, htmlText: "" };
         }
 
         const html = await response.text();
@@ -75,10 +153,11 @@ async function directFetchFallback(url: string): Promise<string> {
         // Quick check: if the page is a CAPTCHA/challenge, bail
         if (html.includes("Just a moment") && html.includes("challenge")) {
             console.warn("Direct fetch hit CAPTCHA, returning empty");
-            return "";
+            return { jsonLd: null, htmlText: "" };
         }
 
         // Extract JSON-LD structured recipe data if available (most recipe sites embed this)
+        let jsonLd: any | null = null;
         const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
         if (jsonLdMatches) {
             for (const match of jsonLdMatches) {
@@ -87,7 +166,8 @@ async function directFetchFallback(url: string): Promise<string> {
                     const parsed = JSON.parse(jsonContent);
                     const recipe = findRecipeInJsonLd(parsed);
                     if (recipe) {
-                        return `--- Structured Recipe Data (JSON-LD) ---\n${JSON.stringify(recipe, null, 2)}`;
+                        jsonLd = recipe;
+                        break;
                     }
                 } catch {
                     // Not valid JSON, skip
@@ -95,18 +175,32 @@ async function directFetchFallback(url: string): Promise<string> {
             }
         }
 
-        // Fallback: strip HTML tags and return raw text (limited)
-        const textContent = html
+        // Plain-text rendering that preserves line structure (for section detection)
+        const htmlText = html
             .replace(/<script[\s\S]*?<\/script>/gi, "")
             .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<li[^>]*>/gi, "\n- ")
+            .replace(/<\/?(h[1-6]|p|div|li|ul|ol|section|article|table|tr|br|header|footer|main|figure|figcaption)[^>]*>/gi, "\n")
             .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
+            .replace(/&amp;/g, "&")
+            .replace(/&nbsp;/g, " ")
+            .replace(/&#x27;|&apos;/g, "'")
+            .replace(/&quot;/g, '"')
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&frac12;/g, "\u00BD")
+            .replace(/&frac14;/g, "\u00BC")
+            .replace(/&frac34;/g, "\u00BE")
+            .split("\n")
+            .map((line) => line.replace(/\s+/g, " ").trim())
+            .filter(Boolean)
+            .join("\n")
+            .substring(0, 150000);
 
-        return textContent.substring(0, 15000);
+        return { jsonLd, htmlText };
     } catch (error) {
-        console.warn("Direct fetch fallback failed:", error);
-        return "";
+        console.warn("Direct fetch failed:", error);
+        return { jsonLd: null, htmlText: "" };
     }
 }
 
@@ -259,11 +353,132 @@ async function consumeExtractionStream(
 /**
  * Extract a recipe from a URL using Gemini or OpenAI
  */
+function finalizeRecipeImage(recipe: ExtractedRecipe, ogImage: string): ExtractedRecipe {
+    // Instagram/Facebook CDN URLs often fail to load in apps due to expiring signatures in query params
+    // Check if the extracted image is from a problematic CDN.
+    // NOTE: We do NOT include TikTok here anymore, because TikTok images *need* their query params to load correctly,
+    // and the wsrv.nl proxy strips them and breaks the image entirely.
+    const isProblematicCdn = recipe.imageUrl && (
+        recipe.imageUrl.includes("cdninstagram.com") ||
+        recipe.imageUrl.includes("fbcdn.net") ||
+        recipe.imageUrl.includes("scontent")
+    );
+
+    if (isProblematicCdn && recipe.imageUrl) {
+        if (__DEV__) console.log("Detected problematic CDN image URL, attempting to clean it.");
+        try {
+            // Option 1: Strip query parameters that cause 403 Forbidden on expiring signatures
+            const urlObj = new URL(recipe.imageUrl);
+            const cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
+
+            // Option 2: Wrap it in a reliable image proxy that bypasses CDN hotlink protection
+            // We use wsrv.nl (images.weserv.nl) which is a free caching proxy often used for mobile apps
+            recipe.imageUrl = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
+            if (__DEV__) console.log("Proxied Cleaned URL:", recipe.imageUrl);
+        } catch (e) {
+            console.warn("Failed to clean/proxy CDN URL", e);
+        }
+    }
+
+    // If no image was extracted or if the AI returned a messy one, and we have a clean OG image fallback
+    if ((!recipe.imageUrl || recipe.imageUrl === "") && ogImage) {
+        if (__DEV__) console.log("Using OG image fallback:", ogImage);
+        recipe.imageUrl = ogImage;
+    } else if (ogImage && recipe.imageUrl && recipe.imageUrl.includes("cdninstagram")) {
+        // Even after cleaning, IG URLs can be very stubborn over time.
+        // If we successfully grabbed a generic OG image earlier, it is much safer
+        // to use it as a fallback instead of a proxy-wrapped CDN image.
+        if (__DEV__) console.log("Replacing stubborn IG CDN url with clean OG image fallback");
+        recipe.imageUrl = ogImage;
+    }
+
+    return recipe;
+}
+
+async function getEdgeAuth(): Promise<{ supabaseUrl: string; supabaseKey: string; authToken: string }> {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error("Supabase environment variables are not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.");
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    return { supabaseUrl, supabaseKey, authToken: session?.access_token || supabaseKey };
+}
+
+/**
+ * Small targeted AI call that only assigns ingredient section labels.
+ * Used by the JSON-LD fast path when the page has multi-group ingredients
+ * but deterministic grouping from the page text is inconclusive.
+ */
+async function fetchIngredientSections(
+    ingredients: ExtractedRecipe["ingredients"],
+    windowText: string
+): Promise<(string | null)[] | null> {
+    try {
+        const { supabaseUrl, supabaseKey, authToken } = await getEdgeAuth();
+        const response = await fetch(`${supabaseUrl}/functions/v1/extract-recipe`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`,
+                "apikey": supabaseKey,
+            },
+            body: JSON.stringify({
+                mode: "ingredient-sections",
+                ingredients: ingredients.map(({ text, quantity, unit, name }) => ({ text, quantity, unit, name })),
+                contentForAI: windowText.substring(0, 4000),
+            }),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        return Array.isArray(data.sections) ? data.sections : null;
+    } catch (e) {
+        if (__DEV__) console.log("[Sections] Targeted section call failed (non-blocking):", e);
+        return null;
+    }
+}
+
 export async function extractFromUrl(
     url: string,
     reCacheOnly = false,
     handlers?: ExtractionStreamHandlers
 ): Promise<ExtractedRecipe[]> {
+    const t0 = Date.now();
+    const timings: Record<string, number> = {};
+    const mark = (label: string) => { timings[label] = Date.now() - t0; };
+
+    // Re-cache flow only needs the edge function — skip all client scraping
+    if (reCacheOnly) {
+        const { supabaseUrl, supabaseKey, authToken } = await getEdgeAuth();
+        const response = await fetch(`${supabaseUrl}/functions/v1/extract-recipe`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${authToken}`,
+                "apikey": supabaseKey,
+            },
+            body: JSON.stringify({ url, reCacheOnly: true }),
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Detailed Edge Function Error: ${errorText} (Status: ${response.status})`);
+        }
+        const data = await response.json();
+        return [validateRecipe(data)];
+    }
+
+    // Cache hit — previously-extracted URL returns instantly
+    const cached = await readExtractionCache(url);
+    if (cached && cached.length > 0) {
+        mark("cache");
+        if (__DEV__) console.log(`[Timing] CACHE HIT total=${Date.now() - t0}ms`, JSON.stringify(timings));
+        handlers?.onContext?.(`${cached[0].title} | ${cached[0].description || ""}`.substring(0, 1200));
+        return cached.map((recipe) => finalizeRecipeImage(recipe, recipe.imageUrl || ""));
+    }
+    mark("cache");
+
     let markdownContent = "";
     let ogImage = "";
     let socialCaption = "";
@@ -303,65 +518,139 @@ export async function extractFromUrl(
         }
     }
 
-    // Step 2: Attempt to grab the OpenGraph image directly as a reliable fallback thumbnail (if not TikTok)
-    if (!isTikTok && !ogImage) {
-        try {
-            const preview: any = await getLinkPreview(url, {
-                headers: { "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)" },
-                timeout: 5000,
-            });
-            if (preview && preview.images && preview.images.length > 0) {
-                ogImage = preview.images[0];
-            }
-            if (preview && preview.description) {
-                // Social media captions are usually injected into the OG description
-                socialCaption = `\n\n--- Social Media Metadata / Caption ---\nTitle: ${preview.title || "Unknown"}\nCaption: ${preview.description}`;
-            }
-        } catch (e) {
-            if (__DEV__) console.log("Failed to fetch OG fallback data", e);
-        }
-    }
-
-    // Step 3: Fetch page content via Jina Reader (for all URLs including TikTok as supplement)
+    // Steps 2-4 run CONCURRENTLY: OG preview + Jina Reader + direct fetch (JSON-LD)
     handlers?.onStage?.("scrape:client");
-    try {
-        const response = await fetch(`https://r.jina.ai/${url}`, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)",
-                "Accept": "text/event-stream, text/plain",
-            },
-        });
 
-        if (!response.ok) {
-            console.warn(`Jina Reader API error: ${response.status}`);
-        } else {
-            markdownContent = await response.text();
-            // Detect if Jina likely returned CAPTCHA — still pass content to AI but hint the server
-            const looksLikeCaptcha = markdownContent.includes("Just a moment") || 
-                markdownContent.includes("Verification successful") || 
-                markdownContent.includes("challenge-platform") ||
-                markdownContent.length < 200;
-            if (!looksLikeCaptcha) {
-                scrapeFailed = false; // Jina got real content
+    const jinaAbort = new AbortController();
+    const jinaTimeout = setTimeout(() => jinaAbort.abort(), 20000);
+
+    // OG image + caption fallback thumbnail
+    const previewTask: Promise<void> = (!isTikTok && !ogImage)
+        ? (async () => {
+            try {
+                const preview: any = await getLinkPreview(url, {
+                    headers: { "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)" },
+                    timeout: 5000,
+                });
+                if (preview && preview.images && preview.images.length > 0) {
+                    ogImage = preview.images[0];
+                }
+                if (preview && preview.description) {
+                    // Social media captions are usually injected into the OG description
+                    socialCaption = `\n\n--- Social Media Metadata / Caption ---\nTitle: ${preview.title || "Unknown"}\nCaption: ${preview.description}`;
+                }
+            } catch (e) {
+                if (__DEV__) console.log("Failed to fetch OG fallback data", e);
             }
-            // Always keep markdownContent — pass everything to the AI
+        })()
+        : Promise.resolve();
+
+    // Jina Reader rendered markdown (AI-path content + fallback)
+    const jinaTask: Promise<void> = (async () => {
+        try {
+            const response = await fetch(`https://r.jina.ai/${url}`, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (compatible; SnapRecipes/1.0)",
+                    "Accept": "text/event-stream, text/plain",
+                },
+                signal: jinaAbort.signal,
+            });
+
+            if (!response.ok) {
+                console.warn(`Jina Reader API error: ${response.status}`);
+            } else {
+                markdownContent = await response.text();
+                // Detect if Jina likely returned CAPTCHA — still pass content to AI but hint the server
+                const looksLikeCaptcha = markdownContent.includes("Just a moment") ||
+                    markdownContent.includes("Verification successful") ||
+                    markdownContent.includes("challenge-platform") ||
+                    markdownContent.length < 200;
+                if (!looksLikeCaptcha) {
+                    scrapeFailed = false; // Jina got real content
+                }
+                // Always keep markdownContent — pass everything to the AI
+            }
+        } catch (error: any) {
+            if (error?.name !== "AbortError") {
+                console.warn(`Failed to fetch URL content via Jina: ${error}`);
+            }
         }
-    } catch (error) {
-        console.warn(`Failed to fetch URL content via Jina: ${error}`);
+    })();
+
+    // Direct fetch: JSON-LD structured data + plain text for section detection
+    const directResult: { jsonLd: any; htmlText: string; fastPath: ExtractedRecipe | null } = {
+        jsonLd: null,
+        htmlText: "",
+        fastPath: null,
+    };
+    const directTask: Promise<void> = (!isTikTok)
+        ? (async () => {
+            const result = await directFetchRecipeData(url);
+            directResult.htmlText = result.htmlText;
+            if (result.jsonLd) {
+                directResult.jsonLd = result.jsonLd;
+                directResult.fastPath = mapJsonLdToExtractedRecipe(result.jsonLd);
+                if (directResult.fastPath) {
+                    // Complete structured recipe — no need to wait for Jina
+                    jinaAbort.abort();
+                    if (__DEV__) console.log("[JSON-LD] Complete structured recipe found — fast path enabled");
+                }
+            }
+        })()
+        : Promise.resolve();
+
+    await Promise.allSettled([previewTask, jinaTask, directTask]);
+    clearTimeout(jinaTimeout);
+    mark("scrape");
+
+    const jsonLdRecipe: any = directResult.jsonLd;
+    const htmlText = directResult.htmlText;
+    const fastPathRecipe = directResult.fastPath;
+
+    // ── FAST PATH: deterministic JSON-LD extraction (no LLM) ────────
+    if (fastPathRecipe) {
+        handlers?.onStage?.("parse:jsonld");
+
+        // Recover ingredient sections from the page text
+        const window = findIngredientsWindow(htmlText);
+        if (window && window.headings.length >= 1) {
+            const grouped = groupIngredientsFromWindow(fastPathRecipe.ingredients, window);
+            const enoughMatches = grouped.matched >= Math.max(2, Math.floor(fastPathRecipe.ingredients.length * 0.5));
+            if (grouped.sections >= 2 && enoughMatches) {
+                fastPathRecipe.ingredients = grouped.ingredients;
+            } else if (window.headings.length >= 2) {
+                // Multi-group page but deterministic grouping inconclusive —
+                // one small scoped AI call to assign section labels only
+                handlers?.onStage?.("sections:ai");
+                const sections = await fetchIngredientSections(fastPathRecipe.ingredients, window.text);
+                if (sections && sections.length === fastPathRecipe.ingredients.length) {
+                    fastPathRecipe.ingredients = fastPathRecipe.ingredients.map((ing, i) => ({
+                        ...ing,
+                        section: sections[i] || undefined,
+                    }));
+                }
+            }
+        }
+        mark("parse");
+
+        if (!ogImage && fastPathRecipe.imageUrl) ogImage = fastPathRecipe.imageUrl;
+        handlers?.onContext?.(
+            `${fastPathRecipe.title} | ${fastPathRecipe.description || ""}`.substring(0, 1200)
+        );
+
+        const finalRecipe = finalizeRecipeImage(fastPathRecipe, ogImage);
+        if (__DEV__) {
+            console.log(`[Timing] FAST PATH total=${Date.now() - t0}ms`, JSON.stringify(timings));
+        }
+        void writeExtractionCache(url, [finalRecipe]);
+        return [finalRecipe];
     }
 
-    // Step 4: Always try to extract JSON-LD structured data (contains nutrition info that Jina misses)
+    // ── AI PATH: build content for the edge function ────────────────
     let jsonLdContent = "";
-    if (!isTikTok) {
-        try {
-            const jsonLdData = await directFetchFallback(url);
-            if (jsonLdData && jsonLdData.includes("Structured Recipe Data")) {
-                jsonLdContent = jsonLdData;
-                if (__DEV__) console.log("[JSON-LD] Found structured recipe data with potential nutrition info");
-            }
-        } catch (e) {
-            if (__DEV__) console.log("JSON-LD extraction failed (non-blocking):", e);
-        }
+    if (jsonLdRecipe) {
+        jsonLdContent = `--- Structured Recipe Data (JSON-LD) ---\n${JSON.stringify(jsonLdRecipe, null, 2)}`;
+        if (__DEV__) console.log("[JSON-LD] Found structured recipe data (incomplete — using AI path)");
     }
 
     // Hand the loader whatever context we managed to scrape so it can generate
@@ -414,16 +703,7 @@ export async function extractFromUrl(
     const provider = await SecureStore.getItemAsync(AI_PROVIDER_STORE) || "gemini";
 
     // Use raw fetch temporarily to get the exact textual error from the Edge Function
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-        throw new Error("Supabase environment variables are not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.");
-    }
-
-    // Get the user's auth token to pass to the Edge Function
-    const { data: { session } } = await supabase.auth.getSession();
-    const authToken = session?.access_token || supabaseKey;
+    const { supabaseUrl, supabaseKey, authToken } = await getEdgeAuth();
 
     const response = await fetch(`${supabaseUrl}/functions/v1/extract-recipe`, {
         method: 'POST',
@@ -453,48 +733,6 @@ export async function extractFromUrl(
         throw new Error(`Detailed Edge Function Error: ${errorText} (Status: ${response.status})`);
     }
 
-    const finalizeRecipeImage = (recipe: ExtractedRecipe): ExtractedRecipe => {
-        // Instagram/Facebook CDN URLs often fail to load in apps due to expiring signatures in query params
-        // Check if the extracted image is from a problematic CDN.
-        // NOTE: We do NOT include TikTok here anymore, because TikTok images *need* their query params to load correctly,
-        // and the wsrv.nl proxy strips them and breaks the image entirely.
-        const isProblematicCdn = recipe.imageUrl && (
-            recipe.imageUrl.includes("cdninstagram.com") ||
-            recipe.imageUrl.includes("fbcdn.net") ||
-            recipe.imageUrl.includes("scontent")
-        );
-
-        if (isProblematicCdn && recipe.imageUrl) {
-            if (__DEV__) console.log("Detected problematic CDN image URL, attempting to clean it.");
-            try {
-                // Option 1: Strip query parameters that cause 403 Forbidden on expiring signatures
-                const urlObj = new URL(recipe.imageUrl);
-                const cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
-
-                // Option 2: Wrap it in a reliable image proxy that bypasses CDN hotlink protection
-                // We use wsrv.nl (images.weserv.nl) which is a free caching proxy often used for mobile apps
-                recipe.imageUrl = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
-                if (__DEV__) console.log("Proxied Cleaned URL:", recipe.imageUrl);
-            } catch (e) {
-                console.warn("Failed to clean/proxy CDN URL", e);
-            }
-        }
-
-        // If no image was extracted or if the AI returned a messy one, and we have a clean OG image fallback
-        if ((!recipe.imageUrl || recipe.imageUrl === "") && ogImage) {
-            if (__DEV__) console.log("Using OG image fallback:", ogImage);
-            recipe.imageUrl = ogImage;
-        } else if (ogImage && recipe.imageUrl && recipe.imageUrl.includes("cdninstagram")) {
-             // Even after cleaning, IG URLs can be very stubborn over time.
-             // If we successfully grabbed a generic OG image earlier, it is much safer
-             // to use it as a fallback instead of a proxy-wrapped CDN image.
-             if (__DEV__) console.log("Replacing stubborn IG CDN url with clean OG image fallback");
-             recipe.imageUrl = ogImage;
-        }
-
-        return recipe;
-    };
-
     // Streaming flow: consume SSE events and resolve with the final payload
     if (handlers) {
         const contentType = response.headers.get("content-type") || "";
@@ -505,7 +743,12 @@ export async function extractFromUrl(
                 if (__DEV__) console.log(`[Slideshow] Received ${streamed.recipes.length} recipes from streamed slideshow extraction`);
                 return streamed.recipes.map((r: any) => validateRecipe(r));
             }
-            return [finalizeRecipeImage(validateRecipe(streamed))];
+            if (__DEV__) {
+                console.log(`[Timing] AI PATH (streamed) total=${Date.now() - t0}ms`, JSON.stringify(timings));
+            }
+            const streamedRecipe = finalizeRecipeImage(validateRecipe(streamed), ogImage);
+            void writeExtractionCache(url, [streamedRecipe]);
+            return [streamedRecipe];
         }
     }
 
@@ -529,11 +772,18 @@ export async function extractFromUrl(
     // Handle slideshow multi-recipe response
     if (data.slideshow && data.recipes && Array.isArray(data.recipes)) {
         if (__DEV__) console.log(`[Slideshow] Received ${data.recipes.length} recipes from slideshow extraction`);
-        return data.recipes.map((r: any) => validateRecipe(r));
+        const slideshowRecipes = data.recipes.map((r: any) => validateRecipe(r));
+        void writeExtractionCache(url, slideshowRecipes);
+        return slideshowRecipes;
     }
 
     // Single recipe flow (normal extraction)
-    return [finalizeRecipeImage(validateRecipe(data))];
+    if (__DEV__) {
+        console.log(`[Timing] AI PATH total=${Date.now() - t0}ms`, JSON.stringify(timings));
+    }
+    const singleRecipe = finalizeRecipeImage(validateRecipe(data), ogImage);
+    void writeExtractionCache(url, [singleRecipe]);
+    return [singleRecipe];
 }
 
 /**

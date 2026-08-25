@@ -24,7 +24,7 @@ import { useTheme } from "@/hooks/useTheme";
 type Tab = "search" | "scan" | "quick" | "recipe";
 
 interface FoodResult {
-    id?: number;
+    id?: number | string;
     food_name: string;
     brand?: string | null;
     serving_size?: string | null;
@@ -35,7 +35,10 @@ interface FoodResult {
     sugar?: number | null;
     fiber?: number | null;
     sodium?: number | null;
-    source: "local" | "ai" | "community" | "global";
+    source: "local" | "ai" | "community" | "global" | "basic";
+    isBasic?: boolean;
+    use_count?: number;
+    lookup_count?: number;
 }
 
 interface QuickAddState {
@@ -58,6 +61,87 @@ const MEAL_TYPES = [
     { key: "dinner", label: "Dinner", icon: "moon" },
     { key: "snack", label: "Snack", icon: "nutrition" },
 ] as const;
+
+// ── Search Tokenizer & Relevance Gate ──
+function tokenizeQuery(query: string): string[] {
+    return query
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter(t => t.length > 0);
+}
+
+function wordMatches(targetText: string, token: string): boolean {
+    if (targetText.includes(token)) return true;
+    if (token.endsWith("ies") && token.length > 4) {
+        const singular = token.slice(0, -3) + "y";
+        if (targetText.includes(singular)) return true;
+    }
+    if (token.endsWith("es") && token.length > 3) {
+        const singular = token.slice(0, -2);
+        if (targetText.includes(singular)) return true;
+    }
+    if (token.endsWith("s") && token.length > 2) {
+        const singular = token.slice(0, -1);
+        if (targetText.includes(singular)) return true;
+    }
+    const plural = token + "s";
+    if (targetText.includes(plural)) return true;
+    return false;
+}
+
+function passesRelevanceGate(item: { food_name: string; brand?: string | null }, queryTokens: string[]): boolean {
+    if (queryTokens.length === 0) return true;
+    const nameLower = (item.food_name || "").toLowerCase();
+    const brandLower = (item.brand || "").toLowerCase();
+    const combined = `${nameLower} ${brandLower}`;
+
+    // Every single query token MUST match in either the food name or the brand
+    return queryTokens.every(token => wordMatches(combined, token));
+}
+
+function calculateScore(item: FoodResult, queryLower: string, queryTokens: string[]): number {
+    const nameLower = item.food_name.toLowerCase();
+    const brandLower = (item.brand || "").toLowerCase();
+    const cleanName = nameLower
+        .replace(/,\s*(raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground).*$/i, "")
+        .replace(/\s*\([^)]*\)/g, "")
+        .trim();
+
+    let score = 0;
+
+    // Exact full match (Tier 0)
+    if (cleanName === queryLower || nameLower === queryLower) {
+        score += 1000;
+    } else if (nameLower.startsWith(queryLower) || cleanName.startsWith(queryLower)) {
+        // Starts with exact query string (Tier 1)
+        score += 700;
+    } else if (nameLower.includes(queryLower)) {
+        // Contains exact query phrase (Tier 2)
+        score += 500;
+    } else {
+        // Tokens scattered (Tier 3)
+        score += 300;
+    }
+
+    // Curated basic / raw foods priority (highest trust for generic searches)
+    if (item.source === "basic") {
+        score += 200;
+    } else if (item.source === "local") {
+        score += 150;
+    } else if (item.source === "community") {
+        score += 100;
+    }
+
+    // Usage & Popularity boost
+    const pop = (item.use_count || item.lookup_count || 0);
+    score += Math.min(100, pop * 10);
+
+    // Shorter clean names score higher (avoids spammy long descriptions)
+    score -= Math.min(50, item.food_name.length * 0.4);
+
+    return score;
+}
 
 export default function AddFoodScreen() {
     const router = useRouter();
@@ -84,8 +168,9 @@ export default function AddFoodScreen() {
     const [logTarget, setLogTarget] = useState<null | { type: "food"; food: FoodResult } | { type: "recipe"; recipe: any }>(null);
     const [servingQtyStr, setServingQtyStr] = useState("1");
 
-    // Debounce timer ref
+    // Debounce timer ref & Sequence Guard ref to prevent race conditions
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const searchSeqRef = useRef<number>(0);
 
     const hasExactMatch = useMemo(() => {
         const queryLower = searchQuery.toLowerCase().trim();
@@ -93,20 +178,23 @@ export default function AddFoodScreen() {
         return searchResults.some(r => {
             const cleanName = r.food_name.toLowerCase()
                 .replace(/,\s*(raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground).*$/i, "")
-                .replace(/\s*\((raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground)\)/i, "")
+                .replace(/\s*\([^)]*\)/g, "")
                 .trim();
             return cleanName === queryLower || r.food_name.toLowerCase().trim() === queryLower;
         });
     }, [searchResults, searchQuery]);
 
-    // ── Smart Search: local DB first, then AI ──
-    // ── Database Search: local + community ──
+    // ── High Precision Search Engine ──
     const performSearch = useCallback(async (q: string) => {
+        const currentSeq = ++searchSeqRef.current;
+
         if (!q.trim()) {
             try {
                 const frequent = await searchCustomFoods("");
+                if (searchSeqRef.current !== currentSeq) return;
                 setSearchResults(frequent.map((f: any) => ({ ...f, source: "local" as const })));
             } catch (e) {
+                if (searchSeqRef.current !== currentSeq) return;
                 console.warn("Failed to load frequent foods:", e);
                 setSearchResults([]);
             }
@@ -119,188 +207,213 @@ export default function AddFoodScreen() {
         setAiLookedUp(false);
 
         try {
-            let combinedResults: FoodResult[] = [];
+            const queryLower = q.toLowerCase().trim();
+            const queryTokens = tokenizeQuery(queryLower);
+
+            let localMatches: FoodResult[] = [];
+            let basicMatches: FoodResult[] = [];
+            let communityMatches: FoodResult[] = [];
+            let globalMatches: FoodResult[] = [];
 
             // Step 1: Search local custom_foods
             try {
                 const localResults = await searchCustomFoods(q);
-                if (localResults.length > 0) {
-                    combinedResults = localResults.map((f: any) => ({ ...f, source: "local" as const }));
-                }
+                localMatches = localResults
+                    .map((f: any) => ({ ...f, source: "local" as const }))
+                    .filter(f => passesRelevanceGate(f, queryTokens));
             } catch (e) {
                 console.warn("Local food search failed:", e);
             }
 
-            // Step 1.5: Search curated raw foods
+            // Step 2: Search curated USDA basics (rawFoods.ts)
             try {
                 const rawMatches = searchRawFoods(q);
-                if (rawMatches.length > 0) {
-                    const existingNames = new Set(combinedResults.map(r => r.food_name.toLowerCase()));
-                    const uniqueRaw = rawMatches
-                        .filter(f => !existingNames.has(f.food_name.toLowerCase()))
-                        .map(f => ({
-                            food_name: f.food_name,
-                            brand: "Curated Basic",
-                            serving_size: f.serving_size,
-                            calories: f.calories,
-                            protein: f.protein,
-                            fat: f.fat,
-                            carbs: f.carbs,
-                            sugar: f.sugar,
-                            fiber: f.fiber,
-                            sodium: f.sodium,
-                            source: "local" as const,
-                        }));
-                    combinedResults = [...combinedResults, ...uniqueRaw];
-                }
+                basicMatches = rawMatches
+                    .map(f => ({
+                        food_name: f.food_name,
+                        brand: "Curated Basic",
+                        serving_size: f.serving_size,
+                        calories: f.calories,
+                        protein: f.protein,
+                        fat: f.fat,
+                        carbs: f.carbs,
+                        sugar: f.sugar,
+                        fiber: f.fiber,
+                        sodium: f.sodium,
+                        source: "basic" as const,
+                        isBasic: true,
+                    }))
+                    .filter(f => passesRelevanceGate(f, queryTokens));
             } catch (e) {
                 console.warn("Raw foods search failed:", e);
             }
 
-            // Step 2: Search community global_foods in Supabase
-            try {
-                const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-                const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+            // Stale check
+            if (searchSeqRef.current !== currentSeq) return;
 
-                if (supabaseUrl && supabaseKey) {
-                    const queryParam = encodeURIComponent(q.toLowerCase());
-                    const response = await fetch(
-                        `${supabaseUrl}/rest/v1/global_foods?food_name_lower=ilike.*${queryParam}*&order=lookup_count.desc&limit=10`,
-                        {
-                            headers: {
-                                "apikey": supabaseKey,
-                                "Authorization": `Bearer ${supabaseKey}`,
-                            },
-                        }
-                    );
+            // Step 3: Search Supabase community global_foods (trigram ranked)
+            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+            const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-                    if (response.ok) {
-                        const globalData = await response.json();
-                        if (globalData && globalData.length > 0) {
-                            const communityItems = globalData.map((f: any) => ({
-                                ...f,
-                                source: "community" as const,
-                            }));
-                            
-                            // Merge and de-duplicate (prefer local hits if name matches exactly)
-                            const localNames = new Set(combinedResults.map(r => r.food_name.toLowerCase()));
-                            const newCommunityItems = communityItems.filter((f: any) => !localNames.has(f.food_name.toLowerCase()));
-                            
-                            combinedResults = [...combinedResults, ...newCommunityItems];
+            if (supabaseUrl && supabaseKey) {
+                try {
+                    // Try search_global_foods RPC first
+                    const { data: rpcData, error: rpcError } = await supabase.rpc("search_global_foods", {
+                        query_text: q,
+                        max_results: 15
+                    });
 
-                            // Increment lookup count for the best community match asynchronously
-                            const topMatch = globalData[0];
-                            fetch(`${supabaseUrl}/rpc/increment_lookup_count`, {
-                                method: 'POST',
+                    if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
+                        communityMatches = rpcData.map((f: any) => ({
+                            id: f.id,
+                            food_name: f.food_name,
+                            brand: f.brand || null,
+                            serving_size: f.serving_size || "1 serving",
+                            calories: Number(f.calories) || 0,
+                            protein: Number(f.protein) || 0,
+                            fat: Number(f.fat) || 0,
+                            carbs: Number(f.carbs) || 0,
+                            sugar: f.sugar !== null ? Number(f.sugar) : null,
+                            fiber: f.fiber !== null ? Number(f.fiber) : null,
+                            sodium: f.sodium !== null ? Number(f.sodium) : null,
+                            source: "community" as const,
+                            lookup_count: f.lookup_count || 1,
+                        })).filter(f => passesRelevanceGate(f, queryTokens));
+                    } else {
+                        // Fallback to REST API
+                        const queryParam = encodeURIComponent(queryLower);
+                        const response = await fetch(
+                            `${supabaseUrl}/rest/v1/global_foods?food_name_lower=ilike.*${queryParam}*&order=lookup_count.desc&limit=10`,
+                            {
                                 headers: {
                                     "apikey": supabaseKey,
                                     "Authorization": `Bearer ${supabaseKey}`,
-                                    "Content-Type": "application/json"
                                 },
-                                body: JSON.stringify({ row_id: topMatch.id })
-                            }).catch(() => {});
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn("Global food search failed:", e);
-            }
-
-            // Step 3: Search Open Food Facts (Global Database)
-            if (combinedResults.length < 5) {
-                try {
-                    const offResp = await fetch(
-                        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10`
-                    );
-                    if (offResp.ok) {
-                        const offData = await offResp.json();
-                        if (offData.products && offData.products.length > 0) {
-                            const offItems: FoodResult[] = offData.products
-                                .filter((p: any) => p.product_name || p.generic_name)
-                                .map((p: any) => {
-                                    const n = p.nutriments || {};
-                                    return {
-                                        food_name: p.product_name || p.generic_name || "Unknown Product",
-                                        brand: p.brands || null,
-                                        serving_size: p.serving_size || p.quantity || "1 serving",
-                                        calories: Math.round(n["energy-kcal_serving"] || n["energy-kcal_100g"] || 0),
-                                        protein: Math.round((n.proteins_serving || n.proteins_100g || 0) * 10) / 10,
-                                        fat: Math.round((n.fat_serving || n.fat_100g || 0) * 10) / 10,
-                                        carbs: Math.round((n.carbohydrates_serving || n.carbohydrates_100g || 0) * 10) / 10,
-                                        sugar: n.sugars_serving || n.sugars_100g || null,
-                                        fiber: n.fiber_serving || n.fiber_100g || null,
-                                        sodium: n.sodium_serving ? Math.round(n.sodium_serving * 1000) : null,
-                                        source: "global" as const,
-                                    };
-                                });
-                            
-                            const existingNames = new Set(combinedResults.map(r => r.food_name.toLowerCase()));
-                            const uniqueOffItems = offItems.filter(f => !existingNames.has(f.food_name.toLowerCase()));
-                            combinedResults = [...combinedResults, ...uniqueOffItems];
+                            }
+                        );
+                        if (response.ok) {
+                            const globalData = await response.json();
+                            if (globalData && globalData.length > 0) {
+                                communityMatches = globalData
+                                    .map((f: any) => ({ ...f, source: "community" as const }))
+                                    .filter((f: any) => passesRelevanceGate(f, queryTokens));
+                            }
                         }
                     }
                 } catch (e) {
-                    console.warn("Global database search failed:", e);
+                    console.warn("Global food search failed:", e);
                 }
             }
-            
-            // Final Step: Smart Ranking & Filtering
-            const queryLower = q.toLowerCase().trim();
-            
-            combinedResults = combinedResults.sort((a, b) => {
-                const nameA = a.food_name.toLowerCase();
-                const nameB = b.food_name.toLowerCase();
-                
-                // 1. Determine Match Tier
-                const getTier = (name: string) => {
-                    const cleanName = name
-                        .replace(/,\s*(raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground).*$/i, "")
-                        .replace(/\s*\((raw|fresh|whole|cooked|boiled|baked|grilled|fried|steamed|roasted|canned|dry|dried|unsalted|salted|sweetened|unsweetened|peeled|with skin|without skin|large|medium|small|chopped|sliced|diced|ground)\)/i, "")
-                        .trim();
-                    if (cleanName === queryLower || name === queryLower) return 0; // Exact match
-                    if (cleanName.startsWith(queryLower) || name.startsWith(queryLower)) return 1; // Starts with
-                    if (cleanName.includes(queryLower) || name.includes(queryLower)) return 2; // Contains
-                    return 3; // Other
-                };
-                
-                const tierA = getTier(nameA);
-                const tierB = getTier(nameB);
-                if (tierA !== tierB) return tierA - tierB;
-                
-                // 2. Determine Source Priority (local > community > global > ai)
-                const sourceOrder = { local: 0, community: 1, global: 2, ai: 3 };
-                const srcA = sourceOrder[a.source] ?? 99;
-                const srcB = sourceOrder[b.source] ?? 99;
-                if (srcA !== srcB) return srcA - srcB;
-                
-                // 3. Determine Popularity / Usage (higher is better)
-                const popA = (a as any).use_count || (a as any).lookup_count || 0;
-                const popB = (b as any).use_count || (b as any).lookup_count || 0;
-                if (popB !== popA) return popB - popA;
-                
-                // 4. Shorter length is better
-                if (nameA.length !== nameB.length) return nameA.length - nameB.length;
-                
-                return nameA.localeCompare(nameB);
-            });
 
-            // 5. Semantic De-noising (e.g. if searching for bread, deprioritize tortillas/wraps)
-            if (queryLower.includes("bread")) {
-                const isNoisy = (name: string) => 
-                    name.includes("tortilla") || name.includes("wrap") || name.includes("pita") || name.includes("flatbread");
-                
-                const clearResults = combinedResults.filter(r => !isNoisy(r.food_name.toLowerCase()));
-                const noisyResults = combinedResults.filter(r => isNoisy(r.food_name.toLowerCase()));
-                combinedResults = [...clearResults, ...noisyResults];
+            // Stale check
+            if (searchSeqRef.current !== currentSeq) return;
+
+            // Step 4: Search Open Food Facts via Search-a-licious API
+            const totalHitsSoFar = localMatches.length + basicMatches.length + communityMatches.length;
+            if (totalHitsSoFar < 15) {
+                try {
+                    const cleanQueryParam = encodeURIComponent(q.trim());
+                    // Primary: Scoped US Search-a-licious search
+                    const offUrl = `https://search.openfoodfacts.org/search?q=${cleanQueryParam}+countries_tags:%22en:united-states%22&langs=en&page_size=15&fields=code,product_name,generic_name,brands,serving_size,serving_quantity,nutriments`;
+                    
+                    let offResp = await fetch(offUrl, {
+                        headers: { "User-Agent": "SnapRecipes - iOS/Android - Version 5.4.1 - www.snaprecipes.app" }
+                    });
+
+                    let offData = offResp.ok ? await offResp.json() : null;
+                    let hits = offData?.hits || [];
+
+                    // Fallback to global if US returned 0 hits
+                    if (hits.length === 0) {
+                        const fallbackUrl = `https://search.openfoodfacts.org/search?q=${cleanQueryParam}&langs=en&page_size=15&fields=code,product_name,generic_name,brands,serving_size,serving_quantity,nutriments`;
+                        const fallbackResp = await fetch(fallbackUrl, {
+                            headers: { "User-Agent": "SnapRecipes - iOS/Android - Version 5.4.1 - www.snaprecipes.app" }
+                        });
+                        if (fallbackResp.ok) {
+                            const fallbackData = await fallbackResp.json();
+                            hits = fallbackData?.hits || [];
+                        }
+                    }
+
+                    if (hits.length > 0) {
+                        globalMatches = hits
+                            .filter((p: any) => p.product_name || p.generic_name)
+                            .map((p: any) => {
+                                const n = p.nutriments || {};
+                                const brandStr = Array.isArray(p.brands) ? p.brands.filter(Boolean).join(", ") : (p.brands || null);
+                                
+                                const getVal = (servingK: string, g100K: string) => {
+                                    if (n[servingK] !== undefined && n[servingK] !== null) return Number(n[servingK]);
+                                    if (n[g100K] !== undefined && n[g100K] !== null) {
+                                        if (p.serving_quantity) {
+                                            return (Number(n[g100K]) * Number(p.serving_quantity)) / 100;
+                                        }
+                                        return Number(n[g100K]);
+                                    }
+                                    return 0;
+                                };
+
+                                const cal = Math.round(getVal("energy-kcal_serving", "energy-kcal_100g") || getVal("energy-kcal", "energy-kcal_100g"));
+                                const pro = Math.round(getVal("proteins_serving", "proteins_100g") * 10) / 10;
+                                const fat = Math.round(getVal("fat_serving", "fat_100g") * 10) / 10;
+                                const carb = Math.round(getVal("carbohydrates_serving", "carbohydrates_100g") * 10) / 10;
+
+                                return {
+                                    food_name: p.product_name || p.generic_name || "Unknown Product",
+                                    brand: brandStr,
+                                    serving_size: p.serving_size || (p.serving_quantity ? `${p.serving_quantity}g` : "1 serving"),
+                                    calories: cal,
+                                    protein: pro,
+                                    fat: fat,
+                                    carbs: carb,
+                                    sugar: n.sugars_serving || n.sugars_100g || null,
+                                    fiber: n.fiber_serving || n.fiber_100g || null,
+                                    sodium: n.sodium_serving ? Math.round(n.sodium_serving * 1000) : (n.sodium_100g ? Math.round(n.sodium_100g * 1000) : null),
+                                    source: "global" as const,
+                                };
+                            })
+                            .filter((f: FoodResult) => passesRelevanceGate(f, queryTokens));
+                    }
+                } catch (e) {
+                    console.warn("Search-a-licious OFF search failed:", e);
+                }
             }
 
-            setSearchResults(combinedResults.slice(0, 15));
-            trackEvent("food_search_completed", { query: q, results_count: combinedResults.length });
+            // Stale check
+            if (searchSeqRef.current !== currentSeq) return;
+
+            // Step 5: De-duplication & Combined Scoring
+            const seen = new Set<string>();
+            const uniqueCombined: FoodResult[] = [];
+
+            // Order of insertion priority: Local > Basics > Community > Global
+            for (const item of [...localMatches, ...basicMatches, ...communityMatches, ...globalMatches]) {
+                const key = `${item.food_name.toLowerCase().trim()}|${(item.brand || "").toLowerCase().trim()}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueCombined.push(item);
+                }
+            }
+
+            // Rank everything with calculateScore
+            uniqueCombined.sort((a, b) => {
+                const scoreA = calculateScore(a, queryLower, queryTokens);
+                const scoreB = calculateScore(b, queryLower, queryTokens);
+                if (scoreB !== scoreA) return scoreB - scoreA;
+                return a.food_name.length - b.food_name.length;
+            });
+
+            // Cap results to 20 cleanest items
+            setSearchResults(uniqueCombined.slice(0, 20));
+            trackEvent("food_search_completed", { query: q, results_count: uniqueCombined.length });
         } catch (e) {
+            if (searchSeqRef.current !== currentSeq) return;
             console.warn("Search failed:", e);
             setSearchResults([]);
         } finally {
-            setSearching(false);
+            if (searchSeqRef.current === currentSeq) {
+                setSearching(false);
+            }
         }
     }, [searchCustomFoods]);
 
@@ -413,30 +526,23 @@ export default function AddFoodScreen() {
             image_url: null,
         });
 
-        // If it's a global item, also "contribute" it to our community database via analyze-food pipeline
-        // This builds our community database without using expensive Gemini tokens
-        if (food.source === "global") {
-            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-            const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-            if (supabaseUrl && supabaseKey) {
-                fetch(`${supabaseUrl}/functions/v1/analyze-food`, {
-                    method: 'POST',
-                    headers: {
-                        "Content-Type": "application/json",
-                        "apikey": supabaseKey,
-                        "Authorization": `Bearer ${supabaseKey}`,
-                    },
-                    body: JSON.stringify({ 
-                        textDescription: food.food_name,
-                        _silent_contribution: true,
-                        _contributed_item: {
-                            ...food,
-                            source: "community"
-                        }
-                    })
-                }).catch(() => {});
-            }
-        }
+        // Asynchronously contribute to global community foods index
+        try {
+            supabase.rpc("upsert_global_food", {
+                p_food_name: food.food_name,
+                p_brand: food.brand || null,
+                p_serving_size: food.serving_size || "1 serving",
+                p_calories: food.calories || 0,
+                p_protein: food.protein || 0,
+                p_fat: food.fat || 0,
+                p_carbs: food.carbs || 0,
+                p_sugar: food.sugar || null,
+                p_fiber: food.fiber || null,
+                p_sodium: food.sodium || null,
+                p_barcode: null,
+                p_source: food.source === "ai" ? "ai" : food.source === "basic" ? "basic" : "community"
+            }).then(() => {}, () => {});
+        } catch {}
 
         await addFoodLog({
             food_name: food.food_name,
@@ -705,25 +811,39 @@ export default function AddFoodScreen() {
 
                     <FlatList
                         data={searchResults}
-                        keyExtractor={(item, idx) => `${item.food_name}-${idx}`}
+                        keyExtractor={(item, idx) => `${item.food_name}-${item.brand || ""}-${idx}`}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 40 }}
                         ListHeaderComponent={searchListHeader}
                         ListEmptyComponent={
                             !searching && searchQuery.trim() ? (
-                                <View className="items-center justify-center py-12 px-10">
-                                    <Ionicons name="search-outline" size={40} color="#4A4A5E" />
-                                    <Text className="text-white font-sans mt-4 text-center text-sm">
-                                        No results found for "{searchQuery}"
+                                <Animated.View entering={FadeInDown} className="items-center justify-center py-8 px-2">
+                                    <View style={{ width: 56, height: 56, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+                                        <Ionicons name="search-outline" size={28} color="#9CA3AF" />
+                                    </View>
+                                    <Text className="text-white font-sans-bold text-base text-center">
+                                        No matching foods found for "{searchQuery}"
                                     </Text>
-                                    <Pressable 
-                                        onPress={triggerAiSearch}
-                                        className="mt-6 bg-amber-400/20 border border-amber-400/30 px-6 py-3 rounded-2xl flex-row items-center"
-                                    >
-                                        <Ionicons name="sparkles" size={18} color="#FBBF24" />
-                                        <Text className="text-amber-400 font-sans-bold ml-2">Ask AI to Estimate</Text>
-                                    </Pressable>
-                                </View>
+                                    <Text className="text-surface-400 font-sans text-xs text-center mt-1 mb-5 px-6">
+                                        Scan a barcode from packaging or use AI to estimate the exact nutritional facts.
+                                    </Text>
+                                    <View className="w-full flex-row" style={{ gap: 10 }}>
+                                        <Pressable 
+                                            onPress={() => handleOpenScanner("barcode")}
+                                            className="flex-1 bg-surface-900 border border-white/10 p-3.5 rounded-2xl flex-row items-center justify-center"
+                                        >
+                                            <Ionicons name="barcode-outline" size={18} color="#FBBF24" />
+                                            <Text className="text-white font-sans-bold text-xs ml-2">Scan Barcode</Text>
+                                        </Pressable>
+                                        <Pressable 
+                                            onPress={triggerAiSearch}
+                                            className="flex-1 bg-amber-400/10 border border-amber-400/30 p-3.5 rounded-2xl flex-row items-center justify-center"
+                                        >
+                                            <Ionicons name="sparkles" size={16} color="#FBBF24" />
+                                            <Text className="text-amber-400 font-sans-bold text-xs ml-2">Ask AI</Text>
+                                        </Pressable>
+                                    </View>
+                                </Animated.View>
                             ) : !searching && !searchQuery.trim() ? (
                                 <View className="items-center justify-center py-16 opacity-40">
                                     <Ionicons name="nutrition" size={48} color={colors.text} />
@@ -759,11 +879,17 @@ export default function AddFoodScreen() {
                                 }}>
                                     <GlassContainer className="flex-row items-center p-3.5 mb-2 rounded-2xl overflow-hidden"
                                         style={
+                                            item.source === "basic" ? { borderColor: "rgba(52,211,153,0.25)" } :
                                             item.source === "local" ? { borderColor: "rgba(239,68,68,0.25)" } :
                                             item.source === "ai" ? { borderColor: "rgba(251,191,36,0.2)" } :
                                             item.source === "community" ? { borderColor: "rgba(52,211,153,0.2)" } : undefined
                                         }
                                     >
+                                        {item.source === "basic" && (
+                                            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(52,211,153,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                                <Ionicons name="leaf" size={16} color="#34D399" />
+                                            </View>
+                                        )}
                                         {item.source === "local" && (
                                             <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(239,68,68,0.15)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
                                                 <Ionicons name="heart" size={16} color="#EF4444" />
@@ -786,8 +912,8 @@ export default function AddFoodScreen() {
                                         )}
                                         <View className="flex-1">
                                             {item.brand && (
-                                                <Text className="text-surface-500 font-sans text-[10px] uppercase tracking-tighter" numberOfLines={1}>
-                                                    {item.brand}
+                                                <Text className="text-surface-400 font-sans text-[10px] uppercase tracking-wider mb-0.5" numberOfLines={1}>
+                                                    {item.source === "basic" ? "Curated Basic • USDA Data" : item.brand}
                                                 </Text>
                                             )}
                                             <Text className="text-white font-sans-bold text-sm" numberOfLines={1}>{item.food_name}</Text>

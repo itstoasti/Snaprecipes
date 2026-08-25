@@ -154,7 +154,22 @@ function ConfettiPiece({ color, angle, distance, size, delay, shapeType }: Confe
     );
 }
 
+let lastConfettiAt = 0;
+const CONFETTI_COOLDOWN_MS = 10000;
+
 function ConfettiExplosion() {
+    // The burst replays on every mount, so dev reloads, double mounts, or
+    // back-navigating into this stage would fire it twice in a row. Cooldown
+    // keeps it to a single burst per visit.
+    const [shouldPlay] = useState(() => {
+        const now = Date.now();
+        if (now - lastConfettiAt < CONFETTI_COOLDOWN_MS) return false;
+        lastConfettiAt = now;
+        return true;
+    });
+
+    if (!shouldPlay) return null;
+
     return (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
             <View style={s.confettiCenter}>
@@ -262,9 +277,16 @@ export default function PaywallSequenceScreen() {
     const [purchasing, setPurchasing] = useState(false);
     const [showAllPlansModal, setShowAllPlansModal] = useState(false);
 
+    const trialDays = 7;
+    const reminderLeadDays = 2;
+
     const reminderDate = new Date();
-    reminderDate.setDate(reminderDate.getDate() + 5);
+    reminderDate.setDate(reminderDate.getDate() + (trialDays - reminderLeadDays));
     const formattedDateStr = reminderDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + trialDays);
+    const formattedEndStr = trialEndDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
     // Skip directly into app without purchasing or creating account
     // X button: skip paywall and go to create-account / login screen
@@ -508,14 +530,14 @@ export default function PaywallSequenceScreen() {
                                     resizeMode="cover"
                                 />
                                 <Text style={s.iosAppName}>SNAPRECIPES</Text>
-                                <Text style={s.iosNotifTime}>5 days away</Text>
+                                <Text style={s.iosNotifTime}>{trialDays - reminderLeadDays} days away</Text>
                             </View>
 
                             {/* Main Push Content */}
                             <View style={s.iosNotifBody}>
                                 <Text style={s.iosNotifTitle}>Free Trial Reminder 🔔</Text>
                                 <Text style={s.iosNotifText}>
-                                    Your 7-day free trial will end on {formattedDateStr}. Cancel anytime before then in Settings with no charge.
+                                    Your 7-day free trial will end on {formattedEndStr}. We'll remind you on {formattedDateStr}. Cancel anytime in Settings with no charge.
                                 </Text>
                             </View>
                         </Animated.View>

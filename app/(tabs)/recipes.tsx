@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { pushPendingChanges, pullRemoteChanges } from "@/lib/sync";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
+import { useTheme } from "@/hooks/useTheme";
 import { canExtractRecipe, getCurrentUsage } from "@/lib/usage";
 
 export default function RecipesScreen() {
@@ -21,6 +22,7 @@ export default function RecipesScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isPro } = useRevenueCat();
+    const { colors } = useTheme();
     const [usageCount, setUsageCount] = useState(0);
     const [showSavesExplanation, setShowSavesExplanation] = useState(false);
 
@@ -99,18 +101,18 @@ export default function RecipesScreen() {
             {/* Search Bar */}
             <View className="px-5 mb-4">
                 <View className="flex-row items-center bg-surface-900 rounded-2xl px-4 py-1 border border-surface-800">
-                    <Ionicons name="search" size={20} color="#6E6E85" className="mr-2" />
+                    <Ionicons name="search" size={20} color={colors.placeholder} className="mr-2" />
                     <TextInput
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder="Search recipes..."
-                        placeholderTextColor="#6E6E85"
+                        placeholderTextColor={colors.placeholder}
                         className="flex-1 text-white font-sans text-base py-3"
                         autoCorrect={false}
                     />
                     {searchQuery.length > 0 && (
                         <Pressable onPress={() => setSearchQuery("")} className="p-2 -mr-2">
-                            <Ionicons name="close-circle" size={18} color="#6E6E85" />
+                            <Ionicons name="close-circle" size={18} color={colors.placeholder} />
                         </Pressable>
                     )}
                 </View>

@@ -28,6 +28,8 @@ const STAGE_MAP: Record<string, number> = {
     "video:process": 1,
     "slideshow:process": 1,
     "generate:start": 2,
+    "sections:ai": 2,
+    "parse:jsonld": 3,
     "image:cache": 3,
     "community:save": 3,
 };

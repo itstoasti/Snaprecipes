@@ -6,7 +6,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getDatabase } from "@/db/client";
 import RecipeFeed from "@/components/RecipeFeed";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import AddRecipesModal from "@/components/AddRecipesModal";
+import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
+import { useCollections } from "@/hooks/useCollections";
 import { useTheme } from "@/hooks/useTheme";
 
 export default function CollectionDetailScreen() {
@@ -14,10 +17,12 @@ export default function CollectionDetailScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { colors } = useTheme();
+    const { deleteCollection } = useCollections();
     const [recipes, setRecipes] = useState<any[]>([]);
     const [collectionName, setCollectionName] = useState("");
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const loadData = useCallback(async () => {
         if (!id) return;
@@ -67,9 +72,18 @@ export default function CollectionDetailScreen() {
                     </View>
                     <Pressable
                         onPress={() => setShowAddModal(true)}
-                        className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center ml-4"
+                        className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center ml-2"
                     >
                         <Ionicons name="add-outline" size={24} color="#FF6B35" />
+                    </Pressable>
+                    <Pressable
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            setShowDeleteModal(true);
+                        }}
+                        className="w-10 h-10 rounded-full bg-surface-800 items-center justify-center ml-2"
+                    >
+                        <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
                     </Pressable>
                 </View>
             </View>
@@ -102,6 +116,22 @@ export default function CollectionDetailScreen() {
                 collectionId={parseInt(id || "0")}
                 onClose={() => setShowAddModal(false)}
                 onAddSuccess={loadData}
+            />
+
+            {/* Custom Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                visible={showDeleteModal}
+                title="Delete Cookbook?"
+                message={`Are you sure you want to delete "${collectionName}"? The recipes inside won't be deleted.`}
+                itemName={collectionName}
+                onCancel={() => setShowDeleteModal(false)}
+                onConfirm={async () => {
+                    if (id) {
+                        await deleteCollection(parseInt(id));
+                        setShowDeleteModal(false);
+                        router.back();
+                    }
+                }}
             />
         </View>
     );

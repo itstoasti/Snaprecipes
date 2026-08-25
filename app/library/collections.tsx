@@ -5,17 +5,18 @@ import {
     FlatList,
     Pressable,
     TextInput,
-    Alert,
     Platform,
     StatusBar as RNStatusBar,
 } from "react-native";
 import { useFocusEffect, useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import { useCollections } from "@/hooks/useCollections";
 import { getDatabase } from "@/db/client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
+import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
 
 export default function CollectionsScreen() {
     const { collections, loading, loadCollections, createCollection, deleteCollection } =
@@ -24,6 +25,7 @@ export default function CollectionsScreen() {
     const [newName, setNewName] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [recipeCounts, setRecipeCounts] = useState<Record<number, number>>({});
+    const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { colors } = useTheme();
@@ -57,18 +59,8 @@ export default function CollectionsScreen() {
     };
 
     const handleDelete = (id: number, name: string) => {
-        Alert.alert(
-            "Delete Cookbook",
-            `Are you sure you want to delete "${name}"? Recipes won't be deleted.`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => deleteCollection(id),
-                },
-            ]
-        );
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setDeleteTarget({ id, name });
     };
 
     const COLORS = ["#FF6B35", "#34D399", "#818CF8", "#F472B6", "#FBBF24", "#22D3EE"];
@@ -196,6 +188,21 @@ export default function CollectionsScreen() {
                         </Pressable>
                     </Animated.View>
                 )}
+            />
+
+            {/* Custom Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                visible={!!deleteTarget}
+                title="Delete Cookbook?"
+                message={`Are you sure you want to delete "${deleteTarget?.name}"? Recipes inside won't be deleted.`}
+                itemName={deleteTarget?.name}
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={async () => {
+                    if (deleteTarget) {
+                        await deleteCollection(deleteTarget.id);
+                        setDeleteTarget(null);
+                    }
+                }}
             />
         </View>
     );

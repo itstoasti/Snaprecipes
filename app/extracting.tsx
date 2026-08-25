@@ -8,7 +8,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { extractFromUrl, cleanUrlForDuplicateCheck } from "@/lib/extract";
 import { useRecipes } from "@/hooks/useRecipes";
 import { getDatabase } from "@/db/client";
-import { incrementUsage, canExtractRecipe } from "@/lib/usage";
+import { incrementUsage, canExtractRecipe, getCurrentUsage } from "@/lib/usage";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { trackEvent } from "@/lib/analytics";
 import ExtractionProgress from "@/components/ExtractionProgress";
@@ -18,7 +18,7 @@ export default function ExtractingScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { insertRecipe, shareRecipeToCommunity } = useRecipes();
-    const { isPro, isReady } = useRevenueCat();
+    const { isPro, entitlementsReady } = useRevenueCat();
 
     const [status, setStatus] = useState<"loading" | "error" | "paywall">("loading");
     const [errorMessage, setErrorMessage] = useState("");
@@ -27,6 +27,7 @@ export default function ExtractingScreen() {
     const [snippet, setSnippet] = useState<string | null>(null);
     const [attempt, setAttempt] = useState(0);
     const hasStarted = useRef(false);
+    const duplicateRedirected = useRef(false);
 
     useEffect(() => {
         if (status === "loading") {
@@ -35,10 +36,10 @@ export default function ExtractingScreen() {
         }
     }, [status]);
 
+    // Fast path: duplicate check needs only the local DB, so run it immediately
+    // instead of waiting for RevenueCat to resolve.
     useEffect(() => {
-        if (!url || !isReady || hasStarted.current) return;
-        hasStarted.current = true;
-
+        if (!url) return;
         (async () => {
             try {
                 const db = await getDatabase();
@@ -51,21 +52,38 @@ export default function ExtractingScreen() {
                     return cleanUrlForDuplicateCheck(r.source_url) === cleanedInputUrl;
                 });
 
-                if (existingRecipe) {
+                if (existingRecipe && !hasStarted.current) {
+                    duplicateRedirected.current = true;
                     router.replace(`/recipe/${existingRecipe.id}`);
-                    return;
                 }
             } catch (dbErr) {
                 console.warn("[Extracting] Duplicate check failed:", dbErr);
             }
+        })();
+    }, [url, attempt]);
 
-            const allowed = await canExtractRecipe(isPro);
-            if (!allowed) {
-                setStatus("paywall");
-                return;
-            }
+    useEffect(() => {
+        if (!url || hasStarted.current || duplicateRedirected.current) return;
 
+        (async () => {
             try {
+                const currentUsage = await getCurrentUsage();
+                const underFreeLimit = currentUsage < 10;
+
+                // If user has hit the free limit, verify Pro entitlements before proceeding
+                if (!underFreeLimit) {
+                    if (!entitlementsReady) {
+                        return; // Wait for RevenueCat to settle
+                    }
+                    const allowed = await canExtractRecipe(isPro);
+                    if (!allowed) {
+                        setStatus("paywall");
+                        return;
+                    }
+                }
+
+                hasStarted.current = true;
+
                 const recipes = await extractFromUrl(url, false, {
                     onStage: setStage,
                     onToken: setAiText,
@@ -94,7 +112,7 @@ export default function ExtractingScreen() {
                 setStatus("error");
             }
         })();
-    }, [url, isReady, attempt]);
+    }, [url, entitlementsReady, isPro, attempt]);
 
     const handleRetry = async () => {
         if (!url) return;

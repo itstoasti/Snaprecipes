@@ -194,30 +194,29 @@ Deno.serve(async (req: Request) => {
                     const nameKey = (item.food_name || "").toLowerCase().trim();
                     if (!nameKey) continue;
 
-                    await serviceClient
-                        .from("global_foods")
-                        .upsert({
-                            food_name: item.food_name,
-                            food_name_lower: nameKey,
-                            serving_size: item.serving_size || "1 serving",
-                            calories: item.calories || 0,
-                            protein: item.protein || 0,
-                            fat: item.fat || 0,
-                            carbs: item.carbs || 0,
-                            sugar: item.sugar || null,
-                            fiber: item.fiber || null,
-                            sodium: item.sodium || null,
-                            source: "ai",
-                            lookup_count: 1,
-                        }, { onConflict: "food_name_lower", ignoreDuplicates: false })
+                    serviceClient
+                        .rpc("upsert_global_food", {
+                            p_food_name: item.food_name,
+                            p_brand: item.brand || null,
+                            p_serving_size: item.serving_size || "1 serving",
+                            p_calories: item.calories || 0,
+                            p_protein: item.protein || 0,
+                            p_fat: item.fat || 0,
+                            p_carbs: item.carbs || 0,
+                            p_sugar: item.sugar || null,
+                            p_fiber: item.fiber || null,
+                            p_sodium: item.sodium || null,
+                            p_barcode: null,
+                            p_source: "ai"
+                        })
                         .then(({ error }) => {
                             if (error) {
-                                // If upsert failed (table may not exist yet), just log it
-                                console.log(`[Global Foods] Upsert skipped:`, error.message);
+                                console.log(`[Global Foods] RPC upsert skipped:`, error.message);
                             } else {
                                 console.log(`[Global Foods] Saved: ${item.food_name}`);
                             }
-                        });
+                        })
+                        .catch(() => {});
                 }
             } catch (e) {
                 // Fire-and-forget — never block the response

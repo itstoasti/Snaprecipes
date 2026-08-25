@@ -10,13 +10,19 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface DeleteConfirmationModalProps {
     visible: boolean;
-    recipeName: string;
+    title?: string;
+    message?: string;
+    itemName?: string;
+    recipeName?: string;
     onCancel: () => void;
     onConfirm: () => void;
 }
 
 export default function DeleteConfirmationModal({
     visible,
+    title,
+    message,
+    itemName,
     recipeName,
     onCancel,
     onConfirm,
@@ -24,6 +30,12 @@ export default function DeleteConfirmationModal({
     const { isDark } = useTheme();
 
     if (!visible) return null;
+
+    const displayName = itemName || recipeName || "this item";
+    const modalTitle = title || (recipeName ? "Delete Recipe?" : "Delete Item?");
+    const modalMessage =
+        message ||
+        `Are you sure you want to delete "${displayName}"? This action cannot be undone.`;
 
     return (
         <Modal transparent visible={visible} animationType="none" statusBarTranslucent>
@@ -58,10 +70,10 @@ export default function DeleteConfirmationModal({
 
                                     {/* Text */}
                                     <Text className="text-white font-sans-bold text-xl mb-2 text-center">
-                                        Delete Recipe?
+                                        {modalTitle}
                                     </Text>
                                     <Text className="text-surface-300 font-sans text-sm text-center mb-8 px-4 leading-5">
-                                        Are you sure you want to delete "{recipeName}"? This action cannot be undone.
+                                        {modalMessage}
                                     </Text>
 
                                     {/* Actions */}

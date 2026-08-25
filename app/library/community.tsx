@@ -91,7 +91,7 @@ export default function CommunityScreen() {
                         params: { id: item.id, isCommunity: "true" }
                     })}
                 >
-                    <GlassContainer className="rounded-3xl overflow-hidden bg-surface-900 border-surface-800">
+                    <View className="rounded-3xl overflow-hidden bg-surface-900 border border-surface-800">
                         <View style={{ height: itemWidth * 1.1 }}>
                             {item.image_url ? (
                                 <Image 
@@ -101,7 +101,7 @@ export default function CommunityScreen() {
                                 />
                             ) : (
                                 <View className="flex-1 items-center justify-center bg-surface-800">
-                                    <Ionicons name="restaurant-outline" size={32} color="#4A4A5E" />
+                                    <Ionicons name="restaurant-outline" size={32} color={colors.textFaint} />
                                 </View>
                             )}
                             
@@ -120,7 +120,7 @@ export default function CommunityScreen() {
                                 {item.source_domain || "Shared Recipe"}
                             </Text>
                         </View>
-                    </GlassContainer>
+                    </View>
                 </Pressable>
             </Animated.View>
         );
@@ -192,7 +192,7 @@ export default function CommunityScreen() {
                     }
                     ListEmptyComponent={
                         <View className="flex-1 items-center justify-center py-20 px-10">
-                            <Ionicons name="search-outline" size={64} color="#2A2A3E" />
+                            <Ionicons name="search-outline" size={64} color={colors.textFaint} />
                             <Text className="text-white font-sans-bold text-lg mt-4 text-center">
                                 No recipes found
                             </Text>

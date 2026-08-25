@@ -17,6 +17,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { pushPendingChanges, pullRemoteChanges, deduplicateLocalRecipes } from "@/lib/sync";
 import { RevenueCatProvider } from "@/hooks/useRevenueCat";
+import { TrialReminderController } from "@/hooks/useTrialReminder";
+import { InactivityReminderController } from "@/hooks/useInactivityReminder";
 import { getDatabase } from "@/db/client";
 import { ShareIntentProvider, useShareIntent } from "expo-share-intent";
 import { initAnalytics, trackScreenView } from "@/lib/analytics";
@@ -24,20 +26,22 @@ import { OnboardingProvider } from "@/components/onboarding/onboardingContext";
 import "../global.css";
 
 // Helper component inside ShareIntentProvider
-function ShareIntentHandler() {
+function ShareIntentHandler({ isReady, fontsLoaded }: { isReady: boolean; fontsLoaded: boolean }) {
     const router = useRouter();
     try {
         const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
         useEffect(() => {
-            if (hasShareIntent && shareIntent?.text) {
+            if (hasShareIntent && shareIntent?.text && isReady && fontsLoaded) {
                 const urlMatch = shareIntent.text.match(/https?:\/\/[^\s]+/);
                 const sharedUrl = urlMatch ? urlMatch[0] : shareIntent.text.trim();
                 if (sharedUrl) {
                     resetShareIntent();
-                    router.push({ pathname: "/share", params: { url: sharedUrl } });
+                    // Go straight to extraction; the /share screen is only a
+                    // fallback for direct deep links.
+                    router.push({ pathname: "/extracting", params: { url: sharedUrl } });
                 }
             }
-        }, [hasShareIntent, shareIntent]);
+        }, [hasShareIntent, shareIntent, isReady, fontsLoaded]);
     } catch (e) {
         // Safe fallback in standard Expo Go where native share-intent is omitted
         console.warn("ShareIntent native module not available in current environment");
@@ -172,26 +176,39 @@ export default function RootLayout() {
         }
     }, [segments]);
 
-    if (!fontsLoaded || !isReady) {
-        return (
-            <View className="flex-1 items-center justify-center bg-surface-950">
-                <ActivityIndicator size="large" color="#FF6B35" />
-            </View>
-        );
-    }
-
     return (
         <ShareIntentProvider>
-            <ShareIntentHandler />
+            <ShareIntentHandler isReady={isReady} fontsLoaded={fontsLoaded} />
             <SafeAreaProvider>
                 <RevenueCatProvider>
                     <OnboardingProvider>
+                        <TrialReminderController />
+                        <InactivityReminderController />
                         <AppThemeProvider>
-                            <ThemedRoot />
+                            {/* Providers stay mounted while fonts/onboarding state
+                                load so RevenueCat, Supabase and DB init overlap the
+                                boot wait — shared links reach extraction faster. */}
+                            {!fontsLoaded || !isReady ? <BootSplash /> : <ThemedRoot />}
                         </AppThemeProvider>
                     </OnboardingProvider>
                 </RevenueCatProvider>
             </SafeAreaProvider>
         </ShareIntentProvider>
+    );
+}
+
+function BootSplash() {
+    const { colors } = useTheme();
+    return (
+        <View
+            style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.bg,
+            }}
+        >
+            <ActivityIndicator size="large" color="#FF6B35" />
+        </View>
     );
 }

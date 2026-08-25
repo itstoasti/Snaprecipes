@@ -342,6 +342,24 @@ export default function ScanScreen() {
                     image_url: null,
                     barcode: scannedBarcode || null,
                 });
+
+                // Asynchronously contribute to global community foods index
+                try {
+                    supabase.rpc("upsert_global_food", {
+                        p_food_name: food.food_name,
+                        p_brand: food.brand || null,
+                        p_serving_size: food.serving_size || "1 serving",
+                        p_calories: food.calories || 0,
+                        p_protein: food.protein || 0,
+                        p_fat: food.fat || 0,
+                        p_carbs: food.carbs || 0,
+                        p_sugar: food.sugar || null,
+                        p_fiber: food.fiber || null,
+                        p_sodium: food.sodium || null,
+                        p_barcode: scannedBarcode || null,
+                        p_source: mode === "barcode" ? "barcode" : "ai"
+                    }).then(() => {}, () => {});
+                } catch {}
             }
 
             trackEvent("foods_logged", { count: selectedIndexes.length, meal_type: selectedMealType, source: mode });

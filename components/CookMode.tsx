@@ -25,9 +25,13 @@ import { scaleQuantity } from "./ServingScaler";
 import type { Ingredient, Step } from "@/db/schema";
 import { useTheme } from "@/hooks/useTheme";
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
+// Enable LayoutAnimation on legacy Android architecture
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental && !(global as any).nativeFabricUIManager) {
+    try {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+    } catch {
+        // no-op on new architecture
+    }
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
