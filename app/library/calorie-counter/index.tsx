@@ -55,7 +55,17 @@ export default function CalorieCounterScreen() {
     useFocusEffect(
         useCallback(() => {
             refreshRef.current();
-        }, [])
+            trackEvent("calorie_counter_viewed", {
+                date: format(selectedDate, "yyyy-MM-dd"),
+                total_calories: Math.round(dailyTotals.calories),
+                calorie_goal: goals.calories,
+                total_protein: Math.round(dailyTotals.protein),
+                total_carbs: Math.round(dailyTotals.carbs),
+                total_fat: Math.round(dailyTotals.fat),
+                logged_items_count: logs.length,
+                is_today: isSameDay(selectedDate, new Date()),
+            });
+        }, [selectedDate, dailyTotals, goals, logs.length])
     );
 
     // Generate next 14 days
@@ -68,12 +78,17 @@ export default function CalorieCounterScreen() {
 
     const handleAddFood = useCallback(
         (mealType?: string) => {
+            const finalMealType = mealType || getDefaultMealType();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            trackEvent("calorie_counter_add_food_tapped", {
+                meal_type: finalMealType,
+                date: format(selectedDate, "yyyy-MM-dd"),
+            });
             router.push({
                 pathname: "/library/calorie-counter/add-food",
                 params: {
                     date: format(selectedDate, "yyyy-MM-dd"),
-                    mealType: mealType || getDefaultMealType(),
+                    mealType: finalMealType,
                 },
             });
         },
@@ -276,7 +291,13 @@ export default function CalorieCounterScreen() {
                         const hasLogs = logs.length > 0 && isSameDay(item, selectedDate);
                         return (
                             <Pressable
-                                onPress={() => setSelectedDate(item)}
+                                onPress={() => {
+                                    trackEvent("calorie_counter_date_selected", {
+                                        date: format(item, "yyyy-MM-dd"),
+                                        is_today: isSameDay(item, new Date()),
+                                    });
+                                    setSelectedDate(item);
+                                }}
                                 style={{
                                     alignItems: "center",
                                     justifyContent: "center",

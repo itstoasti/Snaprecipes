@@ -54,6 +54,10 @@ export default function ExtractingScreen() {
 
                 if (existingRecipe && !hasStarted.current) {
                     duplicateRedirected.current = true;
+                    trackEvent("recipe_extraction_duplicate_redirected", {
+                        url,
+                        existing_recipe_id: existingRecipe.id,
+                    });
                     router.replace(`/recipe/${existingRecipe.id}`);
                 }
             } catch (dbErr) {
@@ -66,6 +70,12 @@ export default function ExtractingScreen() {
         if (!url || hasStarted.current || duplicateRedirected.current) return;
 
         (async () => {
+            const startTime = Date.now();
+            let domain = "";
+            try {
+                domain = new URL(url).hostname;
+            } catch {}
+
             try {
                 const currentUsage = await getCurrentUsage();
                 const underFreeLimit = currentUsage < 10;
@@ -77,12 +87,22 @@ export default function ExtractingScreen() {
                     }
                     const allowed = await canExtractRecipe(isPro);
                     if (!allowed) {
+                        trackEvent("extraction_paywall_blocked", {
+                            url,
+                            domain,
+                            usage_count: currentUsage,
+                        });
                         setStatus("paywall");
                         return;
                     }
                 }
 
                 hasStarted.current = true;
+                trackEvent("recipe_extraction_started", {
+                    url,
+                    domain,
+                    is_pro: isPro,
+                });
 
                 const recipes = await extractFromUrl(url, false, {
                     onStage: setStage,
@@ -100,7 +120,22 @@ export default function ExtractingScreen() {
                 }
                 await incrementUsage();
 
-                trackEvent("recipe_imported", { source: "url" });
+                const durationMs = Date.now() - startTime;
+                const primaryRecipe = recipes[0];
+                trackEvent("recipe_extraction_succeeded", {
+                    url,
+                    domain,
+                    title: primaryRecipe?.title || "Unknown Recipe",
+                    recipes_count: recipes.length,
+                    ingredients_count: primaryRecipe?.ingredients?.length || 0,
+                    steps_count: primaryRecipe?.steps?.length || 0,
+                    duration_ms: durationMs,
+                });
+                trackEvent("recipe_imported", {
+                    source: "url",
+                    domain,
+                    duration_ms: durationMs,
+                });
 
                 if (firstRecipeId) {
                     router.replace(`/recipe/${firstRecipeId}?isNew=true`);
@@ -108,6 +143,13 @@ export default function ExtractingScreen() {
                     router.replace("/");
                 }
             } catch (error: any) {
+                const durationMs = Date.now() - startTime;
+                trackEvent("recipe_extraction_failed", {
+                    url,
+                    domain,
+                    error: error.message || "Unknown extraction failure",
+                    duration_ms: durationMs,
+                });
                 setErrorMessage(error.message || "Could not extract recipe from this URL.");
                 setStatus("error");
             }

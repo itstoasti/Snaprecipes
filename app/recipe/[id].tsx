@@ -116,10 +116,22 @@ export default function RecipeDetailScreen() {
             setInCollection((collectionCount?.count || 0) > 0);
         }
 
-        if (data) {
+        if (data && data.recipe) {
             setRecipe(data.recipe);
-            setIngredients(data.ingredients);
-            setSteps(data.steps);
+            setIngredients(data.ingredients || []);
+            setSteps(data.steps || []);
+            trackEvent("recipe_detail_viewed", {
+                recipe_id: data.recipe.id,
+                title: data.recipe.title,
+                is_community: isCommunity === "true",
+                has_video: isVideoUrl(data.recipe.source_url),
+                ingredients_count: (data.ingredients || []).length,
+                steps_count: (data.steps || []).length,
+                prep_time: data.recipe.prep_time || null,
+                cook_time: data.recipe.cook_time || null,
+                servings: data.recipe.servings || null,
+                has_nutrition: !!(data.recipe.calories || data.recipe.protein),
+            });
         }
         setLoading(false);
     }, [id, isCommunity, getRecipeById, getCommunityRecipeById]);
@@ -145,6 +157,10 @@ export default function RecipeDetailScreen() {
 
     const confirmDelete = async () => {
         if (!recipe) return;
+        trackEvent("recipe_deleted", {
+            recipe_id: recipe.id,
+            title: recipe.title,
+        });
         setShowDeleteModal(false);
         await deleteRecipe(recipe.id);
         router.back();
@@ -152,13 +168,23 @@ export default function RecipeDetailScreen() {
 
     const handleStartCooking = async () => {
         if (!recipe) return;
-
+        trackEvent("cook_mode_started", {
+            recipe_id: recipe.id,
+            title: recipe.title,
+            total_steps: steps.length,
+            ingredients_count: ingredients.length,
+        });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         enterCookMode(recipe.id);
     };
 
     const handlePlayVideo = async () => {
         if (recipe?.source_url) {
+            trackEvent("recipe_video_opened", {
+                recipe_id: recipe.id,
+                title: recipe.title,
+                source_url: recipe.source_url,
+            });
             try {
                 await Linking.openURL(recipe.source_url);
             } catch (error) {
@@ -181,6 +207,12 @@ export default function RecipeDetailScreen() {
         newSteps: { id?: number; text: string; step_number: number }[]
     ) => {
         if (!recipe) return;
+        trackEvent("recipe_edited", {
+            recipe_id: recipe.id,
+            title: updates.title || recipe.title,
+            ingredients_count: newIngredients.length,
+            steps_count: newSteps.length,
+        });
         await updateRecipe(recipe.id, updates, newIngredients, newSteps);
         await loadData();
     };
@@ -202,6 +234,11 @@ export default function RecipeDetailScreen() {
         try {
             const newId = await saveCommunityRecipe(id);
             if (newId) {
+                trackEvent("community_recipe_saved", {
+                    community_recipe_id: id,
+                    new_local_id: newId,
+                    title: recipe?.title || "Community Recipe",
+                });
                 setIsSaved(true);
                 setStatusModalConfig({
                     visible: true,

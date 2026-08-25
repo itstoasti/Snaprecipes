@@ -283,6 +283,7 @@ export default function PaywallScreen() {
         try {
             setLoading(true);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            trackEvent("purchase_restore_initiated");
 
             const Constants = require("expo-constants").default;
             if (Constants.appOwnership === "expo") {
@@ -296,13 +297,16 @@ export default function PaywallScreen() {
 
             if (activeKeys.length > 0) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                trackEvent("purchase_restore_succeeded", { active_entitlements: activeKeys });
                 alert("Success! Your premium access has been restored.");
                 router.replace("/(tabs)/");
             } else {
+                trackEvent("purchase_restore_not_found");
                 alert("No active subscription found to restore.");
             }
         } catch (e: any) {
             console.error("Restore error", e);
+            trackEvent("purchase_restore_failed", { error: e.message });
             alert("Failed to restore purchases: " + e.message);
         } finally {
             setLoading(false);
@@ -328,6 +332,7 @@ export default function PaywallScreen() {
                 <Pressable
                     onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        trackEvent("paywall_dismissed");
                         if (router.canGoBack()) {
                             router.back();
                         } else {

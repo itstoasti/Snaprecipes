@@ -7,6 +7,7 @@ import * as Notifications from "@/lib/notifications";
 import Constants from "expo-constants";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
 import { useOnboarding } from "@/components/onboarding/onboardingContext";
+import { trackEvent } from "@/lib/analytics";
 
 export default function NotificationsScreen() {
     const router = useRouter();
@@ -17,6 +18,7 @@ export default function NotificationsScreen() {
 
     const handlePreAsk = () => {
         if (requesting) return;
+        trackEvent("onboarding_notifications_preask_shown");
         setShowPreAsk(true);
     };
 
@@ -27,11 +29,13 @@ export default function NotificationsScreen() {
         if (requesting) return;
         setRequesting(true);
         setShowPreAsk(false);
+        trackEvent("onboarding_notifications_allow_clicked");
 
         if (Constants.appOwnership === "expo" || !Notifications.isNotificationsAvailable) {
             // Expo Go / clients without the native notifications module can't
             // run the OS prompt, so just remember the user's intent.
             setNotificationAllowed(true);
+            trackEvent("onboarding_notifications_permission_result", { granted: true, is_expo_go: true });
             router.push("/onboarding/attribution");
             return;
         }
@@ -40,6 +44,7 @@ export default function NotificationsScreen() {
             const { status } = await Notifications.requestPermissionsAsync();
             const granted = status === "granted";
             setNotificationAllowed(granted);
+            trackEvent("onboarding_notifications_permission_result", { granted, os_status: status });
 
             if (!granted) {
                 // Denied — the OS dialog won't fire again on its own, so
@@ -50,6 +55,7 @@ export default function NotificationsScreen() {
         } catch (e) {
             console.warn("Notification permission request failed:", e);
             setNotificationAllowed(false);
+            trackEvent("onboarding_notifications_permission_result", { granted: false, error: String(e) });
             setShowSettingsModal(true);
             return;
         }
@@ -61,6 +67,7 @@ export default function NotificationsScreen() {
         if (requesting) return;
         setShowPreAsk(false);
         setNotificationAllowed(false);
+        trackEvent("onboarding_notifications_denied");
         router.push("/onboarding/attribution");
     };
 

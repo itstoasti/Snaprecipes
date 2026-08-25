@@ -563,7 +563,19 @@ export default function AddFoodScreen() {
             image_url: null,
             barcode: null,
         });
-        trackEvent("food_logged", { source: "search", source_type: food.source, calories: food.calories * qty, quantity: qty });
+        trackEvent("food_logged", {
+            source: "search",
+            source_type: food.source,
+            food_name: food.food_name,
+            brand: food.brand || null,
+            meal_type: selectedMealType,
+            calories: Math.round(food.calories * qty),
+            protein: Math.round(food.protein * qty * 10) / 10,
+            carbs: Math.round(food.carbs * qty * 10) / 10,
+            fat: Math.round(food.fat * qty * 10) / 10,
+            quantity: qty,
+            log_date: logDate,
+        });
         router.back();
     }, [addFoodLog, saveCustomFood, selectedMealType, logDate, router]);
 
@@ -599,7 +611,18 @@ export default function AddFoodScreen() {
             source_type: "manual", source_recipe_id: null,
             image_url: null, barcode: null,
         });
-        trackEvent("food_logged", { source: "quick_add", calories: cal * qtyVal, quantity: qtyVal });
+        trackEvent("food_logged", {
+            source: "quick_add",
+            source_type: "quick_add",
+            food_name: quick.food_name.trim(),
+            meal_type: selectedMealType,
+            calories: Math.round(cal * qtyVal),
+            protein: Math.round(pro * qtyVal * 10) / 10,
+            carbs: Math.round(carb * qtyVal * 10) / 10,
+            fat: Math.round(fatVal * qtyVal * 10) / 10,
+            quantity: qtyVal,
+            log_date: logDate,
+        });
         router.back();
     }, [quick, addFoodLog, saveCustomFood, selectedMealType, logDate, router]);
 
@@ -617,7 +640,19 @@ export default function AddFoodScreen() {
             source_type: "recipe", source_recipe_id: recipe.id > 0 ? recipe.id : null,
             image_url: recipe.image_url || null, barcode: null,
         });
-        trackEvent("food_logged", { source: "recipe", calories: (recipe.calories || 0) * qty, quantity: qty });
+        trackEvent("food_logged", {
+            source: "recipe",
+            source_type: "recipe",
+            recipe_id: recipe.id,
+            food_name: recipe.title,
+            meal_type: selectedMealType,
+            calories: Math.round((recipe.calories || 0) * qty),
+            protein: Math.round((recipe.protein || 0) * qty * 10) / 10,
+            carbs: Math.round((recipe.carbs || 0) * qty * 10) / 10,
+            fat: Math.round((recipe.fat || 0) * qty * 10) / 10,
+            quantity: qty,
+            log_date: logDate,
+        });
         router.back();
     }, [addFoodLog, selectedMealType, logDate, router]);
 

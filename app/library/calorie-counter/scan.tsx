@@ -100,9 +100,21 @@ export default function ScanScreen() {
         return () => { deactivateKeepAwake("food-scanner"); };
     }, []);
 
+    // Track screen opened on mount
+    useEffect(() => {
+        trackEvent("scan_screen_opened", {
+            initial_mode: initialMode,
+            meal_type: mealType,
+            date: logDate,
+        });
+    }, []);
+
     // ── Photo Capture → AI Analysis ──
-    const analyzeBase64 = useCallback(async (base64: string) => {
+    const analyzeBase64 = useCallback(async (base64: string, source: "camera" | "gallery" = "camera") => {
         setLoading(true);
+        const startTime = Date.now();
+        trackEvent("plate_scan_started", { source });
+
         try {
             const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
             const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -133,10 +145,22 @@ export default function ScanScreen() {
             }
 
             const data = await response.json();
-            setResults(data.items || []);
-            trackEvent("photo_scanned", { items_count: (data.items || []).length });
+            const items = data.items || [];
+            const durationMs = Date.now() - startTime;
+            setResults(items);
+            trackEvent("plate_scan_succeeded", {
+                items_count: items.length,
+                duration_ms: durationMs,
+                confidence: data.confidence || "medium",
+                detected_foods: items.map((i: any) => i.food_name).join(", "),
+                provider,
+            });
             setConfidence(data.confidence || "medium");
         } catch (error: any) {
+            trackEvent("plate_scan_failed", {
+                error: error.message || "Unknown error",
+                duration_ms: Date.now() - startTime,
+            });
             Alert.alert("Scan Failed", error.message || "Could not analyze food photo");
         } finally {
             setLoading(false);
@@ -244,13 +268,21 @@ export default function ScanScreen() {
 
                     setResults([item]);
                     setConfidence("high");
-                    trackEvent("barcode_scanned", { found_in_off: true });
+                    trackEvent("barcode_scan_succeeded", {
+                        barcode,
+                        found_in_off: true,
+                        source: "open_food_facts",
+                        food_name: item.food_name,
+                        brand: item.brand,
+                        calories: item.calories,
+                    });
                     setBarcodeProcessing(false);
                     return;
                 }
             }
 
             if (!isPro) {
+                trackEvent("barcode_scan_not_found", { barcode, requires_pro: true });
                 Alert.alert(
                     "Product Not Found",
                     `Barcode ${barcode} was not found on Open Food Facts. Pro users can use AI lookup to identify products.`,
@@ -285,13 +317,23 @@ export default function ScanScreen() {
 
             if (aiResp.ok) {
                 const aiData = await aiResp.json();
-                setResults(aiData.items || []);
+                const aiItems = aiData.items || [];
+                setResults(aiItems);
                 setConfidence(aiData.confidence || "low");
-                trackEvent("barcode_scanned", { found_in_off: false, ai_fallback: true });
+                trackEvent("barcode_scan_succeeded", {
+                    barcode,
+                    found_in_off: false,
+                    source: "ai_fallback",
+                    items_count: aiItems.length,
+                    food_name: aiItems[0]?.food_name || "Unknown",
+                    provider,
+                });
             } else {
+                trackEvent("barcode_scan_not_found", { barcode, ai_fallback_failed: true });
                 Alert.alert("Not Found", `Barcode ${barcode} not found. Try scanning the nutrition label with the photo scanner instead.`);
             }
         } catch (e: any) {
+            trackEvent("barcode_scan_failed", { barcode, error: e.message || "Unknown error" });
             Alert.alert("Lookup Failed", e.message || "Could not look up barcode");
         } finally {
             setBarcodeProcessing(false);
@@ -362,7 +404,19 @@ export default function ScanScreen() {
                 } catch {}
             }
 
-            trackEvent("foods_logged", { count: selectedIndexes.length, meal_type: selectedMealType, source: mode });
+            const totalCals = selectedIndexes.reduce((sum, idx) => {
+                const item = results[idx];
+                const qty = quantities[idx] !== undefined ? quantities[idx] : 1;
+                return sum + ((item?.calories || 0) * qty);
+            }, 0);
+
+            trackEvent("foods_logged", {
+                count: selectedIndexes.length,
+                meal_type: selectedMealType,
+                source: mode,
+                total_calories: Math.round(totalCals),
+                food_names: selectedIndexes.map(idx => results[idx]?.food_name).filter(Boolean).join(", "),
+            });
 
             // Move selected indexes to logged indexes
             setLoggedIndexes(prev => [...prev, ...selectedIndexes]);

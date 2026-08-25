@@ -24,6 +24,7 @@ import GlassContainer from "./GlassContainer";
 import { scaleQuantity } from "./ServingScaler";
 import type { Ingredient, Step } from "@/db/schema";
 import { useTheme } from "@/hooks/useTheme";
+import { trackEvent } from "@/lib/analytics";
 
 // Enable LayoutAnimation on legacy Android architecture
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental && !(global as any).nativeFabricUIManager) {
@@ -85,6 +86,15 @@ export default function CookMode({
     const [expandedTaskIndex, setExpandedTaskIndex] = useState(0);
     const scrollRef = useRef<ScrollView>(null);
     const { colors } = useTheme();
+
+    React.useEffect(() => {
+        trackEvent("cook_mode_viewed", {
+            recipe_name: recipeName,
+            total_steps: steps.length,
+            ingredients_count: ingredients.length,
+            multiplier,
+        });
+    }, []);
 
     // Build unified task list: Ingredients first, then each step
     const tasks: Task[] = useMemo(() => {
@@ -341,6 +351,11 @@ export default function CookMode({
                                                                         key={ing.id}
                                                                         onPress={() => {
                                                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                                            trackEvent("cook_mode_ingredient_toggled", {
+                                                                                ingredient_name: ing.name,
+                                                                                recipe_name: recipeName,
+                                                                                checked: !isChecked,
+                                                                            });
                                                                             onToggleIngredient(ing.id);
                                                                         }}
                                                                         className={`flex-row items-center py-2.5 border-b border-surface-700/40 ${isChecked ? "opacity-50" : ""}`}
@@ -378,7 +393,13 @@ export default function CookMode({
                                             // ── Step Instruction ──
                                             <Pressable
                                                 onPress={() => {
+                                                    const isCurrentlyChecked = checkedSteps.has(task.stepData!.id);
                                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                    trackEvent("cook_mode_step_toggled", {
+                                                        step_number: task.stepData!.step_number,
+                                                        recipe_name: recipeName,
+                                                        checked: !isCurrentlyChecked,
+                                                    });
                                                     onToggleStep(task.stepData!.id);
                                                 }}
                                                 className="flex-row items-start"
@@ -407,7 +428,15 @@ export default function CookMode({
                 {/* ── Exit Cook Mode ────────────────────────────── */}
                 <View className="mx-4 mt-4">
                     <Pressable
-                        onPress={onExit}
+                        onPress={() => {
+                            trackEvent("cook_mode_exited", {
+                                recipe_name: recipeName,
+                                steps_completed: checkedSteps.size,
+                                total_steps: steps.length,
+                                all_steps_done: checkedSteps.size >= steps.length,
+                            });
+                            onExit();
+                        }}
                         className="flex-row items-center justify-center py-4 rounded-2xl bg-surface-800 border border-surface-700"
                     >
                         <Ionicons name="close-circle" size={20} color="#FF6B35" />

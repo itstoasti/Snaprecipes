@@ -17,6 +17,7 @@ import { getDatabase } from "@/db/client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
+import { trackEvent } from "@/lib/analytics";
 
 export default function CollectionsScreen() {
     const { collections, loading, loadCollections, createCollection, deleteCollection } =
@@ -38,7 +39,8 @@ export default function CollectionsScreen() {
         useCallback(() => {
             loadCollections();
             loadCounts();
-        }, [loadCollections])
+            trackEvent("collections_viewed", { total_collections: collections.length });
+        }, [loadCollections, collections.length])
     );
 
     const loadCounts = async () => {
@@ -53,6 +55,7 @@ export default function CollectionsScreen() {
 
     const handleCreate = async () => {
         if (!newName.trim()) return;
+        trackEvent("collection_created", { name: newName.trim() });
         await createCollection(newName.trim());
         setNewName("");
         setShowCreate(false);

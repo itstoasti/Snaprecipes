@@ -7,6 +7,8 @@ import GlassContainer from "@/components/GlassContainer";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 
+import { trackEvent } from "@/lib/analytics";
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface LibraryTileProps {
@@ -27,7 +29,13 @@ function LibraryTile({ title, icon, color, description, onPress, index }: Librar
             style={{ width: tileSize, height: tileSize }}
             className="mb-3"
         >
-            <Pressable onPress={onPress} className="flex-1">
+            <Pressable 
+                onPress={() => {
+                    trackEvent("library_hub_tile_tapped", { tile_title: title });
+                    onPress();
+                }} 
+                className="flex-1"
+            >
                 <GlassContainer 
                     style={{ 
                         borderRadius: 32, 

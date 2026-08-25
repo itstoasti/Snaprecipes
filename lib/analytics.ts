@@ -41,19 +41,39 @@ export function initAnalytics(): void {
 }
 
 /**
- * Associate the current device with a known user ID.
+ * Set user properties on Amplitude without changing the user ID.
  */
-export function identifyUser(userId: string, properties?: Record<string, any>): void {
+export function setUserProperties(properties: Record<string, any>): void {
     if (AMPLITUDE_API_KEY) {
-        Amplitude.setUserId(userId);
-        if (properties) {
+        try {
             const identify = new Amplitude.Identify();
             Object.entries(properties).forEach(([key, value]) => {
-                if (value !== undefined) {
+                if (value !== undefined && value !== null) {
                     identify.set(key, value);
                 }
             });
             Amplitude.identify(identify);
+        } catch (e) {
+            console.warn("[Analytics] setUserProperties failed:", e);
+        }
+    }
+    if (__DEV__) {
+        console.log("[Analytics] Set User Properties:", properties);
+    }
+}
+
+/**
+ * Associate the current device with a known user ID.
+ */
+export function identifyUser(userId: string, properties?: Record<string, any>): void {
+    if (AMPLITUDE_API_KEY) {
+        try {
+            Amplitude.setUserId(userId);
+            if (properties) {
+                setUserProperties(properties);
+            }
+        } catch (e) {
+            console.warn("[Analytics] identifyUser failed:", e);
         }
     }
     if (__DEV__) {
@@ -62,12 +82,16 @@ export function identifyUser(userId: string, properties?: Record<string, any>): 
 }
 
 /**
- * Track a custom event.
+ * Track a custom event with properties.
  * In development, events are always logged to the console for debugging.
  */
 export function trackEvent(eventName: string, properties?: Record<string, any>): void {
     if (AMPLITUDE_API_KEY) {
-        Amplitude.track(eventName, properties);
+        try {
+            Amplitude.track(eventName, properties);
+        } catch (e) {
+            console.warn(`[Analytics] trackEvent failed for ${eventName}:`, e);
+        }
     }
     if (__DEV__) {
         console.log(`[Analytics] Event: ${eventName}`, properties || "");

@@ -11,6 +11,7 @@ import AddRecipesModal from "@/components/AddRecipesModal";
 import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
 import { useCollections } from "@/hooks/useCollections";
 import { useTheme } from "@/hooks/useTheme";
+import { trackEvent } from "@/lib/analytics";
 
 export default function CollectionDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,6 +45,11 @@ export default function CollectionDetailScreen() {
             [parseInt(id)]
         );
         setRecipes(results);
+        trackEvent("collection_detail_viewed", {
+            collection_id: id,
+            collection_name: col?.name || "Unknown",
+            recipes_count: results.length,
+        });
         setLoading(false);
     }, [id]);
 

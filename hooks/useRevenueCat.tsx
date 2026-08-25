@@ -200,6 +200,14 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     useEffect(() => {
         if (!entitlementsReady) return;
 
+        // Update Amplitude user properties
+        const { setUserProperties } = require("@/lib/analytics");
+        setUserProperties({
+            is_pro: isPro,
+            has_active_entitlements: hasActiveEntitlements,
+            active_entitlements: activeKeys,
+        });
+
         // Only trigger wipe logic on native devices where we have real subscriber info
         const isNative = Constants.appOwnership !== 'expo';
 
@@ -215,7 +223,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             initialSync().catch(console.error);
         }
         wasProRef.current = isPro;
-    }, [isPro, entitlementsReady]);
+    }, [isPro, entitlementsReady, hasActiveEntitlements, activeKeys]);
 
     return (
         <RevenueCatContext.Provider value={{ isPro, hasActiveEntitlements, customerInfo, currentOffering, isReady, entitlementsReady }}>
