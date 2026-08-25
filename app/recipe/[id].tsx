@@ -33,6 +33,7 @@ import { useRevenueCat } from "@/hooks/useRevenueCat";
 import { useAppReview } from "@/hooks/useAppReview";
 import ReviewPromptModal from "@/components/ReviewPromptModal";
 import { useTheme } from "@/hooks/useTheme";
+import { trackEvent } from "@/lib/analytics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
